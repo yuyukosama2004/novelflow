@@ -1,0 +1,133 @@
+﻿export interface EntityBase {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NovelProject extends EntityBase {
+  title: string;
+  summary: string;
+  genre: string;
+  theme_json: Record<string, unknown>;
+  target_word_count: number | null;
+  pov_type: string;
+  tone: string;
+  status: string;
+  language: string;
+  current_timeline_position: number;
+}
+
+export interface Character extends EntityBase {
+  project_id: string;
+  name: string;
+  aliases_json: string[];
+  role: string;
+  age_text: string;
+  appearance: string;
+  background: string;
+  public_identity: string;
+  secret_identity: string;
+  core_desire: string;
+  core_fear: string;
+  values_json: string[];
+  decision_pattern: string;
+  stress_response: string;
+  speech_style: string;
+  moral_boundaries_json: string[];
+  ability_limits_json: Record<string, unknown>;
+  forbidden_behaviors_json: string[];
+  arc_plan: string;
+  status: string;
+  version: number;
+}
+
+export interface WorldEntry extends EntityBase {
+  project_id: string;
+  entry_type: string;
+  name: string;
+  summary: string;
+  content: string;
+  tags_json: string[];
+  canon_status: string;
+  version: number;
+}
+
+export interface Volume extends EntityBase {
+  project_id: string;
+  sequence_no: number;
+  title: string;
+  summary: string;
+  goal: string;
+  status: string;
+}
+
+export interface Chapter extends EntityBase {
+  volume_id: string;
+  sequence_no: number;
+  title: string;
+  summary: string;
+  goal: string;
+  status: string;
+  approved_word_count: number;
+}
+
+export interface Scene extends EntityBase {
+  chapter_id: string;
+  sequence_no: number;
+  title: string;
+  pov_character_id: string | null;
+  time_text: string;
+  timeline_order: number;
+  location_id: string | null;
+  goal: string;
+  conflict: string;
+  turning_point: string;
+  ending_hook: string;
+  must_include_json: string[];
+  must_not_reveal_json: string[];
+  forbidden_actions_json: string[];
+  status: string;
+  approved_version_id: string | null;
+}
+
+export interface SceneVersion extends EntityBase {
+  scene_id: string;
+  version_no: number;
+  parent_version_id: string | null;
+  branch_name: string;
+  content_markdown: string;
+  summary: string;
+  source_type: string;
+  model_profile_id: string | null;
+  prompt_snapshot_json: Record<string, unknown>;
+  context_manifest_json: Record<string, unknown>;
+  review_status: string;
+  created_by: string;
+}
+
+export interface HealthStatus {
+  status: string;
+  database: string;
+  version: string;
+  models: Record<string, boolean>;
+}
+
+export interface ProviderStatus {
+  models: Record<string, boolean>;
+  default_provider: string;
+}
+
+export interface ModelTestResult {
+  provider: string;
+  connected: boolean;
+  response: string;
+  error: string;
+}
+
+export interface SSEChunk {
+  run_id: string;
+  content_delta: string;
+  finish_reason: string | null;
+  version?: SceneVersion;
+  error?: string;
+}

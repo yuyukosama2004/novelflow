@@ -1,0 +1,216 @@
+﻿import axios from "axios";
+
+import type {
+  Chapter,
+  Character,
+  HealthStatus,
+  ModelTestResult,
+  NovelProject,
+  ProviderStatus,
+  Scene,
+  SceneVersion,
+  Volume,
+  WorldEntry,
+} from "../types/entities";
+
+interface ApiEnvelope<T> {
+  code: number;
+  message: string;
+  data: T;
+  request_id: string;
+}
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api",
+  timeout: 12000,
+});
+
+async function unwrap<T>(
+  promise: Promise<{ data: ApiEnvelope<T> }>,
+): Promise<T> {
+  const response = await promise;
+  return response.data.data;
+}
+
+export const apiClient = {
+  health: () => unwrap<HealthStatus>(api.get("/health")),
+
+  listProjects: () => unwrap<NovelProject[]>(api.get("/projects")),
+  createProject: (
+    payload: Partial<NovelProject> & { title: string },
+  ) => unwrap<NovelProject>(api.post("/projects", payload)),
+  getProject: (projectId: string) =>
+    unwrap<NovelProject>(api.get(`/projects/${projectId}`)),
+
+  listCharacters: (projectId: string) =>
+    unwrap<Character[]>(
+      api.get(`/projects/${projectId}/characters`),
+    ),
+  createCharacter: (
+    projectId: string,
+    payload: { name: string; role?: string },
+  ) =>
+    unwrap<Character>(
+      api.post(`/projects/${projectId}/characters`, payload),
+    ),
+
+  listWorldEntries: (projectId: string) =>
+    unwrap<WorldEntry[]>(
+      api.get(`/projects/${projectId}/world-entries`),
+    ),
+  createWorldEntry: (
+    projectId: string,
+    payload: {
+      name: string;
+      entry_type?: string;
+      canon_status?: string;
+      summary?: string;
+    },
+  ) =>
+    unwrap<WorldEntry>(
+      api.post(`/projects/${projectId}/world-entries`, payload),
+    ),
+  approveWorldEntry: (entryId: string) =>
+    unwrap<WorldEntry>(api.post(`/world-entries/${entryId}/approve`)),
+
+  listVolumes: (projectId: string) =>
+    unwrap<Volume[]>(
+      api.get(`/projects/${projectId}/volumes`),
+    ),
+  createVolume: (
+    projectId: string,
+    payload: { sequence_no: number; title: string },
+  ) =>
+    unwrap<Volume>(
+      api.post(`/projects/${projectId}/volumes`, payload),
+    ),
+  listChapters: (volumeId: string) =>
+    unwrap<Chapter[]>(
+      api.get(`/volumes/${volumeId}/chapters`),
+    ),
+  createChapter: (
+    volumeId: string,
+    payload: { sequence_no: number; title: string },
+  ) =>
+    unwrap<Chapter>(
+      api.post(`/volumes/${volumeId}/chapters`, payload),
+    ),
+  listScenes: (chapterId: string) =>
+    unwrap<Scene[]>(
+      api.get(`/chapters/${chapterId}/scenes`),
+    ),
+  createScene: (
+    chapterId: string,
+    payload: { sequence_no: number; title: string },
+  ) =>
+    unwrap<Scene>(
+      api.post(`/chapters/${chapterId}/scenes`, payload),
+    ),
+  getScene: (sceneId: string) =>
+    unwrap<Scene>(api.get(`/scenes/${sceneId}`)),
+
+  listVersions: (sceneId: string) =>
+    unwrap<SceneVersion[]>(
+      api.get(`/scenes/${sceneId}/versions`),
+    ),
+  createVersion: (
+    sceneId: string,
+    payload: {
+      content_markdown: string;
+      summary?: string;
+      source_type?: string;
+      branch_name?: string;
+      parent_version_id?: string | null;
+    },
+  ) =>
+    unwrap<SceneVersion>(
+      api.post(`/scenes/${sceneId}/versions`, payload),
+    ),
+  approveVersion: (sceneId: string, versionId: string) =>
+    unwrap<Scene>(
+      api.post(`/scenes/${sceneId}/approve-version`, {
+        version_id: versionId,
+      }),
+    ),
+
+  // Model APIs
+  getProviders: () =>
+    unwrap<ProviderStatus>(api.get("/model/providers")),
+  testModel: (payload: { provider?: string; message?: string }) =>
+    unwrap<ModelTestResult>(api.post("/model/test", payload)),
+  generateText: (payload: {
+    provider?: string;
+    model?: string;
+    messages: { role: string; content: string }[];
+    max_tokens?: number;
+    temperature?: number;
+  }) =>
+    unwrap<{ content: string; model: string; prompt_tokens: number; completion_tokens: number; finish_reason: string }>(
+      api.post("/model/generate", payload),
+    ),
+};
+
+export function createSSEStream(
+  sceneId: string,
+  onChunk: (data: {
+    run_id: string;
+    content_delta: string;
+    finish_reason: string | null;
+    version?: SceneVersion;
+    error?: string;
+  }) => void,
+  onDone: () => void,
+  onError: (error: string) => void,
+): AbortController {
+  const controller = new AbortController();
+  const baseUrl =
+    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+
+  fetch(`${baseUrl}/scenes/${sceneId}/generate`, {
+    method: "POST",
+    signal: controller.signal,
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        onError(`HTTP ${response.status}`);
+        return;
+      }
+      const reader = response.body?.getReader();
+      if (!reader) {
+        onError("No readable stream");
+        return;
+      }
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const dataStr = line.slice(6);
+            if (dataStr === "[DONE]") {
+              onDone();
+              return;
+            }
+            try {
+              const data = JSON.parse(dataStr);
+              onChunk(data);
+            } catch {
+              // skip unparseable lines
+            }
+          }
+        }
+      }
+      onDone();
+    })
+    .catch((err) => {
+      if (err.name !== "AbortError") {
+        onError(err.message);
+      }
+    });
+
+  return controller;
+}
