@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { apiClient } from '../../api/client';
-import type { MemoryCandidate } from '../../types/entities';
+import type { MemoryCandidate, MemoryCandidateStatus } from '../../types/entities';
 import { MemoryCandidatePanel } from './MemoryCandidatePanel';
 
 vi.mock('../../api/client', () => ({
@@ -15,11 +15,17 @@ vi.mock('../../api/client', () => ({
   },
 }));
 
-function renderWithQuery(ui: ReactElement) {
-  const queryClient = new QueryClient({
+function createQueryClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
+function renderWithQuery(ui: ReactElement, queryClient = createQueryClient()) {
+  return {
+    queryClient,
+    ...render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>),
+  };
 }
 
 const now = new Date('2026-06-13T00:00:00.000Z').toISOString();
@@ -41,6 +47,14 @@ const candidate: MemoryCandidate = {
   updated_at: now,
 };
 
+const candidateActions: Array<{
+  status: Extract<MemoryCandidateStatus, 'approved' | 'rejected'>;
+  buttonLabel: string;
+}> = [
+  { status: 'approved', buttonLabel: 'Approve memory candidate' },
+  { status: 'rejected', buttonLabel: 'Reject memory candidate' },
+];
+
 describe('MemoryCandidatePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,7 +73,9 @@ describe('MemoryCandidatePanel', () => {
       expect(apiClient.listCandidates).toHaveBeenCalledWith('sv-1');
     });
     expect(
-      await screen.findByText('No memory candidates yet. Extract candidates after reviewing the draft.'),
+      await screen.findByText(
+        'No memory candidates yet. Extract candidates after reviewing the draft.',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -103,15 +119,7 @@ describe('MemoryCandidatePanel', () => {
     expect(screen.queryByLabelText('Reject memory candidate')).not.toBeInTheDocument();
   });
 
-  it('disables extraction when no version exists', () => {
-    renderWithQuery(<MemoryCandidatePanel sceneVersionId="" />);
-
-    expect(screen.getByRole('button', { name: 'Extract' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
-    expect(apiClient.listCandidates).not.toHaveBeenCalled();
-  });
-
-  it('targets the provided sceneVersionId for all operations', async () => {
+  it('targets the provided sceneVersionId for listing and extraction', async () => {
     const targetId = 'sv-target-99';
     renderWithQuery(<MemoryCandidatePanel sceneVersionId={targetId} />);
 
@@ -120,8 +128,109 @@ describe('MemoryCandidatePanel', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Extract' }));
+
     await waitFor(() => {
       expect(apiClient.extractMemories).toHaveBeenCalledWith(targetId);
     });
+  });
+
+  it('extracts candidates, invalidates, and refetches to show new candidates', async () => {
+    vi.mocked(apiClient.listCandidates)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([candidate]);
+    vi.mocked(apiClient.extractMemories).mockResolvedValue([candidate]);
+
+    renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
+
+    await screen.findByText(
+      'No memory candidates yet. Extract candidates after reviewing the draft.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Extract' }));
+
+    await waitFor(() => {
+      expect(apiClient.extractMemories).toHaveBeenCalledWith('sv-1');
+    });
+    expect(await screen.findByText('character knowledge')).toBeInTheDocument();
+    expect(apiClient.listCandidates).toHaveBeenLastCalledWith('sv-1');
+  });
+
+  it('refreshes and refetches candidates for the selected version', async () => {
+    vi.mocked(apiClient.listCandidates)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([candidate]);
+
+    renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
+
+    await screen.findByText(
+      'No memory candidates yet. Extract candidates after reviewing the draft.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByText('character knowledge')).toBeInTheDocument();
+    expect(apiClient.listCandidates).toHaveBeenLastCalledWith('sv-1');
+  });
+
+  it.each(candidateActions)(
+    '$status updates a pending candidate, refetches, and invalidates context',
+    async ({ status, buttonLabel }) => {
+      vi.mocked(apiClient.listCandidates)
+        .mockResolvedValueOnce([candidate])
+        .mockResolvedValueOnce([{ ...candidate, status }]);
+      vi.mocked(apiClient.updateCandidate).mockResolvedValue({ ...candidate, status });
+      const queryClient = createQueryClient();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />, queryClient);
+
+      await screen.findByText('character knowledge');
+
+      fireEvent.click(screen.getByLabelText(buttonLabel));
+
+      await waitFor(() => {
+        expect(apiClient.updateCandidate).toHaveBeenCalledWith('candidate-1', status);
+      });
+      expect(await screen.findByText(status)).toBeInTheDocument();
+      expect(apiClient.listCandidates).toHaveBeenLastCalledWith('sv-1');
+      expect(screen.queryByLabelText('Approve memory candidate')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Reject memory candidate')).not.toBeInTheDocument();
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['memory-candidates', 'sv-1'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['context'] });
+    },
+  );
+
+  it('does not call APIs when sceneVersionId is empty', () => {
+    renderWithQuery(<MemoryCandidatePanel sceneVersionId="" />);
+
+    expect(screen.getByRole('button', { name: 'Extract' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
+    expect(
+      screen.getByText(
+        'Save, generate, or approve a scene version before extracting memory.',
+      ),
+    ).toBeInTheDocument();
+    expect(apiClient.listCandidates).not.toHaveBeenCalled();
+    expect(apiClient.extractMemories).not.toHaveBeenCalled();
+  });
+
+  it('displays error state when extraction fails', async () => {
+    vi.mocked(apiClient.extractMemories).mockRejectedValue(
+      new Error('Extraction failed'),
+    );
+
+    renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
+
+    await screen.findByText(
+      'No memory candidates yet. Extract candidates after reviewing the draft.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Extract' }));
+
+    expect(
+      await screen.findByText('Memory action failed. Please refresh and try again.'),
+    ).toBeInTheDocument();
   });
 });

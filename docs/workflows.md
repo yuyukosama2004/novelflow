@@ -28,7 +28,7 @@ Workflow runs persist:
 - There is no checkpoint-based resume endpoint.
 - There is no server-side retry-current-node endpoint.
 - The frontend has no workflow resume UI.
-- Review and memory-candidate confirmation have compact frontend panels, but they are not full E2E-tested workflows yet.
+- Review and memory-candidate confirmation have compact frontend panels with workflow-level integration tests (run review, extract, approve, reject, refresh, context invalidation), but they are not full E2E-tested workflows yet.
 
 ## Scene Version Selection
 
