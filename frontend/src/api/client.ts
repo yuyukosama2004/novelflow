@@ -4,9 +4,13 @@ import type {
   Chapter,
   Character,
   HealthStatus,
+  MemoryCandidate,
+  MemoryCandidateStatus,
   ModelTestResult,
   NovelProject,
   ProviderStatus,
+  ReviewIssue,
+  ReviewIssueStatus,
   Scene,
   SceneVersion,
   Volume,
@@ -138,6 +142,41 @@ export const apiClient = {
     unwrap<ProviderStatus>(api.get("/model/providers")),
   testModel: (payload: { provider?: string; message?: string }) =>
     unwrap<ModelTestResult>(api.post("/model/test", payload)),
+  // Review APIs
+  runReview: (versionId: string) =>
+    unwrap<ReviewIssue[]>(
+      api.post(`/scene-versions/${versionId}/review`),
+    ),
+  listIssues: (versionId: string) =>
+    unwrap<ReviewIssue[]>(
+      api.get(`/scene-versions/${versionId}/issues`),
+    ),
+  updateIssue: (issueId: string, status: Exclude<ReviewIssueStatus, 'open'>) =>
+    unwrap<ReviewIssue>(
+      api.patch(`/issues/${issueId}`, { status }),
+    ),
+
+  // Memory APIs
+  extractMemories: (versionId: string) =>
+    unwrap<MemoryCandidate[]>(
+      api.post(`/scene-versions/${versionId}/extract-memories`),
+    ),
+  listCandidates: (versionId: string) =>
+    unwrap<MemoryCandidate[]>(
+      api.get(`/scene-versions/${versionId}/candidates`),
+    ),
+  updateCandidate: (
+    candidateId: string,
+    status: Extract<MemoryCandidateStatus, 'approved' | 'rejected'>,
+    contentJson?: Record<string, unknown>,
+  ) =>
+    unwrap<MemoryCandidate>(
+      api.patch(`/candidates/${candidateId}`, {
+        status,
+        content_json: contentJson ?? null,
+      }),
+    ),
+
   generateText: (payload: {
     provider?: string;
     model?: string;

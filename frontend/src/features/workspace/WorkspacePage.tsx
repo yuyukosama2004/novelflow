@@ -6,7 +6,9 @@ import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
-import type { Chapter, Scene, Volume } from '../../types/entities';
+import type { Chapter, Scene, SceneVersion, Volume } from '../../types/entities';
+import { MemoryCandidatePanel } from './MemoryCandidatePanel';
+import { ReviewIssuePanel } from './ReviewIssuePanel';
 import { SceneEditor } from './SceneEditor';
 import ContextChecker from './ContextChecker';
 import SceneGenerationPanel from '../workflows/SceneGenerationPanel';
@@ -58,6 +60,11 @@ export function WorkspacePage() {
   const scene = useQuery({
     queryKey: ['scene', selectedSceneId],
     queryFn: () => apiClient.getScene(selectedSceneId),
+    enabled: Boolean(selectedSceneId),
+  });
+  const sceneVersions = useQuery({
+    queryKey: ['scene-versions', selectedSceneId],
+    queryFn: () => apiClient.listVersions(selectedSceneId),
     enabled: Boolean(selectedSceneId),
   });
 
@@ -139,6 +146,16 @@ export function WorkspacePage() {
   const sortedVolumes = useMemo(() => [...(volumes.data ?? [])].sort((a, b) => a.sequence_no - b.sequence_no), [
     volumes.data,
   ]);
+  const activeSceneVersion = useMemo<SceneVersion | null>(() => {
+    const versions = sceneVersions.data ?? [];
+    if (versions.length === 0) {
+      return null;
+    }
+    const approved = scene.data?.approved_version_id
+      ? versions.find((version) => version.id === scene.data?.approved_version_id)
+      : null;
+    return approved ?? [...versions].sort((a, b) => b.version_no - a.version_no)[0];
+  }, [scene.data?.approved_version_id, sceneVersions.data]);
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -265,10 +282,18 @@ export function WorkspacePage() {
         </aside>
 
         <SceneEditor scene={scene.data ?? null} />
-          <ContextChecker sceneId={selectedSceneId} />
-          <SceneGenerationPanel sceneId={selectedSceneId} />
 
         <aside className="space-y-4">
+          <ContextChecker sceneId={selectedSceneId} />
+          <SceneGenerationPanel
+            sceneId={selectedSceneId}
+            onVersionCreated={() => {
+              queryClient.invalidateQueries({ queryKey: ['scene-versions', selectedSceneId] });
+            }}
+          />
+          <ReviewIssuePanel sceneVersionId={activeSceneVersion?.id ?? ''} />
+          <MemoryCandidatePanel sceneVersionId={activeSceneVersion?.id ?? ''} />
+
           <section className="rounded-md border border-slate-200 bg-white p-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900">人物</h2>

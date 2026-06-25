@@ -124,6 +124,32 @@ export interface ModelTestResult {
   error: string;
 }
 
+export type ReviewIssueStatus = 'open' | 'accepted' | 'ignored' | 'false_positive';
+
+export interface ReviewIssue extends EntityBase {
+  scene_version_id: string;
+  issue_type: string;
+  severity: string;
+  evidence_json: string;
+  conflict_rule: string;
+  suggestion: string;
+  confidence: number;
+  status: ReviewIssueStatus;
+}
+
+export type MemoryCandidateStatus = 'pending' | 'approved' | 'rejected' | 'conflicted';
+
+export interface MemoryCandidate extends EntityBase {
+  scene_version_id: string;
+  candidate_type: string;
+  target_entity_type: string;
+  target_entity_id: string | null;
+  content_json: Record<string, unknown>;
+  evidence: string;
+  confidence: number;
+  status: MemoryCandidateStatus;
+}
+
 export interface SSEChunk {
   run_id: string;
   content_delta: string;
