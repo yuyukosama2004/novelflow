@@ -11,6 +11,7 @@ import type { Scene, SceneVersion } from '../../types/entities';
 
 interface SceneEditorProps {
   scene: Scene | null;
+  onVersionCreated?: (version: SceneVersion) => void;
 }
 
 function selectInitialContent(versions: SceneVersion[] | undefined, scene: Scene | null): string {
@@ -23,7 +24,7 @@ function selectInitialContent(versions: SceneVersion[] | undefined, scene: Scene
   return (approved ?? versions[0]).content_markdown;
 }
 
-export function SceneEditor({ scene }: SceneEditorProps) {
+export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -70,10 +71,11 @@ export function SceneEditor({ scene }: SceneEditorProps) {
         summary: payload.summary ?? '',
         source_type: 'human_revised',
       }),
-    onSuccess: () => {
+    onSuccess: (version) => {
       setDirty(false);
       setSaveState('saved');
       queryClient.invalidateQueries({ queryKey: ['scene-versions', scene?.id] });
+      onVersionCreated?.(version);
     },
     onError: () => setSaveState('error'),
   });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BookMarked, CirclePlus, Globe2, UserPlus } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
@@ -10,6 +10,7 @@ import type { Chapter, Scene, SceneVersion, Volume } from '../../types/entities'
 import { MemoryCandidatePanel } from './MemoryCandidatePanel';
 import { ReviewIssuePanel } from './ReviewIssuePanel';
 import { SceneEditor } from './SceneEditor';
+import { SceneVersionSelector } from './SceneVersionSelector';
 import ContextChecker from './ContextChecker';
 import SceneGenerationPanel from '../workflows/SceneGenerationPanel';
 
@@ -23,6 +24,8 @@ export function WorkspacePage() {
   const [selectedVolumeId, setSelectedVolumeId] = useState<string>('');
   const [selectedChapterId, setSelectedChapterId] = useState<string>('');
   const [selectedSceneId, setSelectedSceneId] = useState<string>('');
+  const [selectedSceneVersionId, setSelectedSceneVersionId] = useState<string>('');
+  const [pendingSceneVersionId, setPendingSceneVersionId] = useState<string>('');
   const [characterName, setCharacterName] = useState('');
   const [worldName, setWorldName] = useState('');
   const [sceneTitle, setSceneTitle] = useState('');
@@ -86,6 +89,71 @@ export function WorkspacePage() {
     }
   }, [scenes.data, selectedSceneId]);
 
+  // Derive the default scene version id: prefer approved, otherwise newest.
+  const defaultSceneVersionId = useMemo(() => {
+    const versions = sceneVersions.data ?? [];
+    if (versions.length === 0) {
+      return '';
+    }
+    const approved = scene.data?.approved_version_id
+      ? versions.find((v) => v.id === scene.data.approved_version_id)
+      : null;
+    return (
+      approved?.id ??
+      [...versions].sort((a, b) => b.version_no - a.version_no)[0].id
+    );
+  }, [scene.data?.approved_version_id, sceneVersions.data]);
+
+  // Reset version targeting immediately when the author switches scenes.
+  useEffect(() => {
+    setSelectedSceneVersionId('');
+    setPendingSceneVersionId('');
+  }, [selectedSceneId]);
+
+  // Select a sensible default after versions load, and repair stale selections.
+  useEffect(() => {
+    if (!selectedSceneId) {
+      setSelectedSceneVersionId('');
+      return;
+    }
+    const versions = sceneVersions.data ?? [];
+    if (versions.length === 0) {
+      setSelectedSceneVersionId('');
+      return;
+    }
+    if (pendingSceneVersionId) {
+      if (versions.some((version) => version.id === pendingSceneVersionId)) {
+        setSelectedSceneVersionId(pendingSceneVersionId);
+        setPendingSceneVersionId('');
+      }
+      return;
+    }
+    setSelectedSceneVersionId((current) => {
+      if (current && versions.some((version) => version.id === current)) {
+        return current;
+      }
+      return defaultSceneVersionId;
+    });
+  }, [defaultSceneVersionId, pendingSceneVersionId, sceneVersions.data, selectedSceneId]);
+
+  const handleVersionSelectionChange = useCallback(
+    (versionId: string) => {
+      setPendingSceneVersionId('');
+      setSelectedSceneVersionId(versionId);
+    },
+    [],
+  );
+
+  const handleVersionCreated = useCallback(
+    (version?: SceneVersion) => {
+      if (version?.id) {
+        setPendingSceneVersionId(version.id);
+      }
+      queryClient.invalidateQueries({ queryKey: ['scene-versions', selectedSceneId] });
+    },
+    [queryClient, selectedSceneId],
+  );
+
   const createCharacter = useMutation({
     mutationFn: () => apiClient.createCharacter(projectId, { name: characterName, role: '角色' }),
     onSuccess: () => {
@@ -146,16 +214,6 @@ export function WorkspacePage() {
   const sortedVolumes = useMemo(() => [...(volumes.data ?? [])].sort((a, b) => a.sequence_no - b.sequence_no), [
     volumes.data,
   ]);
-  const activeSceneVersion = useMemo<SceneVersion | null>(() => {
-    const versions = sceneVersions.data ?? [];
-    if (versions.length === 0) {
-      return null;
-    }
-    const approved = scene.data?.approved_version_id
-      ? versions.find((version) => version.id === scene.data?.approved_version_id)
-      : null;
-    return approved ?? [...versions].sort((a, b) => b.version_no - a.version_no)[0];
-  }, [scene.data?.approved_version_id, sceneVersions.data]);
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -281,18 +339,25 @@ export function WorkspacePage() {
           </section>
         </aside>
 
-        <SceneEditor scene={scene.data ?? null} />
+        <SceneEditor
+          scene={scene.data ?? null}
+          onVersionCreated={handleVersionCreated}
+        />
 
         <aside className="space-y-4">
           <ContextChecker sceneId={selectedSceneId} />
+          <SceneVersionSelector
+            versions={sceneVersions.data ?? []}
+            approvedVersionId={scene.data?.approved_version_id ?? null}
+            selectedVersionId={selectedSceneVersionId || null}
+            onSelect={handleVersionSelectionChange}
+          />
           <SceneGenerationPanel
             sceneId={selectedSceneId}
-            onVersionCreated={() => {
-              queryClient.invalidateQueries({ queryKey: ['scene-versions', selectedSceneId] });
-            }}
+            onVersionCreated={handleVersionCreated}
           />
-          <ReviewIssuePanel sceneVersionId={activeSceneVersion?.id ?? ''} />
-          <MemoryCandidatePanel sceneVersionId={activeSceneVersion?.id ?? ''} />
+          <ReviewIssuePanel sceneVersionId={selectedSceneVersionId} />
+          <MemoryCandidatePanel sceneVersionId={selectedSceneVersionId} />
 
           <section className="rounded-md border border-slate-200 bg-white p-3">
             <div className="flex items-center justify-between">

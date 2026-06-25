@@ -89,4 +89,18 @@ describe('ReviewIssuePanel', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
     expect(apiClient.listIssues).not.toHaveBeenCalled();
   });
+
+  it('targets the provided sceneVersionId for all operations', async () => {
+    const targetId = 'sv-target-42';
+    renderWithQuery(<ReviewIssuePanel sceneVersionId={targetId} />);
+
+    await waitFor(() => {
+      expect(apiClient.listIssues).toHaveBeenCalledWith(targetId);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run review' }));
+    await waitFor(() => {
+      expect(apiClient.runReview).toHaveBeenCalledWith(targetId);
+    });
+  });
 });

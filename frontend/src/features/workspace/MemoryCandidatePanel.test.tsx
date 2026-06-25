@@ -110,4 +110,18 @@ describe('MemoryCandidatePanel', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
     expect(apiClient.listCandidates).not.toHaveBeenCalled();
   });
+
+  it('targets the provided sceneVersionId for all operations', async () => {
+    const targetId = 'sv-target-99';
+    renderWithQuery(<MemoryCandidatePanel sceneVersionId={targetId} />);
+
+    await waitFor(() => {
+      expect(apiClient.listCandidates).toHaveBeenCalledWith(targetId);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Extract' }));
+    await waitFor(() => {
+      expect(apiClient.extractMemories).toHaveBeenCalledWith(targetId);
+    });
+  });
 });
