@@ -11,6 +11,10 @@ import { MemoryCandidatePanel } from './MemoryCandidatePanel';
 import { ReviewIssuePanel } from './ReviewIssuePanel';
 import { SceneEditor } from './SceneEditor';
 import { SceneVersionSelector } from './SceneVersionSelector';
+import {
+  getDefaultSceneVersionId,
+  resolveSceneVersionSelection,
+} from './sceneVersionSelection';
 import ContextChecker from './ContextChecker';
 import SceneGenerationPanel from '../workflows/SceneGenerationPanel';
 
@@ -26,6 +30,8 @@ export function WorkspacePage() {
   const [selectedSceneId, setSelectedSceneId] = useState<string>('');
   const [selectedSceneVersionId, setSelectedSceneVersionId] = useState<string>('');
   const [pendingSceneVersionId, setPendingSceneVersionId] = useState<string>('');
+  const [hasExplicitSceneVersionSelection, setHasExplicitSceneVersionSelection] =
+    useState(false);
   const [characterName, setCharacterName] = useState('');
   const [worldName, setWorldName] = useState('');
   const [sceneTitle, setSceneTitle] = useState('');
@@ -90,55 +96,59 @@ export function WorkspacePage() {
   }, [scenes.data, selectedSceneId]);
 
   // Derive the default scene version id: prefer approved, otherwise newest.
-  const defaultSceneVersionId = useMemo(() => {
-    const versions = sceneVersions.data ?? [];
-    if (versions.length === 0) {
-      return '';
-    }
-    const approved = scene.data?.approved_version_id
-      ? versions.find((v) => v.id === scene.data.approved_version_id)
-      : null;
-    return (
-      approved?.id ??
-      [...versions].sort((a, b) => b.version_no - a.version_no)[0].id
-    );
-  }, [scene.data?.approved_version_id, sceneVersions.data]);
+  const defaultSceneVersionId = useMemo(
+    () =>
+      getDefaultSceneVersionId(
+        sceneVersions.data ?? [],
+        scene.data?.approved_version_id,
+      ),
+    [scene.data?.approved_version_id, sceneVersions.data],
+  );
 
   // Reset version targeting immediately when the author switches scenes.
   useEffect(() => {
     setSelectedSceneVersionId('');
     setPendingSceneVersionId('');
+    setHasExplicitSceneVersionSelection(false);
   }, [selectedSceneId]);
 
   // Select a sensible default after versions load, and repair stale selections.
   useEffect(() => {
     if (!selectedSceneId) {
       setSelectedSceneVersionId('');
+      setPendingSceneVersionId('');
+      setHasExplicitSceneVersionSelection(false);
       return;
     }
-    const versions = sceneVersions.data ?? [];
-    if (versions.length === 0) {
-      setSelectedSceneVersionId('');
-      return;
-    }
-    if (pendingSceneVersionId) {
-      if (versions.some((version) => version.id === pendingSceneVersionId)) {
-        setSelectedSceneVersionId(pendingSceneVersionId);
-        setPendingSceneVersionId('');
-      }
-      return;
-    }
-    setSelectedSceneVersionId((current) => {
-      if (current && versions.some((version) => version.id === current)) {
-        return current;
-      }
-      return defaultSceneVersionId;
+    const nextSelection = resolveSceneVersionSelection({
+      versions: sceneVersions.data ?? [],
+      defaultVersionId: defaultSceneVersionId,
+      selectedVersionId: selectedSceneVersionId,
+      pendingVersionId: pendingSceneVersionId,
+      hasExplicitSelection: hasExplicitSceneVersionSelection,
     });
-  }, [defaultSceneVersionId, pendingSceneVersionId, sceneVersions.data, selectedSceneId]);
+    if (nextSelection.selectedVersionId !== selectedSceneVersionId) {
+      setSelectedSceneVersionId(nextSelection.selectedVersionId);
+    }
+    if (nextSelection.pendingVersionId !== pendingSceneVersionId) {
+      setPendingSceneVersionId(nextSelection.pendingVersionId);
+    }
+    if (nextSelection.hasExplicitSelection !== hasExplicitSceneVersionSelection) {
+      setHasExplicitSceneVersionSelection(nextSelection.hasExplicitSelection);
+    }
+  }, [
+    defaultSceneVersionId,
+    hasExplicitSceneVersionSelection,
+    pendingSceneVersionId,
+    sceneVersions.data,
+    selectedSceneId,
+    selectedSceneVersionId,
+  ]);
 
   const handleVersionSelectionChange = useCallback(
     (versionId: string) => {
       setPendingSceneVersionId('');
+      setHasExplicitSceneVersionSelection(true);
       setSelectedSceneVersionId(versionId);
     },
     [],
