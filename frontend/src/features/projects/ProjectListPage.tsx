@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, Plus, RefreshCw } from 'lucide-react';
+import { ArrowRight, BookOpen, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
 import type { HealthStatus, NovelProject } from '../../types/entities';
+import { label, PROJECT_STATUS_LABELS } from '../../utils/enumLabels';
 
 interface ProjectListViewProps {
   health?: HealthStatus;
@@ -15,6 +16,7 @@ interface ProjectListViewProps {
   error?: string;
   onCreate: (title: string, genre: string) => void;
   isCreating: boolean;
+  onArchive: (id: string) => void;
 }
 
 export function ProjectListView({
@@ -24,6 +26,7 @@ export function ProjectListView({
   error,
   onCreate,
   isCreating,
+  onArchive,
 }: ProjectListViewProps) {
   const [title, setTitle] = useState('');
   const [genre, setGenre] = useState('悬疑');
@@ -93,23 +96,52 @@ export function ProjectListView({
               <p className="px-4 py-8 text-sm text-slate-500">暂无项目</p>
             ) : null}
             {projects.map((project) => (
-              <Link
+              <div
                 key={project.id}
-                to={`/projects/${project.id}`}
                 className="flex items-center justify-between px-4 py-4 transition hover:bg-slate-50"
               >
-                <div className="min-w-0">
+                <Link
+                  to={`/projects/${project.id}`}
+                  className="min-w-0 flex-1"
+                >
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="truncate text-base font-semibold text-slate-950">{project.title}</h3>
-                    <StatusPill>{project.status}</StatusPill>
-                    {project.genre ? <StatusPill tone="ok">{project.genre}</StatusPill> : null}
+                    <h3 className="truncate text-base font-semibold text-slate-950">
+                      {project.title}
+                    </h3>
+                    <StatusPill>
+                      {label(PROJECT_STATUS_LABELS, project.status)}
+                    </StatusPill>
+                    {project.genre ? (
+                      <StatusPill tone="ok">{project.genre}</StatusPill>
+                    ) : null}
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm text-slate-500">
                     {project.summary || project.tone || '未填写简介'}
                   </p>
+                </Link>
+                <div className="ml-4 flex shrink-0 items-center gap-2">
+                  {project.status !== 'archived' ? (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (confirm(`确定要归档项目「${project.title}」吗？`)) {
+                          onArchive(project.id);
+                        }
+                      }}
+                      className="rounded p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600"
+                      title="归档"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  ) : null}
+                  <Link
+                    to={`/projects/${project.id}`}
+                    className="text-slate-400"
+                  >
+                    <ArrowRight size={18} />
+                  </Link>
                 </div>
-                <ArrowRight size={18} className="ml-4 shrink-0 text-slate-400" />
-              </Link>
+              </div>
             ))}
           </div>
         </section>
@@ -140,6 +172,10 @@ export function ProjectListPage() {
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
   });
+  const archiveProject = useMutation({
+    mutationFn: (id: string) => apiClient.archiveProject(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+  });
 
   return (
     <ProjectListView
@@ -149,6 +185,7 @@ export function ProjectListPage() {
       error={projects.error instanceof Error ? projects.error.message : undefined}
       onCreate={(title, genre) => createProject.mutate({ title, genre })}
       isCreating={createProject.isPending}
+      onArchive={(id) => archiveProject.mutate(id)}
     />
   );
 }

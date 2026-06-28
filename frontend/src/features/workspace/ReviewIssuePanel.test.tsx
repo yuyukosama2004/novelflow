@@ -49,12 +49,12 @@ const issueActions: Array<{
   buttonLabel: string;
   statusLabel: string;
 }> = [
-  { status: 'accepted', buttonLabel: 'Accept issue', statusLabel: 'Accepted' },
-  { status: 'ignored', buttonLabel: 'Ignore issue', statusLabel: 'Ignored' },
+  { status: 'accepted', buttonLabel: '接受问题', statusLabel: '已接受' },
+  { status: 'ignored', buttonLabel: '忽略问题', statusLabel: '已忽略' },
   {
     status: 'false_positive',
-    buttonLabel: 'Mark issue false positive',
-    statusLabel: 'False positive',
+    buttonLabel: '标记为误报',
+    statusLabel: '误报',
   },
 ];
 
@@ -73,14 +73,14 @@ describe('ReviewIssuePanel', () => {
       expect(apiClient.listIssues).toHaveBeenCalledWith('sv-1');
     });
     expect(
-      await screen.findByText('No review issues yet. Run a review to check this version.'),
+      await screen.findByText('暂无审查问题，请对当前版本执行审查。'),
     ).toBeInTheDocument();
   });
 
   it('runs continuity review from the panel', async () => {
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run review' }));
+    fireEvent.click(screen.getByRole('button', { name: '执行审查' }));
 
     await waitFor(() => {
       expect(apiClient.runReview).toHaveBeenCalledWith('sv-1');
@@ -92,10 +92,11 @@ describe('ReviewIssuePanel', () => {
 
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    expect(await screen.findByText('timeline conflict')).toBeInTheDocument();
+    // "timeline_conflict" is not in ISSUE_TYPE_LABELS, so label() returns the raw value
+    expect(await screen.findByText('timeline_conflict')).toBeInTheDocument();
     expect(screen.getByText('The scene reveals a secret too early.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Accept issue'));
+    fireEvent.click(screen.getByLabelText('接受问题'));
 
     await waitFor(() => {
       expect(apiClient.updateIssue).toHaveBeenCalledWith('issue-1', 'accepted');
@@ -110,7 +111,7 @@ describe('ReviewIssuePanel', () => {
       expect(apiClient.listIssues).toHaveBeenCalledWith(targetId);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run review' }));
+    fireEvent.click(screen.getByRole('button', { name: '执行审查' }));
 
     await waitFor(() => {
       expect(apiClient.runReview).toHaveBeenCalledWith(targetId);
@@ -125,14 +126,14 @@ describe('ReviewIssuePanel', () => {
 
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    await screen.findByText('No review issues yet. Run a review to check this version.');
+    await screen.findByText('暂无审查问题，请对当前版本执行审查。');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run review' }));
+    fireEvent.click(screen.getByRole('button', { name: '执行审查' }));
 
     await waitFor(() => {
       expect(apiClient.runReview).toHaveBeenCalledWith('sv-1');
     });
-    expect(await screen.findByText('timeline conflict')).toBeInTheDocument();
+    expect(await screen.findByText('timeline_conflict')).toBeInTheDocument();
     expect(apiClient.listIssues).toHaveBeenLastCalledWith('sv-1');
   });
 
@@ -143,11 +144,11 @@ describe('ReviewIssuePanel', () => {
 
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    await screen.findByText('No review issues yet. Run a review to check this version.');
+    await screen.findByText('暂无审查问题，请对当前版本执行审查。');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
 
-    expect(await screen.findByText('timeline conflict')).toBeInTheDocument();
+    expect(await screen.findByText('timeline_conflict')).toBeInTheDocument();
     expect(apiClient.listIssues).toHaveBeenLastCalledWith('sv-1');
   });
 
@@ -161,7 +162,7 @@ describe('ReviewIssuePanel', () => {
 
       renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-      await screen.findByText('timeline conflict');
+      await screen.findByText('timeline_conflict');
 
       fireEvent.click(screen.getByLabelText(buttonLabel));
 
@@ -170,19 +171,19 @@ describe('ReviewIssuePanel', () => {
       });
       expect(await screen.findByText(statusLabel)).toBeInTheDocument();
       expect(apiClient.listIssues).toHaveBeenLastCalledWith('sv-1');
-      expect(screen.queryByLabelText('Accept issue')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Ignore issue')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Mark issue false positive')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('接受问题')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('忽略问题')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('标记为误报')).not.toBeInTheDocument();
     },
   );
 
   it('does not call APIs when sceneVersionId is empty', () => {
     renderWithQuery(<ReviewIssuePanel sceneVersionId="" />);
 
-    expect(screen.getByRole('button', { name: 'Run review' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '执行审查' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '刷新' })).toBeDisabled();
     expect(
-      screen.getByText('Save, generate, or approve a scene version before running review.'),
+      screen.getByText('请先保存、生成或批准场景版本，再进行审查。'),
     ).toBeInTheDocument();
     expect(apiClient.listIssues).not.toHaveBeenCalled();
     expect(apiClient.runReview).not.toHaveBeenCalled();
@@ -193,12 +194,12 @@ describe('ReviewIssuePanel', () => {
 
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    await screen.findByText('No review issues yet. Run a review to check this version.');
+    await screen.findByText('暂无审查问题，请对当前版本执行审查。');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run review' }));
+    fireEvent.click(screen.getByRole('button', { name: '执行审查' }));
 
     expect(
-      await screen.findByText('Review action failed. Please refresh and try again.'),
+      await screen.findByText('审查操作失败，请刷新后重试。'),
     ).toBeInTheDocument();
   });
 });

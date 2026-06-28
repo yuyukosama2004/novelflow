@@ -5,6 +5,7 @@ import { apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
 import type { ReviewIssue, ReviewIssueStatus } from '../../types/entities';
+import { label, ISSUE_STATUS_LABELS, ISSUE_TYPE_LABELS, REVIEW_SEVERITY_LABELS } from '../../utils/enumLabels';
 
 interface Props {
   sceneVersionId: string;
@@ -17,13 +18,6 @@ const SEVERITY_TONE: Record<string, 'neutral' | 'ok' | 'warn'> = {
   medium: 'neutral',
   high: 'warn',
   blocking: 'warn',
-};
-
-const STATUS_LABELS: Record<ReviewIssueStatus, string> = {
-  open: 'Open',
-  accepted: 'Accepted',
-  ignored: 'Ignored',
-  false_positive: 'False positive',
 };
 
 function severityLabelColor(severity: string): string {
@@ -81,27 +75,27 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
     <section className="rounded-md border border-slate-200 bg-white p-3 text-xs">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Continuity Review</h2>
+          <h2 className="text-sm font-semibold text-slate-900">连续性审查</h2>
           <p className="mt-1 text-slate-500">
-            Check the current version against story context before approving it.
+            在批准前检查当前版本是否存在故事设定冲突。
           </p>
         </div>
         <StatusPill tone={issues.length > 0 ? 'warn' : 'neutral'}>
-          {hasVersion ? `${issues.length} issues` : 'No version'}
+          {hasVersion ? `${issues.length} 个问题` : '暂无版本'}
         </StatusPill>
       </div>
 
       <div className="mb-3 flex flex-wrap gap-2">
         <IconButton
           icon={<Search size={14} />}
-          label={isRunning ? 'Reviewing' : 'Run review'}
+          label={isRunning ? '审查中…' : '执行审查'}
           tone="primary"
           onClick={() => runReview.mutate()}
           disabled={isRunning || !hasVersion}
         />
         <IconButton
           icon={<RefreshCw size={14} />}
-          label="Refresh"
+          label="刷新"
           onClick={() =>
             queryClient.invalidateQueries({ queryKey: ['review-issues', sceneVersionId] })
           }
@@ -111,25 +105,25 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
 
       {!hasVersion ? (
         <div className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-center text-slate-500">
-          Save, generate, or approve a scene version before running review.
+          请先保存、生成或批准场景版本，再进行审查。
         </div>
       ) : null}
 
       {hasError ? (
         <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-rose-700">
-          Review action failed. Please refresh and try again.
+          审查操作失败，请刷新后重试。
         </div>
       ) : null}
 
       {hasVersion && isLoading ? (
         <div className="py-4 text-center text-slate-500">
-          {isRunning ? 'Running continuity review...' : 'Loading review issues...'}
+          {isRunning ? '正在执行连续性审查…' : '加载审查问题…'}
         </div>
       ) : null}
 
       {hasVersion && !isLoading && !hasError && issues.length === 0 ? (
         <div className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-center text-slate-500">
-          No review issues yet. Run a review to check this version.
+          暂无审查问题，请对当前版本执行审查。
         </div>
       ) : null}
 
@@ -141,10 +135,10 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className={`font-medium ${severityLabelColor(issue.severity)}`}>
-                      {issue.issue_type.replace(/_/g, ' ')}
+                      {label(ISSUE_TYPE_LABELS, issue.issue_type)}
                     </span>
                     <StatusPill tone={SEVERITY_TONE[issue.severity] ?? 'neutral'}>
-                      {issue.severity}
+                      {label(REVIEW_SEVERITY_LABELS, issue.severity)}
                     </StatusPill>
                     <StatusPill
                       tone={
@@ -155,7 +149,7 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
                             : 'neutral'
                       }
                     >
-                      {STATUS_LABELS[issue.status]}
+                      {label(ISSUE_STATUS_LABELS, issue.status)}
                     </StatusPill>
                     {issue.confidence < 1 ? (
                       <span className="text-slate-400">
@@ -166,18 +160,18 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
 
                   {issue.conflict_rule ? (
                     <p className="mt-2 text-slate-600">
-                      <span className="font-medium">Rule:</span> {issue.conflict_rule}
+                      <span className="font-medium">规则：</span> {issue.conflict_rule}
                     </p>
                   ) : null}
                   {issue.suggestion ? (
                     <p className="mt-1 text-slate-500">
-                      <span className="font-medium">Suggestion:</span> {issue.suggestion}
+                      <span className="font-medium">建议：</span> {issue.suggestion}
                     </p>
                   ) : null}
                   {issue.evidence_json ? (
                     <details className="mt-1">
                       <summary className="cursor-pointer text-slate-400 hover:text-slate-600">
-                        Evidence
+                        证据
                       </summary>
                       <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-slate-600">
                         {formatEvidence(issue.evidence_json)}
@@ -193,8 +187,8 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
                         updateIssue.mutate({ issueId: issue.id, status: 'accepted' })
                       }
                       disabled={updateIssue.isPending}
-                      title="Accept"
-                      aria-label="Accept issue"
+                      title="接受"
+                      aria-label="接受问题"
                       className="rounded p-1 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50"
                     >
                       <Check size={14} />
@@ -204,8 +198,8 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
                         updateIssue.mutate({ issueId: issue.id, status: 'ignored' })
                       }
                       disabled={updateIssue.isPending}
-                      title="Ignore"
-                      aria-label="Ignore issue"
+                      title="忽略"
+                      aria-label="忽略问题"
                       className="rounded p-1 text-amber-600 hover:bg-amber-50 disabled:opacity-50"
                     >
                       <EyeOff size={14} />
@@ -218,8 +212,8 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
                         })
                       }
                       disabled={updateIssue.isPending}
-                      title="Mark false positive"
-                      aria-label="Mark issue false positive"
+                      title="标记误报"
+                      aria-label="标记为误报"
                       className="rounded p-1 text-rose-600 hover:bg-rose-50 disabled:opacity-50"
                     >
                       <X size={14} />

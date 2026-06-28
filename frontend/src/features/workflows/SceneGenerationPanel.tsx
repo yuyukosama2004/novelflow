@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { createSSEStream } from "../../api/client";
 import type { SceneVersion } from "../../types/entities";
@@ -69,14 +69,14 @@ export default function SceneGenerationPanel({
     <div className="flex flex-col gap-3 h-full">
       <div className="flex items-center gap-2">
         <h3 className="text-sm font-semibold text-gray-700">
-          AI Scene Generation
+          AI 场景生成
         </h3>
         {!generating && !done && (
           <button
             onClick={handleGenerate}
             className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
           >
-            Generate
+            生成
           </button>
         )}
         {generating && (
@@ -84,12 +84,12 @@ export default function SceneGenerationPanel({
             onClick={handleCancel}
             className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
           >
-            Cancel
+            取消
           </button>
         )}
         {generating && (
           <span className="text-xs text-indigo-600 animate-pulse">
-            Generating...
+            生成中…
           </span>
         )}
       </div>
@@ -112,10 +112,10 @@ export default function SceneGenerationPanel({
 
       {done && !error && (
         <div className="text-xs text-green-700">
-          Generation complete.
+          生成完成。
           {version && (
             <span className="ml-1">
-              Saved as version #{version.version_no}.
+              已保存为版本 #{version.version_no}。
             </span>
           )}
         </div>

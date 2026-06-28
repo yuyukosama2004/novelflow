@@ -48,6 +48,12 @@ export const apiClient = {
   ) => unwrap<NovelProject>(api.post("/projects", payload)),
   getProject: (projectId: string) =>
     unwrap<NovelProject>(api.get(`/projects/${projectId}`)),
+  patchProject: (
+    projectId: string,
+    payload: { title?: string; summary?: string; genre?: string; tone?: string },
+  ) => unwrap<NovelProject>(api.patch(`/projects/${projectId}`, payload)),
+  archiveProject: (projectId: string) =>
+    unwrap<NovelProject>(api.delete(`/projects/${projectId}`)),
 
   listCharacters: (projectId: string) =>
     unwrap<Character[]>(
@@ -59,6 +65,15 @@ export const apiClient = {
   ) =>
     unwrap<Character>(
       api.post(`/projects/${projectId}/characters`, payload),
+    ),
+  patchCharacter: (
+    characterId: string,
+    payload: { name?: string; role?: string },
+  ) =>
+    unwrap<Character>(api.patch(`/characters/${characterId}`, payload)),
+  deleteCharacter: (characterId: string) =>
+    unwrap<{ deleted: boolean }>(
+      api.delete(`/characters/${characterId}`),
     ),
 
   listWorldEntries: (projectId: string) =>
@@ -79,6 +94,15 @@ export const apiClient = {
     ),
   approveWorldEntry: (entryId: string) =>
     unwrap<WorldEntry>(api.post(`/world-entries/${entryId}/approve`)),
+  patchWorldEntry: (
+    entryId: string,
+    payload: { name?: string; summary?: string; entry_type?: string },
+  ) =>
+    unwrap<WorldEntry>(api.patch(`/world-entries/${entryId}`, payload)),
+  deleteWorldEntry: (entryId: string) =>
+    unwrap<{ deleted: boolean }>(
+      api.delete(`/world-entries/${entryId}`),
+    ),
 
   listVolumes: (projectId: string) =>
     unwrap<Volume[]>(
@@ -91,6 +115,10 @@ export const apiClient = {
     unwrap<Volume>(
       api.post(`/projects/${projectId}/volumes`, payload),
     ),
+  patchVolume: (
+    volumeId: string,
+    payload: { title?: string; summary?: string; goal?: string },
+  ) => unwrap<Volume>(api.patch(`/volumes/${volumeId}`, payload)),
   listChapters: (volumeId: string) =>
     unwrap<Chapter[]>(
       api.get(`/volumes/${volumeId}/chapters`),
@@ -102,6 +130,10 @@ export const apiClient = {
     unwrap<Chapter>(
       api.post(`/volumes/${volumeId}/chapters`, payload),
     ),
+  patchChapter: (
+    chapterId: string,
+    payload: { title?: string; summary?: string; goal?: string },
+  ) => unwrap<Chapter>(api.patch(`/chapters/${chapterId}`, payload)),
   listScenes: (chapterId: string) =>
     unwrap<Scene[]>(
       api.get(`/chapters/${chapterId}/scenes`),
@@ -115,6 +147,14 @@ export const apiClient = {
     ),
   getScene: (sceneId: string) =>
     unwrap<Scene>(api.get(`/scenes/${sceneId}`)),
+  patchScene: (
+    sceneId: string,
+    payload: { title?: string; goal?: string; conflict?: string; time_text?: string },
+  ) => unwrap<Scene>(api.patch(`/scenes/${sceneId}`, payload)),
+  deleteScene: (sceneId: string) =>
+    unwrap<{ deleted: boolean }>(api.delete(`/scenes/${sceneId}`)),
+  getSceneContext: (sceneId: string) =>
+    unwrap<Record<string, unknown>>(api.get(`/scenes/${sceneId}/context`)),
 
   listVersions: (sceneId: string) =>
     unwrap<SceneVersion[]>(

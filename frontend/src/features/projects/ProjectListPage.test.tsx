@@ -31,6 +31,7 @@ it('renders projects and health status', () => {
         isLoading={false}
         onCreate={() => undefined}
         isCreating={false}
+        onArchive={() => undefined}
       />
     </BrowserRouter>,
   );

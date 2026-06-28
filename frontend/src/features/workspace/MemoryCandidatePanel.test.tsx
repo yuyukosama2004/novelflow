@@ -51,8 +51,8 @@ const candidateActions: Array<{
   status: Extract<MemoryCandidateStatus, 'approved' | 'rejected'>;
   buttonLabel: string;
 }> = [
-  { status: 'approved', buttonLabel: 'Approve memory candidate' },
-  { status: 'rejected', buttonLabel: 'Reject memory candidate' },
+  { status: 'approved', buttonLabel: '批准记忆候选' },
+  { status: 'rejected', buttonLabel: '拒绝记忆候选' },
 ];
 
 describe('MemoryCandidatePanel', () => {
@@ -73,16 +73,14 @@ describe('MemoryCandidatePanel', () => {
       expect(apiClient.listCandidates).toHaveBeenCalledWith('sv-1');
     });
     expect(
-      await screen.findByText(
-        'No memory candidates yet. Extract candidates after reviewing the draft.',
-      ),
+      await screen.findByText('暂无记忆候选，请先审查草稿后再提取。'),
     ).toBeInTheDocument();
   });
 
   it('extracts memory candidates from the current version', async () => {
     renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Extract' }));
+    fireEvent.click(screen.getByRole('button', { name: '提取记忆' }));
 
     await waitFor(() => {
       expect(apiClient.extractMemories).toHaveBeenCalledWith('sv-1');
@@ -94,10 +92,11 @@ describe('MemoryCandidatePanel', () => {
 
     renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
 
-    expect(await screen.findByText('character knowledge')).toBeInTheDocument();
+    // "character_knowledge" → "人物知识" via CANDIDATE_TYPE_LABELS
+    expect(await screen.findByText('人物知识')).toBeInTheDocument();
     expect(screen.getByText('The protagonist sees the hidden letter.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Approve memory candidate'));
+    fireEvent.click(screen.getByLabelText('批准记忆候选'));
 
     await waitFor(() => {
       expect(apiClient.updateCandidate).toHaveBeenCalledWith('candidate-1', 'approved');
@@ -114,9 +113,10 @@ describe('MemoryCandidatePanel', () => {
 
     renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
 
-    expect(await screen.findByText('approved')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Approve memory candidate')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Reject memory candidate')).not.toBeInTheDocument();
+    // "approved" → "已批准" via MEMORY_CANDIDATE_STATUS_LABELS
+    expect(await screen.findByText('已批准')).toBeInTheDocument();
+    expect(screen.queryByLabelText('批准记忆候选')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('拒绝记忆候选')).not.toBeInTheDocument();
   });
 
   it('targets the provided sceneVersionId for listing and extraction', async () => {
@@ -127,7 +127,7 @@ describe('MemoryCandidatePanel', () => {
       expect(apiClient.listCandidates).toHaveBeenCalledWith(targetId);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Extract' }));
+    fireEvent.click(screen.getByRole('button', { name: '提取记忆' }));
 
     await waitFor(() => {
       expect(apiClient.extractMemories).toHaveBeenCalledWith(targetId);
@@ -142,16 +142,14 @@ describe('MemoryCandidatePanel', () => {
 
     renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
 
-    await screen.findByText(
-      'No memory candidates yet. Extract candidates after reviewing the draft.',
-    );
+    await screen.findByText('暂无记忆候选，请先审查草稿后再提取。');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Extract' }));
+    fireEvent.click(screen.getByRole('button', { name: '提取记忆' }));
 
     await waitFor(() => {
       expect(apiClient.extractMemories).toHaveBeenCalledWith('sv-1');
     });
-    expect(await screen.findByText('character knowledge')).toBeInTheDocument();
+    expect(await screen.findByText('人物知识')).toBeInTheDocument();
     expect(apiClient.listCandidates).toHaveBeenLastCalledWith('sv-1');
   });
 
@@ -162,13 +160,11 @@ describe('MemoryCandidatePanel', () => {
 
     renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
 
-    await screen.findByText(
-      'No memory candidates yet. Extract candidates after reviewing the draft.',
-    );
+    await screen.findByText('暂无记忆候选，请先审查草稿后再提取。');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
 
-    expect(await screen.findByText('character knowledge')).toBeInTheDocument();
+    expect(await screen.findByText('人物知识')).toBeInTheDocument();
     expect(apiClient.listCandidates).toHaveBeenLastCalledWith('sv-1');
   });
 
@@ -184,17 +180,22 @@ describe('MemoryCandidatePanel', () => {
 
       renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />, queryClient);
 
-      await screen.findByText('character knowledge');
+      await screen.findByText('人物知识');
 
       fireEvent.click(screen.getByLabelText(buttonLabel));
 
       await waitFor(() => {
         expect(apiClient.updateCandidate).toHaveBeenCalledWith('candidate-1', status);
       });
-      expect(await screen.findByText(status)).toBeInTheDocument();
+      // After update, status changes from "pending" to the new status label
+      const statusLabels: Record<string, string> = {
+        approved: '已批准',
+        rejected: '已拒绝',
+      };
+      expect(await screen.findByText(statusLabels[status])).toBeInTheDocument();
       expect(apiClient.listCandidates).toHaveBeenLastCalledWith('sv-1');
-      expect(screen.queryByLabelText('Approve memory candidate')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Reject memory candidate')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('批准记忆候选')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('拒绝记忆候选')).not.toBeInTheDocument();
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: ['memory-candidates', 'sv-1'],
       });
@@ -205,12 +206,10 @@ describe('MemoryCandidatePanel', () => {
   it('does not call APIs when sceneVersionId is empty', () => {
     renderWithQuery(<MemoryCandidatePanel sceneVersionId="" />);
 
-    expect(screen.getByRole('button', { name: 'Extract' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '提取记忆' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '刷新' })).toBeDisabled();
     expect(
-      screen.getByText(
-        'Save, generate, or approve a scene version before extracting memory.',
-      ),
+      screen.getByText('请先保存、生成或批准场景版本，再进行记忆提取。'),
     ).toBeInTheDocument();
     expect(apiClient.listCandidates).not.toHaveBeenCalled();
     expect(apiClient.extractMemories).not.toHaveBeenCalled();
@@ -223,14 +222,12 @@ describe('MemoryCandidatePanel', () => {
 
     renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
 
-    await screen.findByText(
-      'No memory candidates yet. Extract candidates after reviewing the draft.',
-    );
+    await screen.findByText('暂无记忆候选，请先审查草稿后再提取。');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Extract' }));
+    fireEvent.click(screen.getByRole('button', { name: '提取记忆' }));
 
     expect(
-      await screen.findByText('Memory action failed. Please refresh and try again.'),
+      await screen.findByText('记忆操作失败，请刷新后重试。'),
     ).toBeInTheDocument();
   });
 });

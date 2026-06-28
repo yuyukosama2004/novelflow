@@ -60,9 +60,9 @@ describe('SceneVersionSelector', () => {
       />,
     );
 
-    expect(screen.getByText('Scene Version')).toBeInTheDocument();
+    expect(screen.getByText('场景版本')).toBeInTheDocument();
     expect(
-      screen.getByText('No versions yet. Generate or save a draft to create one.'),
+      screen.getByText('暂无版本，请生成或保存草稿以创建版本。'),
     ).toBeInTheDocument();
   });
 
@@ -77,7 +77,7 @@ describe('SceneVersionSelector', () => {
     );
 
     const select = screen.getByRole('combobox', {
-      name: 'Select scene version for review and memory actions',
+      name: '选择用于审查和记忆操作的场景版本',
     }) as HTMLSelectElement;
     const optionTexts = Array.from(select.options).map((option) => option.textContent);
 
@@ -99,11 +99,13 @@ describe('SceneVersionSelector', () => {
     const select = screen.getByRole('combobox') as HTMLSelectElement;
     const options = Array.from(select.options);
 
+    // human_revised → "人工修订"
     expect(options.find((option) => option.value === 'v3')?.textContent).toContain(
-      'Draft / completed',
+      '人工修订 / completed',
     );
+    // ai_generated → "AI 生成", approved → "正式"
     expect(options.find((option) => option.value === 'v2')?.textContent).toContain(
-      'AI / approved / pending',
+      'AI 生成 / 正式 / pending',
     );
     expect(options.find((option) => option.value === 'v1')?.textContent).toContain(
       'First draft',
@@ -135,7 +137,8 @@ describe('SceneVersionSelector', () => {
       />,
     );
 
-    expect(screen.getByText(/AI \(approved\)/)).toBeInTheDocument();
+    // AI 生成（正式）
+    expect(screen.getByText(/AI 生成（正式）/)).toBeInTheDocument();
     expect(screen.getByText('pending')).toBeInTheDocument();
     expect(screen.getByText('AI generated draft')).toBeInTheDocument();
   });
@@ -179,7 +182,7 @@ describe('SceneVersionSelector', () => {
       />,
     );
 
-    expect(screen.getByText('(empty)')).toBeInTheDocument();
+    expect(screen.getByText('（空）')).toBeInTheDocument();
   });
 
   it('falls back to the first rendered option when the selected id is missing', () => {

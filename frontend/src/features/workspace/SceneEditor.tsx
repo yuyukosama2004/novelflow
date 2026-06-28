@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -8,6 +8,7 @@ import { apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
 import type { Scene, SceneVersion } from '../../types/entities';
+import { label, SOURCE_TYPE_LABELS } from '../../utils/enumLabels';
 
 interface SceneEditorProps {
   scene: Scene | null;
@@ -22,6 +23,18 @@ function selectInitialContent(versions: SceneVersion[] | undefined, scene: Scene
     ? versions.find((version) => version.id === scene.approved_version_id)
     : undefined;
   return (approved ?? versions[0]).content_markdown;
+}
+
+function saveStateLabel(
+  saveState: 'idle' | 'saving' | 'saved' | 'error',
+  dirty: boolean,
+  sceneStatus: string,
+): string {
+  if (saveState === 'saving') return '保存中';
+  if (saveState === 'saved') return '已保存';
+  if (saveState === 'error') return '保存失败';
+  if (dirty) return '未保存';
+  return sceneStatus;
 }
 
 export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
@@ -89,6 +102,7 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
     },
   });
 
+  // 自动保存 debounce
   useEffect(() => {
     if (!scene?.id || !dirty || !content.trim()) {
       return;
@@ -118,23 +132,25 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <StatusPill tone={saveState === 'error' ? 'warn' : saveState === 'saved' ? 'ok' : 'neutral'}>
-            {saveState === 'saving'
-              ? '保存中'
-              : saveState === 'saved'
-                ? '已保存'
-                : saveState === 'error'
-                  ? '保存失败'
-                  : dirty
-                    ? '未保存'
-                    : scene.status}
+          <StatusPill
+            tone={
+              saveState === 'error'
+                ? 'warn'
+                : saveState === 'saved'
+                  ? 'ok'
+                  : 'neutral'
+            }
+          >
+            {saveStateLabel(saveState, dirty, scene.status)}
           </StatusPill>
           <IconButton
             icon={<Save size={16} />}
             label="保存版本"
             tone="primary"
             disabled={!content.trim() || createVersion.isPending}
-            onClick={() => createVersion.mutate({ content_markdown: content, summary: scene.title })}
+            onClick={() =>
+              createVersion.mutate({ content_markdown: content, summary: scene.title })
+            }
           />
         </div>
       </div>
@@ -148,22 +164,34 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
         </div>
         <div className="max-h-72 divide-y divide-slate-100 overflow-auto">
           {versions.data?.map((version) => (
-            <div key={version.id} className="flex items-center justify-between gap-3 px-3 py-3">
+            <div
+              key={version.id}
+              className="flex items-center justify-between gap-3 px-3 py-3"
+            >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-slate-900">v{version.version_no}</span>
-                  <StatusPill tone={scene.approved_version_id === version.id ? 'ok' : 'neutral'}>
-                    {scene.approved_version_id === version.id ? '正式' : version.source_type}
+                  <span className="text-sm font-medium text-slate-900">
+                    v{version.version_no}
+                  </span>
+                  <StatusPill
+                    tone={scene.approved_version_id === version.id ? 'ok' : 'neutral'}
+                  >
+                    {scene.approved_version_id === version.id
+                      ? '正式稿'
+                      : label(SOURCE_TYPE_LABELS, version.source_type)}
                   </StatusPill>
                 </div>
                 <p className="mt-1 truncate text-xs text-slate-500">
-                  {version.summary || version.content_markdown.replace(/<[^>]+>/g, '').slice(0, 80)}
+                  {version.summary ||
+                    version.content_markdown.replace(/<[^>]+>/g, '').slice(0, 80)}
                 </p>
               </div>
               <IconButton
                 icon={<Check size={15} />}
                 label="批准"
-                disabled={scene.approved_version_id === version.id || approveVersion.isPending}
+                disabled={
+                  scene.approved_version_id === version.id || approveVersion.isPending
+                }
                 onClick={() => approveVersion.mutate(version.id)}
               />
             </div>
