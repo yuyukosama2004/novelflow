@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar
 
-from sqlalchemy import Select, delete, select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.base import Base
@@ -30,8 +30,10 @@ class Repository(Generic[ModelT]):
         return item
 
     async def delete(self, item_id: str) -> None:
-        id_column = cast(Any, self.model).id
-        await self.session.execute(delete(self.model).where(id_column == item_id))
+        item = await self.session.get(self.model, item_id)
+        if item is not None:
+            await self.session.delete(item)
+            await self.session.flush()
 
 
 def apply_updates(model: Any, values: dict[str, Any]) -> None:

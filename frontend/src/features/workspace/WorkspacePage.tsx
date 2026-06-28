@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
-import { apiClient } from '../../api/client';
+import { API_BASE_URL, apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
 import type { Chapter, Scene, SceneVersion, Volume } from '../../types/entities';
@@ -423,7 +423,7 @@ export function WorkspacePage() {
               创作向导
             </Link>
             <a
-              href={`http://localhost:8000/api/projects/${projectId}/exports/markdown`}
+              href={`${API_BASE_URL}/projects/${projectId}/exports/markdown`}
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-emerald-400"
             >
               导出 Markdown

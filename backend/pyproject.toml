@@ -44,6 +44,7 @@ ignore = ["B008"]
 [tool.ruff.lint.per-file-ignores]
 "alembic/versions/*" = ["E501"]
 "app/services/interview_service.py" = ["E501"]
+"app/models/bible.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

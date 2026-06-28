@@ -62,13 +62,13 @@ export function StoryBiblePage() {
 
   const saveCharacter = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
-      apiClient.patchCharacter(id, payload as { name: string; role: string }),
+      apiClient.patchCharacter(id, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['characters', projectId] }),
   });
 
   const saveWorldEntry = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
-      apiClient.patchWorldEntry(id, payload as { name: string; summary: string }),
+      apiClient.patchWorldEntry(id, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['world', projectId] }),
   });
 

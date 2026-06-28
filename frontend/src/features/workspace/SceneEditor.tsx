@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -102,6 +102,10 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
     },
   });
 
+  // 使用 ref 持有 mutate 引用，避免 useEffect 依赖不稳定
+  const mutateRef = useRef(createVersion.mutate);
+  mutateRef.current = createVersion.mutate;
+
   // 自动保存 debounce
   useEffect(() => {
     if (!scene?.id || !dirty || !content.trim()) {
@@ -109,10 +113,10 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
     }
     const timer = window.setTimeout(() => {
       setSaveState('saving');
-      createVersion.mutate({ content_markdown: content, summary: scene.title });
+      mutateRef.current({ content_markdown: content, summary: scene.title });
     }, 1600);
     return () => window.clearTimeout(timer);
-  }, [content, createVersion, dirty, scene?.id, scene?.title]);
+  }, [content, dirty, scene?.id, scene?.title]);
 
   if (!scene) {
     return (

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -12,6 +12,9 @@ class CharacterRelationship(UUIDMixin, TimestampMixin, Base):
     """两个人物之间的关系。"""
 
     __tablename__ = "character_relationships"
+    __table_args__ = (
+        UniqueConstraint("project_id", "character_a_id", "character_b_id", "relation_type", name="uq_character_relation"),
+    )
 
     project_id: Mapped[str] = mapped_column(
         ForeignKey("novel_projects.id"), index=True

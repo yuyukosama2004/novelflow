@@ -71,7 +71,7 @@ export const apiClient = {
     ),
   patchCharacter: (
     characterId: string,
-    payload: { name?: string; role?: string },
+    payload: Record<string, unknown>,
   ) =>
     unwrap<Character>(api.patch(`/characters/${characterId}`, payload)),
   deleteCharacter: (characterId: string) =>
@@ -99,7 +99,7 @@ export const apiClient = {
     unwrap<WorldEntry>(api.post(`/world-entries/${entryId}/approve`)),
   patchWorldEntry: (
     entryId: string,
-    payload: { name?: string; summary?: string; entry_type?: string },
+    payload: { name?: string; summary?: string; entry_type?: string; content?: string },
   ) =>
     unwrap<WorldEntry>(api.patch(`/world-entries/${entryId}`, payload)),
   deleteWorldEntry: (entryId: string) =>
@@ -261,11 +261,11 @@ export const apiClient = {
     payload: { status?: string; content_json?: Record<string, unknown> },
   ) =>
     unwrap<StoryCandidateEntity>(
-      api.patch(`/candidates/${candidateId}`, payload),
+      api.patch(`/story-candidates/${candidateId}`, payload),
     ),
   applyCandidate: (candidateId: string) =>
     unwrap<StoryCandidateEntity>(
-      api.post(`/candidates/${candidateId}/apply`),
+      api.post(`/story-candidates/${candidateId}/apply`),
     ),
 
   // Bible / Relationship APIs

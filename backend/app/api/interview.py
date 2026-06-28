@@ -91,7 +91,7 @@ async def list_candidates(
     return success(candidates, request)
 
 
-@router.patch("/candidates/{candidate_id}")
+@router.patch("/story-candidates/{candidate_id}")
 async def update_candidate(
     candidate_id: str,
     payload: UpdateCandidateRequest,
@@ -107,7 +107,7 @@ async def update_candidate(
     return success(result, request)
 
 
-@router.post("/candidates/{candidate_id}/apply")
+@router.post("/story-candidates/{candidate_id}/apply")
 async def apply_candidate(
     candidate_id: str,
     request: Request,
