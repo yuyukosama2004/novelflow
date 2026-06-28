@@ -20,6 +20,7 @@ import type { Chapter, Scene, SceneVersion, Volume } from '../../types/entities'
 import { label, PROJECT_STATUS_LABELS } from '../../utils/enumLabels';
 import { MemoryCandidatePanel } from './MemoryCandidatePanel';
 import { ReviewIssuePanel } from './ReviewIssuePanel';
+import { SceneCardEditor } from './SceneCardEditor';
 import { SceneEditor } from './SceneEditor';
 import { SceneVersionSelector } from './SceneVersionSelector';
 import {
@@ -913,6 +914,7 @@ export function WorkspacePage() {
             sceneId={selectedSceneId}
             onVersionCreated={handleVersionCreated}
           />
+          <SceneCardEditor scene={scene.data ?? null} />
           <ContextChecker sceneId={selectedSceneId} />
           <ReviewIssuePanel sceneVersionId={selectedSceneVersionId} />
           <MemoryCandidatePanel sceneVersionId={selectedSceneVersionId} />

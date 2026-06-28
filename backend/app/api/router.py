@@ -11,6 +11,7 @@ from app.api import (
     interview,
     memory,
     model_profiles,
+    outline,
     projects,
     review,
     scenes,
@@ -32,3 +33,4 @@ api_router.include_router(review.router, tags=["review"])
 api_router.include_router(memory.router, tags=["memory"])
 api_router.include_router(interview.router, tags=["interview"])
 api_router.include_router(bible.router, tags=["bible"])
+api_router.include_router(outline.router, tags=["outline"])

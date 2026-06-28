@@ -1,22 +1,24 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BookOpen, Globe2, Heart, Users, Clock } from 'lucide-react';
+import { ArrowLeft, BookOpen, Globe2, Heart, ListChecks, Users, Clock } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
 import { apiClient } from '../../api/client';
 import { CoreConceptPanel } from './CoreConceptPanel';
 import { CharacterDetailPanel } from './CharacterDetailPanel';
+import { OutlineGeneratorPanel } from './OutlineGeneratorPanel';
 import { WorldEntryDetailPanel } from './WorldEntryDetailPanel';
 import { RelationshipPanel } from './RelationshipPanel';
 import { TimelinePanel } from './TimelinePanel';
 
-type Tab = 'concept' | 'characters' | 'relationships' | 'world' | 'timeline';
+type Tab = 'concept' | 'characters' | 'relationships' | 'world' | 'outline' | 'timeline';
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'concept', label: '核心概念', icon: BookOpen },
   { key: 'characters', label: '人物', icon: Users },
   { key: 'relationships', label: '人物关系', icon: Heart },
   { key: 'world', label: '世界观', icon: Globe2 },
+  { key: 'outline', label: '大纲', icon: ListChecks },
   { key: 'timeline', label: '时间线', icon: Clock },
 ];
 
@@ -44,6 +46,11 @@ export function StoryBiblePage() {
   const relationships = useQuery({
     queryKey: ['relationships', projectId],
     queryFn: () => apiClient.listRelationships(projectId),
+    enabled: Boolean(projectId),
+  });
+  const volumes = useQuery({
+    queryKey: ['volumes', projectId],
+    queryFn: () => apiClient.listVolumes(projectId),
     enabled: Boolean(projectId),
   });
 
@@ -192,6 +199,11 @@ export function StoryBiblePage() {
                 </div>
               )}
             </div>
+          ) : tab === 'outline' ? (
+            <OutlineGeneratorPanel
+              projectId={projectId}
+              hasExistingOutline={(volumes.data?.length ?? 0) > 0}
+            />
           ) : tab === 'timeline' ? (
             <TimelinePanel projectId={projectId} />
           ) : null}

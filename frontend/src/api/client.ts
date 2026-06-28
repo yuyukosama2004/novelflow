@@ -303,6 +303,35 @@ export const apiClient = {
     unwrap<Character>(api.get(`/characters/${characterId}`)),
   getWorldEntry: (entryId: string) =>
     unwrap<WorldEntry>(api.get(`/world-entries/${entryId}`)),
+
+  // Outline APIs
+  generateOutline: (projectId: string) =>
+    unwrap<
+      {
+        sequence_no: number;
+        title: string;
+        summary: string;
+        goal: string;
+        chapters: {
+          sequence_no: number;
+          title: string;
+          summary: string;
+          goal: string;
+          scenes: {
+            sequence_no: number;
+            title: string;
+            goal: string;
+            conflict: string;
+            turning_point: string;
+            ending_hook: string;
+          }[];
+        }[];
+      }[]
+    >(api.post(`/projects/${projectId}/generate-outline`)),
+  applyOutline: (projectId: string, outline: Record<string, unknown>[]) =>
+    unwrap<Record<string, number>>(
+      api.post(`/projects/${projectId}/apply-outline`, { outline }),
+    ),
 };
 
 export function createSSEStream(
