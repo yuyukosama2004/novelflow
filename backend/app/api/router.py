@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api import (
+    bible,
     characters,
     context,
     exports,
@@ -30,3 +31,4 @@ api_router.include_router(context.router, tags=["context"])
 api_router.include_router(review.router, tags=["review"])
 api_router.include_router(memory.router, tags=["memory"])
 api_router.include_router(interview.router, tags=["interview"])
+api_router.include_router(bible.router, tags=["bible"])

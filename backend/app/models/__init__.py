@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.bible import CharacterRelationship
 from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.interview import InterviewSession, StoryCandidate
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
@@ -13,6 +14,7 @@ __all__ = [
     "Chapter",
     "Character",
     "CharacterKnowledge",
+    "CharacterRelationship",
     "CharacterState",
     "InterviewSession",
     "MemoryCandidate",

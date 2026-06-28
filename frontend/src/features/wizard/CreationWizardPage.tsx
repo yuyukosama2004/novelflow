@@ -140,13 +140,21 @@ export function CreationWizardPage() {
               </h1>
             </div>
           </div>
-          <Link
-            to={`/projects/${projectId}`}
-            className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-          >
-            进入工作台
-            <ArrowRight size={15} />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/projects/${projectId}/bible`}
+              className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
+            >
+              故事圣经
+            </Link>
+            <Link
+              to={`/projects/${projectId}`}
+              className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              进入工作台
+              <ArrowRight size={15} />
+            </Link>
+          </div>
         </div>
       </header>
 

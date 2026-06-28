@@ -3,6 +3,7 @@
 import type {
   Chapter,
   Character,
+  CharacterRelationship,
   HealthStatus,
   InterviewSession,
   MemoryCandidate,
@@ -266,6 +267,42 @@ export const apiClient = {
     unwrap<StoryCandidateEntity>(
       api.post(`/candidates/${candidateId}/apply`),
     ),
+
+  // Bible / Relationship APIs
+  createRelationship: (
+    projectId: string,
+    payload: {
+      character_a_id: string;
+      character_b_id: string;
+      relation_type?: string;
+      description?: string;
+      timeline_info?: string;
+    },
+  ) =>
+    unwrap<CharacterRelationship>(
+      api.post(`/projects/${projectId}/relationships`, payload),
+    ),
+  listRelationships: (projectId: string) =>
+    unwrap<CharacterRelationship[]>(
+      api.get(`/projects/${projectId}/relationships`),
+    ),
+  patchRelationship: (
+    relationshipId: string,
+    payload: { relation_type?: string; description?: string; timeline_info?: string },
+  ) =>
+    unwrap<CharacterRelationship>(
+      api.patch(`/relationships/${relationshipId}`, payload),
+    ),
+  deleteRelationship: (relationshipId: string) =>
+    unwrap<{ deleted: boolean }>(
+      api.delete(`/relationships/${relationshipId}`),
+    ),
+
+  // Existing list/get endpoints exposed clearly
+  getCharacter: (characterId: string) =>
+    unwrap<Character>(api.get(`/characters/${characterId}`)),
+  getWorldEntry: (entryId: string) =>
+    unwrap<WorldEntry>(api.get(`/world-entries/${entryId}`)),
 };
 
 export function createSSEStream(

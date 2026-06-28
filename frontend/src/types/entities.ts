@@ -193,3 +193,18 @@ export interface StoryCandidateEntity {
   created_at: string;
   updated_at: string;
 }
+
+// ── 故事圣经 ──
+
+export interface CharacterRelationship {
+  id: string;
+  project_id: string;
+  character_a_id: string;
+  character_b_id: string;
+  relation_type: string;
+  description: string;
+  timeline_info: string;
+  status: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
