@@ -52,6 +52,8 @@ class OpenAICompatibleClient(LLMClient):
         response = await client.post("/chat/completions", json=payload)
         response.raise_for_status()
         data = response.json()
+        if not data.get("choices"):
+            raise ValueError(f"LLM returned empty choices array: {str(data)[:200]}")
         choice = data["choices"][0]
         usage = data.get("usage", {})
         return LLMResponse(

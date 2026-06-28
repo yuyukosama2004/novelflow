@@ -161,6 +161,8 @@ export function ProjectListPage() {
     queryKey: ['projects'],
     queryFn: apiClient.listProjects,
   });
+  const [mutationError, setMutationError] = useState('');
+
   const createProject = useMutation({
     mutationFn: ({ title, genre }: { title: string; genre: string }) =>
       apiClient.createProject({
@@ -172,13 +174,19 @@ export function ProjectListPage() {
         tone: '克制、现实',
       }),
     onSuccess: (data) => {
+      setMutationError('');
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       navigate(`/projects/${data.id}/wizard`);
     },
+    onError: (err: Error) => setMutationError(err.message),
   });
   const archiveProject = useMutation({
     mutationFn: (id: string) => apiClient.archiveProject(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => {
+      setMutationError('');
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (err: Error) => setMutationError(err.message),
   });
 
   return (
@@ -186,7 +194,7 @@ export function ProjectListPage() {
       health={health.data}
       projects={projects.data ?? []}
       isLoading={projects.isLoading}
-      error={projects.error instanceof Error ? projects.error.message : undefined}
+      error={mutationError || (projects.error instanceof Error ? projects.error.message : undefined)}
       onCreate={(title, genre) => createProject.mutate({ title, genre })}
       isCreating={createProject.isPending}
       onArchive={(id) => archiveProject.mutate(id)}

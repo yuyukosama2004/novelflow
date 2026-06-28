@@ -7,9 +7,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.exceptions import ConflictError
 from app.llm.base import LLMMessage, LLMRequest
 from app.llm.router import LLMRouter
 from app.models.character import Character
@@ -195,5 +197,12 @@ class OutlineService:
                     self.session.add(scene)
                     created["scenes"] += 1
 
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            raise ConflictError(
+                "outline sequence_no conflicts with existing records — "
+                "please delete existing volumes/chapters/scenes first",
+                {"detail": str(exc)},
+            ) from exc
         return created

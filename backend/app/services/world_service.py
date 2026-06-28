@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, ValidationAppError
 from app.models.world import WorldEntry
 from app.repositories.base import apply_updates
 from app.repositories.world_repository import WorldEntryRepository
@@ -45,7 +45,14 @@ class WorldService:
         await self.world_entries.delete(entry_id)
         await self.session.commit()
 
+    _valid_statuses = {"draft", "candidate", "approved", "deprecated", "conflicted"}
+
     async def set_status(self, entry_id: str, status: str) -> WorldEntry:
+        if status not in self._valid_statuses:
+            raise ValidationAppError(
+                "invalid canon status",
+                {"status": status, "valid": list(self._valid_statuses)},
+            )
         entry = await self.get(entry_id)
         entry.canon_status = status
         entry.version += 1

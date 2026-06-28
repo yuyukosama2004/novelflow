@@ -8,7 +8,6 @@ from app.llm.base import LLMClient, LLMRequest, LLMResponse, LLMStreamChunk
 from app.llm.deepseek import DeepSeekClient
 from app.llm.fake import FakeLLMClient
 from app.llm.ollama import OllamaClient
-from app.llm.openai_compatible import OpenAICompatibleClient
 
 
 class ModelConnectionError(AppError):
@@ -44,8 +43,9 @@ class LLMRouter:
                 base_url=self.settings.deepseek_base_url,
             )
         if provider == "openai":
-            return OpenAICompatibleClient(
-                api_key=self.settings.deepseek_api_key,
+            raise ModelConfigurationError(
+                "openai provider requires its own API key; use deepseek or openai_compatible instead",
+                {"provider": provider},
             )
         if provider == "ollama":
             return OllamaClient(
@@ -71,8 +71,8 @@ class LLMRouter:
             raise
         except Exception as exc:
             raise ModelResponseError(
-                f"model generation failed: {exc}",
-                {"provider": provider, "error": str(exc)},
+                f"model generation failed: {type(exc).__name__}",
+                {"provider": provider},
             ) from exc
 
     async def stream_generate(
@@ -89,8 +89,8 @@ class LLMRouter:
             raise
         except Exception as exc:
             raise ModelResponseError(
-                f"model streaming failed: {exc}",
-                {"provider": provider, "error": str(exc)},
+                f"model streaming failed: {type(exc).__name__}",
+                {"provider": provider},
             ) from exc
 
     async def validate_connection(self, provider: str) -> bool:
