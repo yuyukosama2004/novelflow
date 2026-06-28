@@ -4,6 +4,7 @@ import type {
   Chapter,
   Character,
   HealthStatus,
+  InterviewSession,
   MemoryCandidate,
   MemoryCandidateStatus,
   ModelTestResult,
@@ -13,6 +14,7 @@ import type {
   ReviewIssueStatus,
   Scene,
   SceneVersion,
+  StoryCandidateEntity,
   Volume,
   WorldEntry,
 } from "../types/entities";
@@ -229,6 +231,40 @@ export const apiClient = {
   }) =>
     unwrap<{ content: string; model: string; prompt_tokens: number; completion_tokens: number; finish_reason: string }>(
       api.post("/model/generate", payload),
+    ),
+
+  // Interview APIs
+  startInterview: (projectId: string, entryType: string, title?: string) =>
+    unwrap<InterviewSession>(
+      api.post(`/projects/${projectId}/interview/start`, {
+        entry_type: entryType,
+        title: title ?? "",
+      }),
+    ),
+  sendInterviewMessage: (sessionId: string, content: string) =>
+    unwrap<InterviewSession>(
+      api.post(`/sessions/${sessionId}/message`, { content }),
+    ),
+  getInterviewSession: (sessionId: string) =>
+    unwrap<InterviewSession>(api.get(`/sessions/${sessionId}`)),
+  extractStoryCandidates: (sessionId: string) =>
+    unwrap<StoryCandidateEntity[]>(
+      api.post(`/sessions/${sessionId}/extract-candidates`),
+    ),
+  listStoryCandidates: (sessionId: string) =>
+    unwrap<StoryCandidateEntity[]>(
+      api.get(`/sessions/${sessionId}/candidates`),
+    ),
+  updateStoryCandidate: (
+    candidateId: string,
+    payload: { status?: string; content_json?: Record<string, unknown> },
+  ) =>
+    unwrap<StoryCandidateEntity>(
+      api.patch(`/candidates/${candidateId}`, payload),
+    ),
+  applyCandidate: (candidateId: string) =>
+    unwrap<StoryCandidateEntity>(
+      api.post(`/candidates/${candidateId}/apply`),
     ),
 };
 

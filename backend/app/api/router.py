@@ -7,6 +7,7 @@ from app.api import (
     context,
     exports,
     health,
+    interview,
     memory,
     model_profiles,
     projects,
@@ -28,3 +29,4 @@ api_router.include_router(workflows.router, tags=["workflows"])
 api_router.include_router(context.router, tags=["context"])
 api_router.include_router(review.router, tags=["review"])
 api_router.include_router(memory.router, tags=["memory"])
+api_router.include_router(interview.router, tags=["interview"])

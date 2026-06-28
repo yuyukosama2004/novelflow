@@ -1,5 +1,6 @@
 from app.models.base import Base
 from app.models.character import Character, CharacterKnowledge, CharacterState
+from app.models.interview import InterviewSession, StoryCandidate
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
 from app.models.memory import MemoryCandidate, TimelineEvent
 from app.models.project import NovelProject
@@ -13,11 +14,13 @@ __all__ = [
     "Character",
     "CharacterKnowledge",
     "CharacterState",
+    "InterviewSession",
     "MemoryCandidate",
     "NovelProject",
     "ReviewIssue",
     "Scene",
     "SceneVersion",
+    "StoryCandidate",
     "TimelineEvent",
     "Volume",
     "WorkflowRun",

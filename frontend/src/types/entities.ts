@@ -157,3 +157,39 @@ export interface SSEChunk {
   version?: SceneVersion;
   error?: string;
 }
+
+// ── 访谈相关 ──
+
+export interface InterviewMessage {
+  role: string;
+  content: string;
+  timestamp?: string;
+}
+
+export interface InterviewSession {
+  id: string;
+  project_id: string;
+  entry_type: string;
+  title: string;
+  status: string;
+  messages: InterviewMessage[];
+}
+
+export type StoryCandidateType = 'project_setting' | 'character' | 'world_entry';
+export type StoryCandidateStatus = 'pending' | 'approved' | 'rejected';
+
+export interface StoryCandidateEntity {
+  id: string;
+  project_id: string;
+  session_id: string;
+  candidate_type: StoryCandidateType;
+  title: string;
+  content_json: Record<string, unknown>;
+  proposal: string;
+  confidence: number;
+  status: StoryCandidateStatus;
+  applied_entity_type: string | null;
+  applied_entity_id: string | null;
+  created_at: string;
+  updated_at: string;
+}

@@ -408,6 +408,12 @@ export function WorkspacePage() {
             <StatusPill tone="ok">
               {label(PROJECT_STATUS_LABELS, project.data?.status)}
             </StatusPill>
+            <Link
+              to={`/projects/${projectId}/wizard`}
+              className="rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+            >
+              创作向导
+            </Link>
             <a
               href={`http://localhost:8000/api/projects/${projectId}/exports/markdown`}
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-emerald-400"

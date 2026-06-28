@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, BookOpen, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
@@ -152,6 +152,7 @@ export function ProjectListView({
 
 export function ProjectListPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const health = useQuery({
     queryKey: ['health'],
     queryFn: apiClient.health,
@@ -170,7 +171,10 @@ export function ProjectListPage() {
         pov_type: '第三人称限知',
         tone: '克制、现实',
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      navigate(`/projects/${data.id}/wizard`);
+    },
   });
   const archiveProject = useMutation({
     mutationFn: (id: string) => apiClient.archiveProject(id),
