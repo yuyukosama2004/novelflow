@@ -4,17 +4,17 @@ Revision ID: bc594df4182d
 Revises: e80d1d1f3685
 Create Date: 2026-06-28 20:38:28.921897
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'bc594df4182d'
-down_revision: Union[str, None] = 'e80d1d1f3685'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = 'e80d1d1f3685'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

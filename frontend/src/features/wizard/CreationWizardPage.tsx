@@ -25,13 +25,6 @@ export function CreationWizardPage() {
     enabled: Boolean(projectId),
   });
 
-  // ── 载入已有会话 ──
-  const sessionQuery = useQuery({
-    queryKey: ['interview-session', sessionId],
-    queryFn: () => apiClient.getInterviewSession(sessionId),
-    enabled: Boolean(sessionId),
-  });
-
   // ── 候选列表 ──
   const candidatesQuery = useQuery({
     queryKey: ['story-candidates', sessionId],

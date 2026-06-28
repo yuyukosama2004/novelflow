@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, BookOpen, CheckCircle, EyeOff } from 'lucide-react';
+import { AlertTriangle, BookOpen, CheckCircle } from 'lucide-react';
 
 import { apiClient } from '../../api/client';
 

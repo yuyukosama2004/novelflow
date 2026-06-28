@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react';
 
 import type { StoryCandidateEntity } from '../../types/entities';
-import { label } from '../../utils/enumLabels';
 
 const CANDIDATE_TYPE_LABELS: Record<string, string> = {
   project_setting: '项目设定',
