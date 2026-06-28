@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
+import { API_BASE_URL } from "../../api/client";
+
 interface Props {
   sceneId: string;
 }
@@ -44,9 +46,7 @@ export default function ContextChecker({ sceneId }: Props) {
     queryKey: ["context", sceneId],
     queryFn: async () => {
       // Using raw fetch since apiClient doesn't have this endpoint yet
-      const baseUrl =
-        import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
-      const res = await fetch(`${baseUrl}/scenes/${sceneId}/context`);
+      const res = await fetch(`${API_BASE_URL}/scenes/${sceneId}/context`);
       const json = await res.json();
       return json.data as ContextData;
     },

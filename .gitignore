@@ -15,5 +15,10 @@ uploads/
 exports/
 .idea/
 .vscode/settings.json
-AGENT_HANDOFF.md
-NovelFlow_Agent开发执行文档.md
+
+# Local development documents and agent handoff notes.
+# README.md is the only Markdown project document intended for Git.
+*.md
+!README.md
+docs/
+local-dev-docs/

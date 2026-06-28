@@ -24,8 +24,11 @@ interface ApiEnvelope<T> {
   request_id: string;
 }
 
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api";
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api",
+  baseURL: API_BASE_URL,
   timeout: 12000,
 });
 
@@ -202,10 +205,7 @@ export function createSSEStream(
   onError: (error: string) => void,
 ): AbortController {
   const controller = new AbortController();
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
-
-  fetch(`${baseUrl}/scenes/${sceneId}/generate`, {
+  fetch(`${API_BASE_URL}/scenes/${sceneId}/generate`, {
     method: "POST",
     signal: controller.signal,
   })
