@@ -22,6 +22,7 @@ import { MemoryCandidatePanel } from './MemoryCandidatePanel';
 import { ReviewIssuePanel } from './ReviewIssuePanel';
 import { SceneCardEditor } from './SceneCardEditor';
 import { SceneEditor } from './SceneEditor';
+import { WritingAssistant } from './WritingAssistant';
 import { SceneVersionSelector } from './SceneVersionSelector';
 import {
   getDefaultSceneVersionId,
@@ -896,11 +897,14 @@ export function WorkspacePage() {
           </section>
         </aside>
 
-        {/* ── 中间：场景编辑器 ── */}
-        <SceneEditor
-          scene={scene.data ?? null}
-          onVersionCreated={handleVersionCreated}
-        />
+        {/* ── 中间：写作辅助 + 场景编辑器 ── */}
+        <div className="space-y-4">
+          <WritingAssistant sceneId={selectedSceneId} />
+          <SceneEditor
+            scene={scene.data ?? null}
+            onVersionCreated={handleVersionCreated}
+          />
+        </div>
 
         {/* ── 右侧栏：当前场景版本工具 ── */}
         <aside className="space-y-4">
