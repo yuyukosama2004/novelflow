@@ -7,9 +7,11 @@ import logging
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.exceptions import ConflictError
 from app.database.session import get_session
 from app.llm.router import LLMRouter
 from app.models.workflow import WorkflowRun
@@ -127,6 +129,21 @@ async def generate_scene_stream(
     settings = get_settings()
     manuscript = ManuscriptService(session)
     scene = await manuscript.get_scene(scene_id)
+
+    # 并发锁：检查是否有正在运行中的生成任务
+    active_run = await session.execute(
+        select(WorkflowRun)
+        .where(
+            WorkflowRun.scene_id == scene_id,
+            WorkflowRun.status.in_(["pending", "planning", "drafting"]),
+        )
+        .limit(1)
+    )
+    if active_run.scalar_one_or_none() is not None:
+        raise ConflictError(
+            "此场景已有正在进行的生成任务，请等待完成或取消后再试",
+            {"scene_id": scene_id},
+        )
 
     builder = ContextBuilder(session)
     ctx = await builder.build_for_scene(scene_id)

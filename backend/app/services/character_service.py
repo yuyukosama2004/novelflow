@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
@@ -71,9 +72,35 @@ class CharacterService:
         await self.get(character_id)
         return await self.states.list_by_character(character_id)
 
-    async def current_state(self, character_id: str) -> CharacterState | None:
-        states = await self.list_states(character_id)
-        return states[0] if states else None
+    async def current_state(
+        self,
+        character_id: str,
+        timeline_order: int | None = None,
+    ) -> CharacterState | None:
+        """获取人物当前最新已确认状态，可选限制时间线位置。
+
+        与 ContextBuilder._current_state() 使用相同的过滤逻辑：
+        只返回 status=confirmed 的状态，按 timeline_order DESC 取最新。
+        """
+        await self.get(character_id)
+
+        conditions = [
+            CharacterState.character_id == character_id,
+            CharacterState.status == "confirmed",
+        ]
+        if timeline_order is not None:
+            conditions.append(CharacterState.timeline_order <= timeline_order)
+
+        result = await self.session.execute(
+            select(CharacterState)
+            .where(*conditions)
+            .order_by(
+                CharacterState.timeline_order.desc(),
+                CharacterState.created_at.desc(),
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def create_knowledge(
         self,
