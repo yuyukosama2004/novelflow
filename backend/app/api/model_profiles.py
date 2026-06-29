@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.responses import success
+from app.database.session import get_session
 from app.llm.base import LLMMessage, LLMRequest
 from app.llm.router import LLMRouter
+from app.services.model_profile_service import ModelProfileService
 
 router = APIRouter()
 
@@ -118,3 +121,92 @@ async def generate_text(
         ),
         request,
     )
+
+
+# ── Model Profile CRUD ──
+
+class ProfileCreate(BaseModel):
+    name: str = ""
+    provider: str = "deepseek"
+    base_url: str = ""
+    api_key: str = ""
+    model_name: str = ""
+    temperature: float = 0.7
+    max_output_tokens: int = 4096
+    timeout_seconds: int = 120
+    is_default: bool = False
+    enabled: bool = True
+
+
+class ProfileUpdate(BaseModel):
+    name: str | None = None
+    provider: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+    model_name: str | None = None
+    temperature: float | None = None
+    max_output_tokens: int | None = None
+    timeout_seconds: int | None = None
+    is_default: bool | None = None
+    enabled: bool | None = None
+
+
+@router.get("/model/profiles")
+async def list_profiles(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    profiles = await ModelProfileService(session).list_all()
+    return success([ModelProfileService._out(p) for p in profiles], request)
+
+
+@router.post("/model/profiles")
+async def create_profile(
+    payload: ProfileCreate,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    p = await ModelProfileService(session).create(payload.model_dump())
+    return success(ModelProfileService._out(p), request)
+
+
+@router.patch("/model/profiles/{profile_id}")
+async def update_profile(
+    profile_id: str,
+    payload: ProfileUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    p = await ModelProfileService(session).update(
+        profile_id, payload.model_dump(exclude_unset=True)
+    )
+    return success(ModelProfileService._out(p), request)
+
+
+@router.delete("/model/profiles/{profile_id}")
+async def delete_profile(
+    profile_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    await ModelProfileService(session).delete(profile_id)
+    return success({"deleted": True}, request)
+
+
+@router.post("/model/profiles/{profile_id}/test")
+async def test_profile(
+    profile_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    result = await ModelProfileService(session).test(profile_id)
+    return success(result, request)
+
+
+@router.get("/model/providers/{provider}/models")
+async def list_provider_models(
+    provider: str,
+    request: Request,
+) -> dict:
+    models = ModelProfileService.get_provider_models(provider)
+    return success({"provider": provider, "models": models}, request)

@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, MessageSquare, Sparkles } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
 import { apiClient } from '../../api/client';
+import { ModelSelector } from '../../components/ModelSelector';
 import type { InterviewMessage, StoryCandidateEntity } from '../../types/entities';
 import { CandidateCard } from './CandidateCard';
 import { EntrySelector } from './EntrySelector';
@@ -16,6 +17,7 @@ export function CreationWizardPage() {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('entry');
   const [sessionId, setSessionId] = useState<string>('');
+  const [modelProfileId, setModelProfileId] = useState('');
   const [messages, setMessages] = useState<InterviewMessage[]>([]);
 
   // ── 加载项目信息 ──
@@ -134,6 +136,7 @@ export function CreationWizardPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ModelSelector selectedId={modelProfileId} onChange={setModelProfileId} />
             <Link
               to={`/projects/${projectId}/bible`}
               className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"

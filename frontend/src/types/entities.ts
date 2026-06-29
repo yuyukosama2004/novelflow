@@ -196,6 +196,24 @@ export interface StoryCandidateEntity {
 
 // ── 故事圣经 ──
 
+// ── 模型配置 ──
+
+export interface ModelProfile {
+  id: string;
+  name: string;
+  provider: string;
+  base_url: string;
+  api_key_configured: boolean;
+  model_name: string;
+  temperature: number;
+  max_output_tokens: number;
+  timeout_seconds: number;
+  is_default: boolean;
+  enabled: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface CharacterRelationship {
   id: string;
   project_id: string;

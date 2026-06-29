@@ -4,15 +4,36 @@ import asyncio
 
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.database.session import AsyncSessionLocal
 from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
+from app.models.model_profile import ModelProfile
 from app.models.project import NovelProject
 from app.models.world import WorldEntry
 
 
 async def main() -> None:
     async with AsyncSessionLocal() as session:
+        # 从 .env 创建默认模型配置
+        settings = get_settings()
+        existing_profile = await session.execute(
+            select(ModelProfile).where(ModelProfile.is_default.is_(True))
+        )
+        if existing_profile.scalar_one_or_none() is None:
+            profile = ModelProfile(
+                name="默认 DeepSeek",
+                provider="deepseek",
+                base_url=settings.deepseek_base_url,
+                api_key=settings.deepseek_api_key,
+                model_name="deepseek-chat",
+                is_default=True,
+                enabled=True,
+            )
+            session.add(profile)
+            await session.commit()
+            print(f"Created default profile: {profile.name}")
+
         existing = await session.execute(select(NovelProject).where(NovelProject.title == "雨夜档案"))
         if existing.scalar_one_or_none() is not None:
             print("Seed data already exists.")

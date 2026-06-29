@@ -15,6 +15,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { API_BASE_URL, apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
+import { ModelSelector } from '../../components/ModelSelector';
 import { StatusPill } from '../../components/StatusPill';
 import type { Chapter, Scene, SceneVersion, Volume } from '../../types/entities';
 import { label, PROJECT_STATUS_LABELS } from '../../utils/enumLabels';
@@ -65,6 +66,7 @@ export function WorkspacePage() {
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [editingSceneTitle, setEditingSceneTitle] = useState('');
   const [showSettings, setShowSettings] = useState(true);
+  const [modelProfileId, setModelProfileId] = useState('');
 
   // ── 数据查询 ──
   const project = useQuery({
@@ -410,6 +412,7 @@ export function WorkspacePage() {
             <StatusPill tone="ok">
               {label(PROJECT_STATUS_LABELS, project.data?.status)}
             </StatusPill>
+            <ModelSelector selectedId={modelProfileId} onChange={setModelProfileId} />
             <Link
               to={`/projects/${projectId}/bible`}
               className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"

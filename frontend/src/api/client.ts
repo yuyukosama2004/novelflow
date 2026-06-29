@@ -7,6 +7,7 @@ import type {
   HealthStatus,
   InterviewSession,
   MemoryCandidate,
+  ModelProfile,
   MemoryCandidateStatus,
   ModelTestResult,
   NovelProject,
@@ -303,6 +304,24 @@ export const apiClient = {
     unwrap<Character>(api.get(`/characters/${characterId}`)),
   getWorldEntry: (entryId: string) =>
     unwrap<WorldEntry>(api.get(`/world-entries/${entryId}`)),
+
+  // Model Profile APIs
+  listModelProfiles: () =>
+    unwrap<ModelProfile[]>(api.get("/model/profiles")),
+  createModelProfile: (payload: Record<string, unknown>) =>
+    unwrap<ModelProfile>(api.post("/model/profiles", payload)),
+  patchModelProfile: (id: string, payload: Record<string, unknown>) =>
+    unwrap<ModelProfile>(api.patch(`/model/profiles/${id}`, payload)),
+  deleteModelProfile: (id: string) =>
+    unwrap<{ deleted: boolean }>(api.delete(`/model/profiles/${id}`)),
+  testModelProfile: (id: string) =>
+    unwrap<{ connected: boolean; provider: string; model: string; error?: string }>(
+      api.post(`/model/profiles/${id}/test`),
+    ),
+  listProviderModels: (provider: string) =>
+    unwrap<{ provider: string; models: string[] }>(
+      api.get(`/model/providers/${provider}/models`),
+    ),
 
   // Outline APIs
   generateOutline: (projectId: string) =>
