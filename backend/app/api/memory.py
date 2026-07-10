@@ -9,15 +9,12 @@ from app.core.exceptions import (
     ConflictError,
     MemoryExtractionError,
     NotFoundError,
-    ValidationAppError,
 )
 from app.core.responses import success
 from app.database.session import get_session
 from app.llm.router import LLMRouter
 from app.models.base import utc_now
-from app.models.character import Character, CharacterKnowledge, CharacterState
-from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
-from app.models.memory import MemoryCandidate, MemoryExtractionRun, TimelineEvent
+from app.models.memory import MemoryCandidate, MemoryExtractionRun
 from app.schemas.memory import (
     MemoryCandidateOut,
     MemoryExtractionResultOut,
@@ -26,6 +23,7 @@ from app.schemas.memory import (
 )
 from app.services.context_builder import ContextBuilder
 from app.services.manuscript_service import ManuscriptService
+from app.services.memory_application import MemoryApplicationService
 from app.services.memory_curator import MemoryCurator
 
 router = APIRouter()
@@ -163,144 +161,8 @@ async def update_candidate(
         candidate.content_json = payload.content_json
 
     if payload.status == "approved":
-        await _ensure_candidate_source_is_approved(session, candidate)
-        await _apply_candidate(session, candidate)
+        await MemoryApplicationService(session).apply(candidate)
 
     candidate.status = payload.status
     await session.commit()
     return success(MemoryCandidateOut.model_validate(candidate), request)
-
-
-async def _ensure_candidate_source_is_approved(
-    session: AsyncSession,
-    candidate: MemoryCandidate,
-) -> None:
-    result = await session.execute(
-        select(Scene.approved_version_id)
-        .select_from(SceneVersion)
-        .join(Scene, SceneVersion.scene_id == Scene.id)
-        .where(SceneVersion.id == candidate.scene_version_id)
-    )
-    approved_version_id = result.scalar_one_or_none()
-    if approved_version_id != candidate.scene_version_id:
-        raise ConflictError(
-            "memory candidate source is not the approved version",
-            {
-                "reason": "CANDIDATE_SOURCE_NOT_APPROVED",
-                "scene_version_id": candidate.scene_version_id,
-            },
-        )
-
-
-async def _apply_candidate(session: AsyncSession, candidate: MemoryCandidate) -> None:
-    """Apply an approved memory candidate to the relevant entity."""
-    project_id, timeline_order = await _scene_metadata(
-        session,
-        candidate.scene_version_id,
-    )
-
-    if candidate.candidate_type in ("character_state", "character_knowledge"):
-        char_id = candidate.target_entity_id
-        if not char_id:
-            raise ValidationAppError("character memory candidate requires target_entity_id")
-        character = await session.get(Character, char_id)
-        if character is None or character.project_id != project_id:
-            raise ValidationAppError(
-                "memory candidate target character is not in the scene project",
-                {"target_entity_id": char_id},
-            )
-
-        if candidate.candidate_type == "character_state":
-            session.add(
-                CharacterState(
-                    character_id=char_id,
-                    timeline_order=timeline_order,
-                    physical_state_json=candidate.content_json.get("physical_state", {}),
-                    emotional_state=candidate.content_json.get("emotional_state", ""),
-                    current_goal=candidate.content_json.get("current_goal", ""),
-                    current_pressure=candidate.content_json.get("current_pressure", ""),
-                    resources_json=candidate.content_json.get("resources", {}),
-                    injuries_json=candidate.content_json.get("injuries", {}),
-                    active_secrets_json=candidate.content_json.get("active_secrets", []),
-                    notes=candidate.evidence,
-                    source_scene_version_id=candidate.scene_version_id,
-                    status="confirmed",
-                )
-            )
-            return
-
-        fact_key = candidate.content_json.get("fact_key")
-        if not isinstance(fact_key, str) or not fact_key.strip():
-            raise ValidationAppError("character knowledge candidate requires fact_key")
-        knowledge_status = candidate.content_json.get(
-            "knowledge_status",
-            "confirmed",
-        )
-        allowed_statuses = {
-            "unknown",
-            "suspected",
-            "believed",
-            "confirmed",
-            "misunderstood",
-            "forgotten",
-        }
-        if knowledge_status not in allowed_statuses:
-            raise ValidationAppError(
-                "invalid character knowledge status",
-                {"knowledge_status": knowledge_status},
-            )
-        fact_value = candidate.content_json.get(
-            "fact_value_json",
-            candidate.content_json.get("fact_value", {}),
-        )
-        if not isinstance(fact_value, dict):
-            fact_value = {"value": fact_value}
-        session.add(
-            CharacterKnowledge(
-                character_id=char_id,
-                fact_key=fact_key.strip(),
-                fact_value_json=fact_value,
-                knowledge_status=knowledge_status,
-                learned_at_scene_version_id=candidate.scene_version_id,
-                confidence=candidate.confidence,
-            )
-        )
-        return
-
-    if candidate.candidate_type == "timeline_event":
-        session.add(
-            TimelineEvent(
-                project_id=project_id,
-                scene_version_id=candidate.scene_version_id,
-                event_text=candidate.content_json.get("event_text", ""),
-                timeline_order=timeline_order,
-                affected_character_ids=candidate.content_json.get("affected_character_ids", []),
-            )
-        )
-        return
-
-    raise ValidationAppError(
-        "unsupported memory candidate type",
-        {"candidate_type": candidate.candidate_type},
-    )
-
-
-async def _scene_metadata(
-    session: AsyncSession,
-    scene_version_id: str,
-) -> tuple[str, int]:
-    result = await session.execute(
-        select(Volume.project_id, Scene.timeline_order)
-        .select_from(SceneVersion)
-        .join(Scene, SceneVersion.scene_id == Scene.id)
-        .join(Chapter, Scene.chapter_id == Chapter.id)
-        .join(Volume, Chapter.volume_id == Volume.id)
-        .where(SceneVersion.id == scene_version_id)
-    )
-    metadata = result.one_or_none()
-    if metadata is None:
-        raise NotFoundError(
-            "scene version not found",
-            {"version_id": scene_version_id},
-        )
-    return metadata.project_id, metadata.timeline_order
