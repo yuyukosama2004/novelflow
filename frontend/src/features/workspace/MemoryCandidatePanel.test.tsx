@@ -59,6 +59,8 @@ const completedRun: MemoryExtractionRun = {
   id: 'run-1',
   scene_version_id: 'sv-1',
   model_profile_id: null,
+  provider: 'fake',
+  model: 'fake-model',
   status: 'completed',
   prompt_snapshot_json: {},
   started_at: now,
@@ -112,6 +114,18 @@ describe('MemoryCandidatePanel', () => {
 
     await waitFor(() => {
       expect(apiClient.extractMemories).toHaveBeenCalledWith('sv-1');
+    });
+  });
+
+  it('passes the selected model profile to extraction', async () => {
+    renderWithQuery(
+      <MemoryCandidatePanel sceneVersionId="sv-1" modelProfileId="profile-1" />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '提取记忆' }));
+
+    await waitFor(() => {
+      expect(apiClient.extractMemories).toHaveBeenCalledWith('sv-1', 'profile-1');
     });
   });
 

@@ -12,6 +12,7 @@ interface Props {
   sceneId?: string;
   sceneVersionId: string;
   approvedVersionId?: string | null;
+  modelProfileId?: string;
 }
 
 type CandidateAction = Extract<MemoryCandidateStatus, 'approved' | 'rejected'>;
@@ -46,6 +47,7 @@ export function MemoryCandidatePanel({
   sceneId,
   sceneVersionId,
   approvedVersionId,
+  modelProfileId = '',
 }: Props) {
   const queryClient = useQueryClient();
   const hasVersion = Boolean(sceneVersionId);
@@ -65,7 +67,10 @@ export function MemoryCandidatePanel({
   });
 
   const extractMemories = useMutation({
-    mutationFn: () => apiClient.extractMemories(sceneVersionId),
+    mutationFn: () =>
+      modelProfileId
+        ? apiClient.extractMemories(sceneVersionId, modelProfileId)
+        : apiClient.extractMemories(sceneVersionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['memory-candidates', sceneVersionId] });
       queryClient.invalidateQueries({ queryKey: ['memory-extraction-runs', sceneVersionId] });

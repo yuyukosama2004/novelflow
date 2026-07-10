@@ -4,14 +4,13 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.core.exceptions import NotFoundError, ReviewExecutionError
 from app.core.responses import success
 from app.database.session import get_session
-from app.llm.router import LLMRouter
 from app.models.base import utc_now
 from app.models.manuscript import SceneVersion
 from app.models.review import ReviewIssue, ReviewRun
+from app.schemas.model_runtime import ModelProfileRequest
 from app.schemas.review import (
     ReviewIssueOut,
     ReviewResultOut,
@@ -21,6 +20,7 @@ from app.schemas.review import (
 from app.services.context_builder import ContextBuilder
 from app.services.continuity_reviewer import ContinuityReviewer
 from app.services.manuscript_service import ManuscriptService
+from app.services.model_runtime import ModelRuntimeResolver
 
 router = APIRouter()
 
@@ -36,16 +36,22 @@ def review_result(run: ReviewRun, issues: list[ReviewIssue]) -> ReviewResultOut:
 async def review_version(
     version_id: str,
     request: Request,
+    payload: ModelProfileRequest | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Run continuity review on a scene version."""
-    settings = get_settings()
     manuscript = ManuscriptService(session)
     version = await manuscript.get_version(version_id)
+    runtime = await ModelRuntimeResolver(session).resolve_for_version(
+        version.id,
+        payload.model_profile_id if payload else None,
+    )
 
     run = ReviewRun(
         scene_version_id=version.id,
-        model_profile_id=version.model_profile_id,
+        model_profile_id=runtime.profile_id,
+        provider=runtime.provider,
+        model=runtime.model,
         status="pending",
         prompt_snapshot_json={},
         summary="",
@@ -62,9 +68,10 @@ async def review_version(
 
         builder = ContextBuilder(session)
         ctx = await builder.build_for_scene(version.scene_id)
-        reviewer = ContinuityReviewer(LLMRouter(), settings.default_model_provider)
+        reviewer = ContinuityReviewer(runtime.router, runtime.provider)
         run.prompt_snapshot_json = {
-            "provider": settings.default_model_provider,
+            "provider": runtime.provider,
+            "model": runtime.model,
             "prompt": reviewer.build_prompt(version, ctx),
         }
         issues = await reviewer.review(version, ctx)

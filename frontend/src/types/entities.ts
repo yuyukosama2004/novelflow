@@ -15,6 +15,7 @@ export interface NovelProject extends EntityBase {
   status: string;
   language: string;
   current_timeline_position: number;
+  default_model_profile_id: string | null;
 }
 
 export interface Character extends EntityBase {
@@ -133,6 +134,8 @@ export type ReviewRunStatus = 'pending' | 'running' | 'completed' | 'failed';
 export interface ReviewRun extends EntityBase {
   scene_version_id: string;
   model_profile_id: string | null;
+  provider: string;
+  model: string;
   status: ReviewRunStatus;
   prompt_snapshot_json: Record<string, unknown>;
   started_at: string | null;
@@ -174,6 +177,8 @@ export interface MemoryCandidate extends EntityBase {
 export interface MemoryExtractionRun extends EntityBase {
   scene_version_id: string;
   model_profile_id: string | null;
+  provider: string;
+  model: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   prompt_snapshot_json: Record<string, unknown>;
   started_at: string | null;
@@ -204,6 +209,9 @@ export interface InterviewMessage {
 export interface InterviewSession {
   id: string;
   project_id: string;
+  model_profile_id: string | null;
+  provider: string;
+  model: string;
   entry_type: string;
   title: string;
   status: string;

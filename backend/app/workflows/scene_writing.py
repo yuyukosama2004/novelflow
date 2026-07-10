@@ -100,10 +100,12 @@ class SceneWritingWorkflow:
                 ),
                 LLMMessage(role="user", content=self.user_prompt),
             ],
+            model=self.state.model,
             max_tokens=512,
             temperature=0.7,
         )
         response = await self.llm.generate(plan_request, self.state.provider)
+        self.state.model = response.model
         return response.content
 
     async def _draft(self) -> AsyncIterator[dict]:
@@ -117,6 +119,7 @@ class SceneWritingWorkflow:
                 LLMMessage(role="system", content=self.system_prompt),
                 LLMMessage(role="user", content=full_prompt),
             ],
+            model=self.state.model,
             max_tokens=4096,
             temperature=0.8,
         )

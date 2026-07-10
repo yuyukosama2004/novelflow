@@ -35,6 +35,8 @@ const latestRun: ReviewRun = {
   id: 'run-latest',
   scene_version_id: 'sv-1',
   model_profile_id: null,
+  provider: 'fake',
+  model: 'fake-model',
   status: 'completed',
   prompt_snapshot_json: {},
   started_at: now,
@@ -120,6 +122,19 @@ describe('ReviewIssuePanel', () => {
       expect(apiClient.runReview).toHaveBeenCalledWith('sv-1');
     });
     expect(await screen.findByText('timeline_conflict')).toBeInTheDocument();
+  });
+
+  it('passes the selected model profile to review', async () => {
+    renderWithQuery(
+      <ReviewIssuePanel sceneVersionId="sv-1" modelProfileId="profile-1" />,
+    );
+
+    await screen.findByText('尚未执行审查。');
+    fireEvent.click(screen.getByRole('button', { name: '执行审查' }));
+
+    await waitFor(() => {
+      expect(apiClient.runReview).toHaveBeenCalledWith('sv-1', 'profile-1');
+    });
   });
 
   it('shows the latest run and allows reading an older run', async () => {

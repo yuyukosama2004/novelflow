@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ConflictError, NotFoundError
 from app.llm.router import LLMRouter
 from app.models.model_profile import ModelProfile
+from app.models.project import NovelProject
 
 # DeepSeek 已知模型列表
 DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner"]
@@ -43,6 +44,8 @@ class ModelProfileService:
         if payload.get("is_default"):
             await self._clear_defaults()
         for key, value in payload.items():
+            if key == "api_key" and value == "":
+                continue
             if hasattr(p, key):
                 setattr(p, key, value)
         await self.session.commit()
@@ -53,19 +56,36 @@ class ModelProfileService:
         p = await self.get(profile_id)
         if p.is_default:
             raise ConflictError("cannot delete default profile")
+        project_result = await self.session.execute(
+            select(NovelProject.id).where(NovelProject.default_model_profile_id == profile_id).limit(1)
+        )
+        if project_result.scalar_one_or_none() is not None:
+            raise ConflictError(
+                "cannot delete a profile used as a project default",
+                {"profile_id": profile_id},
+            )
         await self.session.delete(p)
         await self.session.commit()
 
     async def test(self, profile_id: str) -> dict:
         p = await self.get(profile_id)
-        router = LLMRouter()
+        if not p.enabled:
+            return {"connected": False, "error": "model profile is disabled"}
+        router = LLMRouter(p)
         try:
-            connected = await router.validate_connection(p.provider)
+            connected = await router.validate_connection()
             if connected:
                 return {"connected": True, "provider": p.provider, "model": p.model_name}
             return {"connected": False, "error": "connection test failed"}
-        except Exception as exc:
-            return {"connected": False, "error": str(exc)}
+        except Exception:
+            return {"connected": False, "error": "connection test failed"}
+
+    async def clear_api_key(self, profile_id: str) -> ModelProfile:
+        profile = await self.get(profile_id)
+        profile.api_key = ""
+        await self.session.commit()
+        await self.session.refresh(profile)
+        return profile
 
     async def get_default(self) -> ModelProfile | None:
         result = await self.session.execute(
@@ -82,9 +102,7 @@ class ModelProfileService:
         return []  # openai_compatible 由用户手动输入
 
     async def _clear_defaults(self) -> None:
-        result = await self.session.execute(
-            select(ModelProfile).where(ModelProfile.is_default.is_(True))
-        )
+        result = await self.session.execute(select(ModelProfile).where(ModelProfile.is_default.is_(True)))
         for p in result.scalars().all():
             p.is_default = False
 

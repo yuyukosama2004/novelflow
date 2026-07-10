@@ -10,7 +10,6 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.core.exceptions import ConflictError
 from app.database.session import get_session
 from app.llm.router import LLMRouter
@@ -18,6 +17,7 @@ from app.models.workflow import WorkflowRun
 from app.schemas.manuscript import SceneVersionCreate, SceneVersionRead
 from app.services.context_builder import ContextBuilder
 from app.services.manuscript_service import ManuscriptService
+from app.services.model_runtime import ModelRuntimeResolver
 from app.workflows.scene_writing import SceneWritingWorkflow, WorkflowState
 
 router = APIRouter()
@@ -91,6 +91,9 @@ def _build_user_prompt(ctx, scene) -> str:  # type: ignore[no-untyped-def]
 
 class WorkflowRunOut(BaseModel):
     id: str
+    model_profile_id: str | None
+    provider: str
+    model: str
     run_type: str
     status: str
     plan: str
@@ -100,6 +103,10 @@ class WorkflowRunOut(BaseModel):
     version_created_id: str | None
 
     model_config = {"from_attributes": True}
+
+
+class GenerateSceneRequest(BaseModel):
+    model_profile_id: str | None = None
 
 
 @router.get("/workflows/runs/{run_id}")
@@ -123,12 +130,16 @@ async def get_workflow_run(
 async def generate_scene_stream(
     scene_id: str,
     request: Request,
+    payload: GenerateSceneRequest | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
     """Stream-generate scene content via the persisted workflow state machine."""
-    settings = get_settings()
     manuscript = ManuscriptService(session)
     scene = await manuscript.get_scene(scene_id)
+    runtime = await ModelRuntimeResolver(session).resolve_for_scene(
+        scene_id,
+        payload.model_profile_id if payload else None,
+    )
 
     # 并发锁：检查是否有正在运行中的生成任务
     active_run = await session.execute(
@@ -151,16 +162,17 @@ async def generate_scene_stream(
     run_id = getattr(request.state, "request_id", f"run_{scene_id[:8]}")
     system_prompt = _build_system_prompt()
     user_prompt = _build_user_prompt(ctx, scene)
-    provider = settings.default_model_provider
+    provider = runtime.provider
 
     # Persist workflow run
     wf_run = WorkflowRun(
         id=run_id,
         scene_id=scene_id,
+        model_profile_id=runtime.profile_id,
         run_type="scene_writing",
         status="pending",
         provider=provider,
-        model="",
+        model=runtime.model,
         prompt_snapshot_json={
             "system": system_prompt,
             "user": user_prompt,
@@ -174,11 +186,12 @@ async def generate_scene_stream(
         scene_id=scene_id,
         scene_title=scene.title,
         provider=provider,
+        model=runtime.model,
         run_id=run_id,
         prompt_snapshot={"system": system_prompt, "user": user_prompt},
         context_manifest=ctx.manifest,
     )
-    llm = LLMRouter()
+    llm = runtime.router if runtime.profile_id else LLMRouter()
     workflow = SceneWritingWorkflow(state, llm, system_prompt, user_prompt, ctx.manifest)
 
     async def stream():  # type: ignore[no-untyped-def]
@@ -188,6 +201,7 @@ async def generate_scene_stream(
                 wf_run.status = state.status
                 wf_run.plan = state.plan
                 wf_run.draft = state.draft
+                wf_run.model = state.model
                 wf_run.events_json = state.events
                 wf_run.error = state.error
                 await session.commit()
@@ -200,6 +214,7 @@ async def generate_scene_stream(
                     content_markdown=state.draft,
                     summary=_summary(state.draft),
                     source_type="ai_generated",
+                    model_profile_id=runtime.profile_id,
                     prompt_snapshot_json=state.prompt_snapshot,
                     context_manifest_json=state.context_manifest,
                 )

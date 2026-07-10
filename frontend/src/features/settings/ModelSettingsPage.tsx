@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, KeyRound, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { apiClient } from '../../api/client';
@@ -21,6 +21,7 @@ export function ModelSettingsPage() {
   const [form, setForm] = useState<Record<string, unknown>>({
     name: '', provider: 'deepseek', base_url: '', api_key: '',
     model_name: '', temperature: 0.7, max_output_tokens: 4096,
+    timeout_seconds: 120,
     is_default: false, enabled: true,
   });
 
@@ -46,6 +47,11 @@ export function ModelSettingsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['model-profiles'] }),
   });
 
+  const clearApiKey = useMutation({
+    mutationFn: (id: string) => apiClient.clearModelProfileApiKey(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['model-profiles'] }),
+  });
+
   const testProfile = useMutation({
     mutationFn: (id: string) => apiClient.testModelProfile(id),
     onSuccess: (data) => setTestResult(data.connected ? '✅ 连接成功' : `❌ ${data.error || '连接失败'}`),
@@ -55,6 +61,7 @@ export function ModelSettingsPage() {
   function startAdd() {
     setForm({ name: '', provider: 'deepseek', base_url: '', api_key: '',
       model_name: '', temperature: 0.7, max_output_tokens: 4096,
+      timeout_seconds: 120,
       is_default: false, enabled: true });
     setAdding(true);
     setEditingId(null);
@@ -64,7 +71,8 @@ export function ModelSettingsPage() {
     setForm({
       name: p.name, provider: p.provider, base_url: p.base_url, api_key: '',
       model_name: p.model_name, temperature: p.temperature,
-      max_output_tokens: p.max_output_tokens, is_default: p.is_default, enabled: p.enabled,
+      max_output_tokens: p.max_output_tokens, timeout_seconds: p.timeout_seconds,
+      is_default: p.is_default, enabled: p.enabled,
     });
     setEditingId(p.id);
     setAdding(false);
@@ -117,6 +125,17 @@ export function ModelSettingsPage() {
                     className="rounded p-1.5 text-slate-400 hover:bg-slate-100" title="编辑">
                     <Pencil size={14} />
                   </button>
+                  {p.api_key_configured ? (
+                    <button
+                      onClick={() => {
+                        if (confirm('确定清除这个配置的 API Key？')) clearApiKey.mutate(p.id);
+                      }}
+                      className="rounded p-1.5 text-amber-500 hover:bg-amber-50"
+                      title="清除 API Key"
+                    >
+                      <KeyRound size={14} />
+                    </button>
+                  ) : null}
                   <button onClick={() => { if (confirm('确定删除？')) remove.mutate(p.id); }}
                     className="rounded p-1.5 text-rose-400 hover:bg-rose-50" title="删除">
                     <Trash2 size={14} />
@@ -191,6 +210,29 @@ function ProfileForm({
         <input type="password" value={String(form.api_key ?? '')} onChange={e => setForm({ ...form, api_key: e.target.value })}
           placeholder="留空不修改" className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600" />
       </label>
+      <div className="grid grid-cols-3 gap-3">
+        <label className="block">
+          <span className="font-medium text-slate-700">温度</span>
+          <input type="number" min="0" max="2" step="0.1"
+            value={Number(form.temperature ?? 0.7)}
+            onChange={e => setForm({ ...form, temperature: Number(e.target.value) })}
+            className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600" />
+        </label>
+        <label className="block">
+          <span className="font-medium text-slate-700">最大输出</span>
+          <input type="number" min="1"
+            value={Number(form.max_output_tokens ?? 4096)}
+            onChange={e => setForm({ ...form, max_output_tokens: Number(e.target.value) })}
+            className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600" />
+        </label>
+        <label className="block">
+          <span className="font-medium text-slate-700">超时（秒）</span>
+          <input type="number" min="1"
+            value={Number(form.timeout_seconds ?? 120)}
+            onChange={e => setForm({ ...form, timeout_seconds: Number(e.target.value) })}
+            className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600" />
+        </label>
+      </div>
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={Boolean(form.is_default)} onChange={e => setForm({ ...form, is_default: e.target.checked })} />

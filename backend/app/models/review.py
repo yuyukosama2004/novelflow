@@ -14,6 +14,8 @@ class ReviewRun(UUIDMixin, TimestampMixin, Base):
 
     scene_version_id: Mapped[str] = mapped_column(ForeignKey("scene_versions.id"), index=True)
     model_profile_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    provider: Mapped[str] = mapped_column(String(40), default="")
+    model: Mapped[str] = mapped_column(String(100), default="")
     status: Mapped[str] = mapped_column(String(40), default="pending")
     prompt_snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

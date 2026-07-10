@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, MessageSquare, Sparkles } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
@@ -27,6 +27,12 @@ export function CreationWizardPage() {
     enabled: Boolean(projectId),
   });
 
+  useEffect(() => {
+    if (project.data?.default_model_profile_id) {
+      setModelProfileId(project.data.default_model_profile_id);
+    }
+  }, [project.data?.default_model_profile_id]);
+
   // ── 候选列表 ──
   const candidatesQuery = useQuery({
     queryKey: ['story-candidates', sessionId],
@@ -37,7 +43,7 @@ export function CreationWizardPage() {
   // ── 操作 Mutations ──
   const startSession = useMutation({
     mutationFn: (entryType: string) =>
-      apiClient.startInterview(projectId, entryType),
+      apiClient.startInterview(projectId, entryType, undefined, modelProfileId),
     onSuccess: (data) => {
       setSessionId(data.id);
       setMessages(data.messages);

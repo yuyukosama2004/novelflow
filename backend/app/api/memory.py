@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.core.exceptions import (
     ConflictError,
     MemoryExtractionError,
@@ -12,7 +11,6 @@ from app.core.exceptions import (
 )
 from app.core.responses import success
 from app.database.session import get_session
-from app.llm.router import LLMRouter
 from app.models.base import utc_now
 from app.models.memory import MemoryCandidate, MemoryExtractionRun
 from app.schemas.memory import (
@@ -21,10 +19,12 @@ from app.schemas.memory import (
     MemoryExtractionRunOut,
     UpdateCandidateRequest,
 )
+from app.schemas.model_runtime import ModelProfileRequest
 from app.services.context_builder import ContextBuilder
 from app.services.manuscript_service import ManuscriptService
 from app.services.memory_application import MemoryApplicationService
 from app.services.memory_curator import MemoryCurator
+from app.services.model_runtime import ModelRuntimeResolver
 
 router = APIRouter()
 
@@ -43,16 +43,22 @@ def extraction_result(
 async def extract_memories(
     version_id: str,
     request: Request,
+    payload: ModelProfileRequest | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Extract memory candidates from a scene version."""
-    settings = get_settings()
     manuscript = ManuscriptService(session)
     version = await manuscript.get_version(version_id)
+    runtime = await ModelRuntimeResolver(session).resolve_for_version(
+        version.id,
+        payload.model_profile_id if payload else None,
+    )
 
     run = MemoryExtractionRun(
         scene_version_id=version.id,
-        model_profile_id=version.model_profile_id,
+        model_profile_id=runtime.profile_id,
+        provider=runtime.provider,
+        model=runtime.model,
         status="pending",
         prompt_snapshot_json={},
     )
@@ -67,9 +73,10 @@ async def extract_memories(
 
         builder = ContextBuilder(session)
         ctx = await builder.build_for_scene(version.scene_id)
-        curator = MemoryCurator(LLMRouter(), settings.default_model_provider)
+        curator = MemoryCurator(runtime.router, runtime.provider)
         run.prompt_snapshot_json = {
-            "provider": settings.default_model_provider,
+            "provider": runtime.provider,
+            "model": runtime.model,
             "prompt": curator.build_prompt(version, ctx),
         }
         candidates = await curator.extract(version, ctx)

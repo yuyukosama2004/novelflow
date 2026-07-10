@@ -33,15 +33,20 @@ interface SceneOutline {
 interface Props {
   projectId: string;
   hasExistingOutline: boolean;
+  modelProfileId?: string;
 }
 
-export function OutlineGeneratorPanel({ projectId, hasExistingOutline }: Props) {
+export function OutlineGeneratorPanel({
+  projectId,
+  hasExistingOutline,
+  modelProfileId = '',
+}: Props) {
   const queryClient = useQueryClient();
   const [outline, setOutline] = useState<VolumeOutline[] | null>(null);
   const [error, setError] = useState('');
 
   const generate = useMutation({
-    mutationFn: () => apiClient.generateOutline(projectId),
+    mutationFn: () => apiClient.generateOutline(projectId, modelProfileId),
     onSuccess: (data) => {
       setOutline(data);
       setError('');

@@ -12,6 +12,8 @@ class ReviewRunOut(BaseModel):
     id: str
     scene_version_id: str
     model_profile_id: str | None
+    provider: str
+    model: str
     status: str
     prompt_snapshot_json: dict[str, Any]
     started_at: datetime | None

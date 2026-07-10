@@ -17,14 +17,22 @@ class ApplyOutlineRequest(BaseModel):
     outline: list[dict]
 
 
+class GenerateOutlineRequest(BaseModel):
+    model_profile_id: str | None = None
+
+
 @router.post("/projects/{project_id}/generate-outline")
 async def generate_outline(
     project_id: str,
     request: Request,
+    payload: GenerateOutlineRequest | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """根据项目圣经信息生成大纲（卷/章/场景草案）。不直接写入数据库。"""
-    outline = await OutlineService(session).generate_outline(project_id)
+    outline = await OutlineService(session).generate_outline(
+        project_id,
+        payload.model_profile_id if payload else None,
+    )
     return success(outline, request)
 
 

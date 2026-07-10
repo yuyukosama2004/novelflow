@@ -110,6 +110,12 @@ export function WorkspacePage() {
     enabled: Boolean(selectedSceneId),
   });
 
+  useEffect(() => {
+    if (project.data?.default_model_profile_id) {
+      setModelProfileId(project.data.default_model_profile_id);
+    }
+  }, [project.data?.default_model_profile_id]);
+
   // ── 级联默认选择 ──
   useEffect(() => {
     if (!selectedVolumeId && volumes.data?.[0]) {
@@ -906,6 +912,7 @@ export function WorkspacePage() {
           <SceneEditor
             scene={scene.data ?? null}
             onVersionCreated={handleVersionCreated}
+            modelProfileId={modelProfileId}
           />
         </div>
 
@@ -919,15 +926,20 @@ export function WorkspacePage() {
           />
           <SceneGenerationPanel
             sceneId={selectedSceneId}
+            modelProfileId={modelProfileId}
             onVersionCreated={handleVersionCreated}
           />
           <SceneCardEditor scene={scene.data ?? null} />
           <ContextChecker sceneId={selectedSceneId} />
-          <ReviewIssuePanel sceneVersionId={selectedSceneVersionId} />
+          <ReviewIssuePanel
+            sceneVersionId={selectedSceneVersionId}
+            modelProfileId={modelProfileId}
+          />
           <MemoryCandidatePanel
             sceneId={selectedSceneId}
             sceneVersionId={selectedSceneVersionId}
             approvedVersionId={scene.data?.approved_version_id ?? null}
+            modelProfileId={modelProfileId}
           />
         </aside>
       </div>

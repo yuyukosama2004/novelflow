@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BookOpen, Globe2, Heart, ListChecks, Users, Clock } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
 import { apiClient } from '../../api/client';
+import { ModelSelector } from '../../components/ModelSelector';
 import { CoreConceptPanel } from './CoreConceptPanel';
 import { CharacterDetailPanel } from './CharacterDetailPanel';
 import { OutlineGeneratorPanel } from './OutlineGeneratorPanel';
@@ -27,6 +28,7 @@ export function StoryBiblePage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('concept');
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
+  const [modelProfileId, setModelProfileId] = useState('');
 
   const project = useQuery({
     queryKey: ['project', projectId],
@@ -53,6 +55,12 @@ export function StoryBiblePage() {
     queryFn: () => apiClient.listVolumes(projectId),
     enabled: Boolean(projectId),
   });
+
+  useEffect(() => {
+    if (project.data?.default_model_profile_id) {
+      setModelProfileId(project.data.default_model_profile_id);
+    }
+  }, [project.data?.default_model_profile_id]);
 
   const saveProject = useMutation({
     mutationFn: (payload: Record<string, string>) =>
@@ -100,10 +108,13 @@ export function StoryBiblePage() {
               {project.data?.title ?? '加载中…'} · 故事圣经
             </h1>
           </div>
-          <Link to={`/projects/${projectId}`}
-            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-            进入工作台
-          </Link>
+          <div className="flex items-center gap-2">
+            <ModelSelector selectedId={modelProfileId} onChange={setModelProfileId} />
+            <Link to={`/projects/${projectId}`}
+              className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+              进入工作台
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -203,6 +214,7 @@ export function StoryBiblePage() {
             <OutlineGeneratorPanel
               projectId={projectId}
               hasExistingOutline={(volumes.data?.length ?? 0) > 0}
+              modelProfileId={modelProfileId}
             />
           ) : tab === 'timeline' ? (
             <TimelinePanel projectId={projectId} />

@@ -16,6 +16,7 @@ router = APIRouter()
 class StartSessionRequest(BaseModel):
     entry_type: str  # idea | world | character | outline | direct
     title: str = ""
+    model_profile_id: str | None = None
 
 
 class SendMessageRequest(BaseModel):
@@ -39,6 +40,7 @@ async def start_interview(
         project_id,
         payload.entry_type,
         payload.title,
+        payload.model_profile_id,
     )
     return success(result, request)
 

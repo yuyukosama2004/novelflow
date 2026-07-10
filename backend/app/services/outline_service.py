@@ -10,14 +10,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.core.exceptions import ConflictError
 from app.llm.base import LLMMessage, LLMRequest
-from app.llm.router import LLMRouter
 from app.models.character import Character
 from app.models.manuscript import Chapter, Scene, Volume
 from app.models.project import NovelProject
 from app.models.world import WorldEntry
+from app.services.model_runtime import ModelRuntimeResolver
 from app.services.project_service import ProjectService
 from app.services.structured_output import generate_json_array
 
@@ -64,26 +63,44 @@ class OutlineService:
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self.llm = LLMRouter()
-        self.settings = get_settings()
 
-    async def generate_outline(self, project_id: str) -> list[dict]:
+    async def generate_outline(
+        self,
+        project_id: str,
+        model_profile_id: str | None = None,
+    ) -> list[dict]:
         """根据项目圣经信息生成大纲候选。"""
         await ProjectService(self.session).get(project_id)
+        runtime = await ModelRuntimeResolver(self.session).resolve(
+            project_id,
+            model_profile_id,
+        )
 
         # 收集项目信息
         project = await self.session.get(NovelProject, project_id)
 
-        characters = (await self.session.execute(
-            select(Character).where(Character.project_id == project_id, Character.status == "active")
-        )).scalars().all()
-
-        world_entries = (await self.session.execute(
-            select(WorldEntry).where(
-                WorldEntry.project_id == project_id,
-                WorldEntry.canon_status == "approved",
+        characters = (
+            (
+                await self.session.execute(
+                    select(Character).where(Character.project_id == project_id, Character.status == "active")
+                )
             )
-        )).scalars().all()
+            .scalars()
+            .all()
+        )
+
+        world_entries = (
+            (
+                await self.session.execute(
+                    select(WorldEntry).where(
+                        WorldEntry.project_id == project_id,
+                        WorldEntry.canon_status == "approved",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
 
         # 构建 prompt
         info_parts = ["## 项目设定"]
@@ -114,12 +131,16 @@ class OutlineService:
                 LLMMessage(role="system", content=OUTLINE_SYSTEM_PROMPT),
                 LLMMessage(role="user", content="\n".join(info_parts)),
             ],
+            model=runtime.model,
             max_tokens=4096,
             temperature=0.7,
         )
 
         volumes = await generate_json_array(
-            self.llm, self.settings.default_model_provider, request, OutlineVolume,
+            runtime.router,
+            runtime.provider,
+            request,
+            OutlineVolume,
         )
 
         return [

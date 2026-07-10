@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,8 +85,8 @@ async def test_model_connection(
             )
             llm_response = await router_instance.generate(llm_request, provider)
             response_text = llm_response.content
-        except Exception as exc:
-            error = str(exc)
+        except Exception:
+            error = "model request failed"
     return success(
         ModelTestResponse(
             provider=provider,
@@ -125,28 +127,29 @@ async def generate_text(
 
 # ── Model Profile CRUD ──
 
+
 class ProfileCreate(BaseModel):
     name: str = ""
-    provider: str = "deepseek"
+    provider: Literal["deepseek", "ollama", "openai_compatible", "fake"] = "deepseek"
     base_url: str = ""
     api_key: str = ""
     model_name: str = ""
-    temperature: float = 0.7
-    max_output_tokens: int = 4096
-    timeout_seconds: int = 120
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    max_output_tokens: int = Field(default=4096, ge=1)
+    timeout_seconds: int = Field(default=120, ge=1)
     is_default: bool = False
     enabled: bool = True
 
 
 class ProfileUpdate(BaseModel):
     name: str | None = None
-    provider: str | None = None
+    provider: Literal["deepseek", "ollama", "openai_compatible", "fake"] | None = None
     base_url: str | None = None
     api_key: str | None = None
     model_name: str | None = None
-    temperature: float | None = None
-    max_output_tokens: int | None = None
-    timeout_seconds: int | None = None
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    max_output_tokens: int | None = Field(default=None, ge=1)
+    timeout_seconds: int | None = Field(default=None, ge=1)
     is_default: bool | None = None
     enabled: bool | None = None
 
@@ -177,9 +180,7 @@ async def update_profile(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    p = await ModelProfileService(session).update(
-        profile_id, payload.model_dump(exclude_unset=True)
-    )
+    p = await ModelProfileService(session).update(profile_id, payload.model_dump(exclude_unset=True))
     return success(ModelProfileService._out(p), request)
 
 
@@ -191,6 +192,16 @@ async def delete_profile(
 ) -> dict:
     await ModelProfileService(session).delete(profile_id)
     return success({"deleted": True}, request)
+
+
+@router.delete("/model/profiles/{profile_id}/api-key")
+async def clear_profile_api_key(
+    profile_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    profile = await ModelProfileService(session).clear_api_key(profile_id)
+    return success(ModelProfileService._out(profile), request)
 
 
 @router.post("/model/profiles/{profile_id}/test")

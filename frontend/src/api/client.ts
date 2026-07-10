@@ -58,7 +58,13 @@ export const apiClient = {
     unwrap<NovelProject>(api.get(`/projects/${projectId}`)),
   patchProject: (
     projectId: string,
-    payload: { title?: string; summary?: string; genre?: string; tone?: string },
+    payload: {
+      title?: string;
+      summary?: string;
+      genre?: string;
+      tone?: string;
+      default_model_profile_id?: string | null;
+    },
   ) => unwrap<NovelProject>(api.patch(`/projects/${projectId}`, payload)),
   archiveProject: (projectId: string) =>
     unwrap<NovelProject>(api.delete(`/projects/${projectId}`)),
@@ -201,9 +207,11 @@ export const apiClient = {
   testModel: (payload: { provider?: string; message?: string }) =>
     unwrap<ModelTestResult>(api.post("/model/test", payload)),
   // Review APIs
-  runReview: (versionId: string) =>
+  runReview: (versionId: string, modelProfileId?: string) =>
     unwrap<ReviewResult>(
-      api.post(`/scene-versions/${versionId}/review`),
+      api.post(`/scene-versions/${versionId}/review`, {
+        model_profile_id: modelProfileId || null,
+      }),
     ),
   listReviewRuns: (versionId: string) =>
     unwrap<ReviewRun[]>(
@@ -223,9 +231,11 @@ export const apiClient = {
     ),
 
   // Memory APIs
-  extractMemories: (versionId: string) =>
+  extractMemories: (versionId: string, modelProfileId?: string) =>
     unwrap<MemoryExtractionResult>(
-      api.post(`/scene-versions/${versionId}/extract-memories`),
+      api.post(`/scene-versions/${versionId}/extract-memories`, {
+        model_profile_id: modelProfileId || null,
+      }),
     ),
   listMemoryExtractionRuns: (versionId: string) =>
     unwrap<MemoryExtractionRun[]>(
@@ -259,11 +269,17 @@ export const apiClient = {
     ),
 
   // Interview APIs
-  startInterview: (projectId: string, entryType: string, title?: string) =>
+  startInterview: (
+    projectId: string,
+    entryType: string,
+    title?: string,
+    modelProfileId?: string,
+  ) =>
     unwrap<InterviewSession>(
       api.post(`/projects/${projectId}/interview/start`, {
         entry_type: entryType,
         title: title ?? "",
+        model_profile_id: modelProfileId || null,
       }),
     ),
   sendInterviewMessage: (sessionId: string, content: string) =>
@@ -337,6 +353,8 @@ export const apiClient = {
     unwrap<ModelProfile>(api.patch(`/model/profiles/${id}`, payload)),
   deleteModelProfile: (id: string) =>
     unwrap<{ deleted: boolean }>(api.delete(`/model/profiles/${id}`)),
+  clearModelProfileApiKey: (id: string) =>
+    unwrap<ModelProfile>(api.delete(`/model/profiles/${id}/api-key`)),
   testModelProfile: (id: string) =>
     unwrap<{ connected: boolean; provider: string; model: string; error?: string }>(
       api.post(`/model/profiles/${id}/test`),
@@ -347,7 +365,7 @@ export const apiClient = {
     ),
 
   // Outline APIs
-  generateOutline: (projectId: string) =>
+  generateOutline: (projectId: string, modelProfileId?: string) =>
     unwrap<
       {
         sequence_no: number;
@@ -369,7 +387,11 @@ export const apiClient = {
           }[];
         }[];
       }[]
-    >(api.post(`/projects/${projectId}/generate-outline`)),
+    >(
+      api.post(`/projects/${projectId}/generate-outline`, {
+        model_profile_id: modelProfileId || null,
+      }),
+    ),
   applyOutline: (projectId: string, outline: Record<string, unknown>[]) =>
     unwrap<Record<string, number>>(
       api.post(`/projects/${projectId}/apply-outline`, { outline }),
@@ -378,6 +400,7 @@ export const apiClient = {
 
 export function createSSEStream(
   sceneId: string,
+  modelProfileId: string,
   onChunk: (data: {
     run_id: string;
     content_delta: string;
@@ -391,6 +414,8 @@ export function createSSEStream(
   const controller = new AbortController();
   fetch(`${API_BASE_URL}/scenes/${sceneId}/generate`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model_profile_id: modelProfileId || null }),
     signal: controller.signal,
   })
     .then(async (response) => {

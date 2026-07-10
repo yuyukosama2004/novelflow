@@ -12,14 +12,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.core.exceptions import ConflictError, NotFoundError, ValidationAppError
 from app.llm.base import LLMMessage, LLMRequest
-from app.llm.router import LLMRouter
 from app.models.character import Character
 from app.models.interview import InterviewSession, StoryCandidate
 from app.models.project import NovelProject
 from app.models.world import WorldEntry
+from app.services.model_runtime import ModelRuntime, ModelRuntimeResolver
 from app.services.project_service import ProjectService
 
 # ── 访谈入口 Prompt ──
@@ -96,10 +95,10 @@ EXTRACT_SYSTEM_PROMPT = (
     "2. 每个候选必须能在对话中找到依据。\n"
     "3. 输出一个 JSON 数组，每个元素包含：\n"
     '  - candidate_type: "project_setting" | "character" | "world_entry"\n'
-    '  - title: 简短标题\n'
-    '  - content_json: 具体内容（取决于 candidate_type）\n'
-    '  - proposal: 从对话中提取的依据和理由\n'
-    '  - confidence: 0.0-1.0 的置信度\n'
+    "  - title: 简短标题\n"
+    "  - content_json: 具体内容（取决于 candidate_type）\n"
+    "  - proposal: 从对话中提取的依据和理由\n"
+    "  - confidence: 0.0-1.0 的置信度\n"
     "4. project_setting 的 content_json 包含：title(书名), summary(简介), genre(类型), tone(基调), theme(主题)\n"
     "5. character 的 content_json 包含：name(姓名), role(身份), core_desire(核心欲望), core_fear(核心恐惧), background(背景)\n"
     "6. world_entry 的 content_json 包含：name(名称), entry_type(类型), summary(摘要), content(详细内容)\n"
@@ -113,8 +112,6 @@ class InterviewService:
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self.llm = LLMRouter()
-        self.settings = get_settings()
 
     # ── 会话管理 ──
 
@@ -123,6 +120,7 @@ class InterviewService:
         project_id: str,
         entry_type: str,
         title: str = "",
+        model_profile_id: str | None = None,
     ) -> dict:
         """创建访谈会话并返回初始 LLM 消息。"""
         # 验证项目存在
@@ -136,16 +134,24 @@ class InterviewService:
 
         system_prompt = ENTRY_SYSTEM_PROMPTS[entry_type]
         session_title = title or ENTRY_TITLES.get(entry_type, "创作访谈")
+        runtime = await ModelRuntimeResolver(self.session).resolve(
+            project_id,
+            model_profile_id,
+        )
 
         # 构建初始 LLM 消息
         initial_message = await self._llm_first_message(
             entry_type,
             system_prompt,
             project_id,
+            runtime,
         )
 
         session = InterviewSession(
             project_id=project_id,
+            model_profile_id=runtime.profile_id,
+            provider=runtime.provider,
+            model=runtime.model,
             entry_type=entry_type,
             title=session_title,
             status="active",
@@ -164,6 +170,10 @@ class InterviewService:
 
         return {
             "id": session.id,
+            "project_id": session.project_id,
+            "model_profile_id": session.model_profile_id,
+            "provider": session.provider,
+            "model": session.model,
             "entry_type": session.entry_type,
             "title": session.title,
             "status": session.status,
@@ -173,6 +183,10 @@ class InterviewService:
     async def send_message(self, session_id: str, content: str) -> dict:
         """发送用户消息，获取 LLM 回复。"""
         session_obj = await self._get_session(session_id)
+        runtime = await ModelRuntimeResolver(self.session).resolve(
+            session_obj.project_id,
+            session_obj.model_profile_id,
+        )
 
         if session_obj.status != "active":
             raise ConflictError(
@@ -181,38 +195,43 @@ class InterviewService:
             )
 
         # 添加用户消息
-        session_obj.messages_json.append({
-            "role": "user",
-            "content": content,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        session_obj.messages_json.append(
+            {
+                "role": "user",
+                "content": content,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
         # 调用 LLM
-        llm_messages = [
-            LLMMessage(role=m["role"], content=m["content"])
-            for m in session_obj.messages_json
-        ]
-        response = await self.llm.generate(
+        llm_messages = [LLMMessage(role=m["role"], content=m["content"]) for m in session_obj.messages_json]
+        response = await runtime.router.generate(
             LLMRequest(
                 messages=llm_messages,
+                model=runtime.model,
                 max_tokens=1024,
                 temperature=0.8,
             ),
-            provider=self.settings.default_model_provider,
+            provider=runtime.provider,
         )
 
         # 添加 LLM 回复
-        session_obj.messages_json.append({
-            "role": "assistant",
-            "content": response.content,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        session_obj.messages_json.append(
+            {
+                "role": "assistant",
+                "content": response.content,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
         await self.session.commit()
         await self.session.refresh(session_obj)
 
         return {
             "id": session_obj.id,
+            "model_profile_id": session_obj.model_profile_id,
+            "provider": session_obj.provider,
+            "model": session_obj.model,
             "messages": session_obj.messages_json,
         }
 
@@ -222,6 +241,9 @@ class InterviewService:
         return {
             "id": session_obj.id,
             "project_id": session_obj.project_id,
+            "model_profile_id": session_obj.model_profile_id,
+            "provider": session_obj.provider,
+            "model": session_obj.model,
             "entry_type": session_obj.entry_type,
             "title": session_obj.title,
             "status": session_obj.status,
@@ -233,12 +255,13 @@ class InterviewService:
     async def extract_candidates(self, session_id: str) -> list[dict]:
         """从访谈对话中提取结构化候选。"""
         session_obj = await self._get_session(session_id)
+        runtime = await ModelRuntimeResolver(self.session).resolve(
+            session_obj.project_id,
+            session_obj.model_profile_id,
+        )
 
         # 构建提取请求
-        conversation_text = "\n".join(
-            f"{m['role']}: {m['content']}"
-            for m in session_obj.messages_json
-        )
+        conversation_text = "\n".join(f"{m['role']}: {m['content']}" for m in session_obj.messages_json)
 
         llm_messages = [
             LLMMessage(role="system", content=EXTRACT_SYSTEM_PROMPT),
@@ -260,10 +283,11 @@ class InterviewService:
             confidence: float = Field(ge=0.0, le=1.0)
 
         items = await generate_json_array(
-            self.llm,
-            self.settings.default_model_provider,
+            runtime.router,
+            runtime.provider,
             LLMRequest(
                 messages=llm_messages,
+                model=runtime.model,
                 max_tokens=2048,
                 temperature=0.4,
             ),
@@ -370,6 +394,7 @@ class InterviewService:
         entry_type: str,
         system_prompt: str,
         project_id: str,
+        runtime: ModelRuntime,
     ) -> str:
         """生成访谈的第一条消息（LLM 发起对话）。"""
         # 获取项目基本信息
@@ -392,9 +417,14 @@ class InterviewService:
             ),
         ]
 
-        response = await self.llm.generate(
-            LLMRequest(messages=messages, max_tokens=512, temperature=0.8),
-            provider=self.settings.default_model_provider,
+        response = await runtime.router.generate(
+            LLMRequest(
+                messages=messages,
+                model=runtime.model,
+                max_tokens=512,
+                temperature=0.8,
+            ),
+            provider=runtime.provider,
         )
         return response.content
 

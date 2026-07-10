@@ -19,6 +19,7 @@ import {
 
 interface Props {
   sceneVersionId: string;
+  modelProfileId?: string;
 }
 
 type IssueAction = Exclude<ReviewIssueStatus, 'open'>;
@@ -66,7 +67,7 @@ function runOptionLabel(status: ReviewRunStatus, createdAt: string): string {
   );
 }
 
-export function ReviewIssuePanel({ sceneVersionId }: Props) {
+export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props) {
   const queryClient = useQueryClient();
   const [selectedRunId, setSelectedRunId] = useState('');
   const hasVersion = Boolean(sceneVersionId);
@@ -88,7 +89,10 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
   });
 
   const runReview = useMutation({
-    mutationFn: () => apiClient.runReview(sceneVersionId),
+    mutationFn: () =>
+      modelProfileId
+        ? apiClient.runReview(sceneVersionId, modelProfileId)
+        : apiClient.runReview(sceneVersionId),
     onSuccess: (result) => {
       setSelectedRunId(result.run.id);
       queryClient.setQueryData(['review-run', result.run.id], result);

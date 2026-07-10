@@ -20,6 +20,7 @@ class ProjectCreate(BaseModel):
     status: ProjectStatus = "draft"
     language: str = "zh-CN"
     current_timeline_position: int = 0
+    default_model_profile_id: str | None = None
 
 
 class ProjectUpdate(BaseModel):
@@ -33,6 +34,7 @@ class ProjectUpdate(BaseModel):
     status: ProjectStatus | None = None
     language: str | None = None
     current_timeline_position: int | None = None
+    default_model_profile_id: str | None = None
 
 
 class ProjectRead(EntityBase):
@@ -48,3 +50,4 @@ class ProjectRead(EntityBase):
     status: str
     language: str
     current_timeline_position: int
+    default_model_profile_id: str | None

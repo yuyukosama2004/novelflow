@@ -47,6 +47,11 @@ $env:DEEPSEEK_API_KEY = [Environment]::GetEnvironmentVariable("DEEPSEEK_API_KEY"
 
 如果 Key 曾被提交到 Git，即使后来删除文件，也必须在服务商后台撤销并重新生成。
 
+模型设置页也可以保存不同 Provider 的连接配置。当前版本面向本地单用户，API Key
+会以明文保存在本机 SQLite 数据库中；数据库文件已被 Git 忽略，但这不等同于加密。
+不要把数据库复制到公开位置，也不要将当前存储方式直接用于多人或公网部署。更新配置时
+将 Key 留空表示保留原值；如需删除，请使用设置页单独的“清除 API Key”操作。
+
 ## Quick Start
 
 Backend:

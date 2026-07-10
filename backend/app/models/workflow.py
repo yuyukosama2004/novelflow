@@ -12,6 +12,7 @@ class WorkflowRun(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "workflow_runs"
 
     scene_id: Mapped[str] = mapped_column(ForeignKey("scenes.id"), index=True)
+    model_profile_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     run_type: Mapped[str] = mapped_column(String(40), default="scene_writing")
     status: Mapped[str] = mapped_column(String(40), default="pending")
     provider: Mapped[str] = mapped_column(String(40), default="")

@@ -20,6 +20,7 @@ const project: NovelProject = {
   status: 'active',
   language: 'zh-CN',
   current_timeline_position: 0,
+  default_model_profile_id: null,
 };
 
 it('renders projects and health status', () => {

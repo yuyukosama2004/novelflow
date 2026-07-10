@@ -5,11 +5,13 @@ import type { SceneVersion } from "../../types/entities";
 
 interface Props {
   sceneId: string;
+  modelProfileId?: string;
   onVersionCreated?: (version: SceneVersion) => void;
 }
 
 export default function SceneGenerationPanel({
   sceneId,
+  modelProfileId = "",
   onVersionCreated,
 }: Props) {
   const [generating, setGenerating] = useState(false);
@@ -35,6 +37,7 @@ export default function SceneGenerationPanel({
 
     controllerRef.current = createSSEStream(
       sceneId,
+      modelProfileId,
       (data) => {
         if (data.error) {
           setError(data.error);

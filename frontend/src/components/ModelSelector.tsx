@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -17,9 +18,18 @@ export function ModelSelector({ selectedId, onChange }: Props) {
   });
 
   const list = profiles.data ?? [];
-  const selected = list.find((p) => p.id === selectedId);
+  const enabledProfiles = list.filter((profile) => profile.enabled);
+  const selected = enabledProfiles.find((profile) => profile.id === selectedId);
+  const fallback =
+    enabledProfiles.find((profile) => profile.is_default) ?? enabledProfiles[0];
 
-  if (list.length === 0) {
+  useEffect(() => {
+    if (!selected && fallback) {
+      onChange(fallback.id);
+    }
+  }, [fallback, onChange, selected]);
+
+  if (enabledProfiles.length === 0) {
     return (
       <Link
         to="/settings/models"
@@ -35,11 +45,11 @@ export function ModelSelector({ selectedId, onChange }: Props) {
     <div className="flex items-center gap-1.5">
       <Cpu size={14} className="text-slate-400" />
       <select
-        value={selectedId}
+        value={selected?.id ?? fallback?.id ?? ''}
         onChange={(e) => onChange(e.target.value)}
         className="rounded border border-slate-300 bg-white py-1.5 pl-2 pr-6 text-xs text-slate-700 outline-none focus:border-emerald-600"
       >
-        {list.filter((p) => p.enabled).map((p) => (
+        {enabledProfiles.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name || p.provider} · {p.model_name || '默认模型'}
           </option>

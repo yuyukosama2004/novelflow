@@ -89,6 +89,8 @@ const completedRun: ReviewRun = {
   id: 'run-1',
   scene_version_id: 'version-1',
   model_profile_id: null,
+  provider: 'fake',
+  model: 'fake-model',
   status: 'completed',
   prompt_snapshot_json: {},
   started_at: now,
@@ -135,6 +137,19 @@ describe('SceneEditor approval gate', () => {
       expect(apiClient.runReview).toHaveBeenCalledWith('version-1');
     });
     expect(apiClient.approveVersion).not.toHaveBeenCalled();
+  });
+
+  it('uses the selected model profile for approval review', async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([
+      version('not_reviewed'),
+    ]);
+    renderWithQuery(<SceneEditor scene={scene} modelProfileId="profile-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '先审查' }));
+
+    await waitFor(() => {
+      expect(apiClient.runReview).toHaveBeenCalledWith('version-1', 'profile-1');
+    });
   });
 
   it('approves a completed review without an override', async () => {

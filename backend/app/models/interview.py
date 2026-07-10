@@ -19,16 +19,15 @@ class InterviewSession(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "interview_sessions"
 
-    project_id: Mapped[str] = mapped_column(
-        ForeignKey("novel_projects.id"), index=True
-    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("novel_projects.id"), index=True)
+    model_profile_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    provider: Mapped[str] = mapped_column(String(40), default="")
+    model: Mapped[str] = mapped_column(String(100), default="")
     entry_type: Mapped[str] = mapped_column(
         String(40), default="idea"
     )  # idea | world | character | outline | direct
     title: Mapped[str] = mapped_column(String(200), default="")
-    status: Mapped[str] = mapped_column(
-        String(40), default="active"
-    )  # active | completed
+    status: Mapped[str] = mapped_column(String(40), default="active")  # active | completed
     messages_json: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON, default=list
     )  # [{role, content, timestamp}]
@@ -45,12 +44,8 @@ class StoryCandidate(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "story_candidates"
 
-    project_id: Mapped[str] = mapped_column(
-        ForeignKey("novel_projects.id"), index=True
-    )
-    session_id: Mapped[str] = mapped_column(
-        ForeignKey("interview_sessions.id"), index=True
-    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("novel_projects.id"), index=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("interview_sessions.id"), index=True)
     candidate_type: Mapped[str] = mapped_column(
         String(40), default="project_setting"
     )  # project_setting | character | world_entry
@@ -58,9 +53,7 @@ class StoryCandidate(UUIDMixin, TimestampMixin, Base):
     content_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     proposal: Mapped[str] = mapped_column(Text, default="")  # LLM 建议理由
     confidence: Mapped[float] = mapped_column(Float, default=0.8)
-    status: Mapped[str] = mapped_column(
-        String(40), default="pending"
-    )  # pending | approved | rejected
+    status: Mapped[str] = mapped_column(String(40), default="pending")  # pending | approved | rejected
     applied_entity_type: Mapped[str | None] = mapped_column(
         String(40), nullable=True
     )  # project | character | world_entry

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import JSON, Integer, String, Text
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -21,6 +21,9 @@ class NovelProject(UUIDMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(40), default="draft")
     language: Mapped[str] = mapped_column(String(40), default="zh-CN")
     current_timeline_position: Mapped[int] = mapped_column(Integer, default=0)
+    default_model_profile_id: Mapped[str | None] = mapped_column(
+        ForeignKey("model_profiles.id"), nullable=True
+    )
 
     characters = relationship("Character", back_populates="project", cascade="all, delete-orphan")
     world_entries = relationship("WorldEntry", back_populates="project", cascade="all, delete-orphan")

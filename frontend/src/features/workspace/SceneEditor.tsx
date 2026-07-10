@@ -14,6 +14,7 @@ import { label, SOURCE_TYPE_LABELS } from '../../utils/enumLabels';
 interface SceneEditorProps {
   scene: Scene | null;
   onVersionCreated?: (version: SceneVersion) => void;
+  modelProfileId?: string;
 }
 
 function selectInitialContent(
@@ -64,7 +65,11 @@ function approvalFailureMessage(reason: string | undefined): string {
   return '批准失败，请刷新后重试。';
 }
 
-export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
+export function SceneEditor({
+  scene,
+  onVersionCreated,
+  modelProfileId = '',
+}: SceneEditorProps) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -144,7 +149,10 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
   });
 
   const reviewForApproval = useMutation({
-    mutationFn: (versionId: string) => apiClient.runReview(versionId),
+    mutationFn: (versionId: string) =>
+      modelProfileId
+        ? apiClient.runReview(versionId, modelProfileId)
+        : apiClient.runReview(versionId),
     onSuccess: (result) => {
       setApprovalMessage('审查已完成，请确认审查问题后再次批准。');
       queryClient.setQueryData(['review-run', result.run.id], result);
