@@ -95,6 +95,13 @@ class SceneVersion(UUIDMixin, TimestampMixin, Base):
     created_by: Mapped[str] = mapped_column(String(80), default="user")
 
     scene = relationship("Scene", back_populates="versions", foreign_keys=[scene_id])
+    review_runs = relationship(
+        "ReviewRun",
+        back_populates="scene_version",
+        cascade="all, delete-orphan",
+        foreign_keys="ReviewRun.scene_version_id",
+        order_by="ReviewRun.created_at",
+    )
     review_issues = relationship(
         "ReviewIssue",
         back_populates="scene_version",

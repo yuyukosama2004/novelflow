@@ -1,11 +1,21 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, EyeOff, RefreshCw, Search, X } from 'lucide-react';
 
 import { apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
-import type { ReviewIssue, ReviewIssueStatus } from '../../types/entities';
-import { label, ISSUE_STATUS_LABELS, ISSUE_TYPE_LABELS, REVIEW_SEVERITY_LABELS } from '../../utils/enumLabels';
+import type {
+  ReviewIssue,
+  ReviewIssueStatus,
+  ReviewRunStatus,
+} from '../../types/entities';
+import {
+  label,
+  ISSUE_STATUS_LABELS,
+  ISSUE_TYPE_LABELS,
+  REVIEW_SEVERITY_LABELS,
+} from '../../utils/enumLabels';
 
 interface Props {
   sceneVersionId: string;
@@ -18,6 +28,13 @@ const SEVERITY_TONE: Record<string, 'neutral' | 'ok' | 'warn'> = {
   medium: 'neutral',
   high: 'warn',
   blocking: 'warn',
+};
+
+const RUN_STATUS_LABELS: Record<ReviewRunStatus, string> = {
+  pending: '等待审查',
+  running: '审查中',
+  completed: '审查完成',
+  failed: '审查失败',
 };
 
 function severityLabelColor(severity: string): string {
@@ -41,35 +58,87 @@ function formatEvidence(evidence: string): string {
   }
 }
 
+function runOptionLabel(status: ReviewRunStatus, createdAt: string): string {
+  return (
+    RUN_STATUS_LABELS[status] +
+    ' · ' +
+    new Date(createdAt).toLocaleString('zh-CN')
+  );
+}
+
 export function ReviewIssuePanel({ sceneVersionId }: Props) {
   const queryClient = useQueryClient();
+  const [selectedRunId, setSelectedRunId] = useState('');
   const hasVersion = Boolean(sceneVersionId);
 
-  const issuesQuery = useQuery({
-    queryKey: ['review-issues', sceneVersionId],
-    queryFn: () => apiClient.listIssues(sceneVersionId),
+  const runsQuery = useQuery({
+    queryKey: ['review-runs', sceneVersionId],
+    queryFn: () => apiClient.listReviewRuns(sceneVersionId),
     enabled: hasVersion,
+  });
+  const runs = runsQuery.data ?? [];
+  const activeRunId = runs.some((run) => run.id === selectedRunId)
+    ? selectedRunId
+    : (runs[0]?.id ?? '');
+
+  const runQuery = useQuery({
+    queryKey: ['review-run', activeRunId],
+    queryFn: () => apiClient.getReviewRun(activeRunId),
+    enabled: Boolean(activeRunId),
   });
 
   const runReview = useMutation({
     mutationFn: () => apiClient.runReview(sceneVersionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['review-issues', sceneVersionId] });
+    onSuccess: (result) => {
+      setSelectedRunId(result.run.id);
+      queryClient.setQueryData(['review-run', result.run.id], result);
+      queryClient.invalidateQueries({
+        queryKey: ['review-runs', sceneVersionId],
+      });
     },
   });
 
   const updateIssue = useMutation({
-    mutationFn: ({ issueId, status }: { issueId: string; status: IssueAction }) =>
-      apiClient.updateIssue(issueId, status),
+    mutationFn: ({
+      issueId,
+      status,
+    }: {
+      issueId: string;
+      status: IssueAction;
+    }) => apiClient.updateIssue(issueId, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['review-issues', sceneVersionId] });
+      queryClient.invalidateQueries({
+        queryKey: ['review-run', activeRunId],
+      });
     },
   });
 
-  const issues = issuesQuery.data ?? [];
-  const isRunning = runReview.isPending;
-  const isLoading = issuesQuery.isLoading || issuesQuery.isFetching || isRunning;
-  const hasError = issuesQuery.isError || runReview.isError || updateIssue.isError;
+  const result = runQuery.data;
+  const run = result?.run;
+  const issues = result?.issues ?? [];
+  const isRunning = runReview.isPending || run?.status === 'running';
+  const isLoading =
+    runsQuery.isLoading ||
+    runsQuery.isFetching ||
+    runQuery.isLoading ||
+    runQuery.isFetching ||
+    runReview.isPending;
+  const hasError =
+    runsQuery.isError ||
+    runQuery.isError ||
+    runReview.isError ||
+    updateIssue.isError;
+
+  function refresh() {
+    queryClient.invalidateQueries({
+      queryKey: ['review-runs', sceneVersionId],
+    });
+    if (activeRunId) {
+      queryClient.invalidateQueries({
+        queryKey: ['review-run', activeRunId],
+      });
+    }
+  }
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-3 text-xs">
@@ -80,8 +149,16 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
             在批准前检查当前版本是否存在故事设定冲突。
           </p>
         </div>
-        <StatusPill tone={issues.length > 0 ? 'warn' : 'neutral'}>
-          {hasVersion ? `${issues.length} 个问题` : '暂无版本'}
+        <StatusPill
+          tone={
+            issues.length > 0 || run?.status === 'failed' ? 'warn' : 'neutral'
+          }
+        >
+          {!hasVersion
+            ? '暂无版本'
+            : run
+              ? RUN_STATUS_LABELS[run.status]
+              : '尚未审查'}
         </StatusPill>
       </div>
 
@@ -96,12 +173,28 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
         <IconButton
           icon={<RefreshCw size={14} />}
           label="刷新"
-          onClick={() =>
-            queryClient.invalidateQueries({ queryKey: ['review-issues', sceneVersionId] })
-          }
+          onClick={refresh}
           disabled={isLoading || !hasVersion}
         />
       </div>
+
+      {runs.length > 0 ? (
+        <label className="mb-3 block text-slate-600">
+          <span className="mb-1 block font-medium">审查轮次</span>
+          <select
+            aria-label="审查轮次"
+            value={activeRunId}
+            onChange={(event) => setSelectedRunId(event.target.value)}
+            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5"
+          >
+            {runs.map((item) => (
+              <option key={item.id} value={item.id}>
+                {runOptionLabel(item.status, item.created_at)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {!hasVersion ? (
         <div className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-center text-slate-500">
@@ -117,27 +210,52 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
 
       {hasVersion && isLoading ? (
         <div className="py-4 text-center text-slate-500">
-          {isRunning ? '正在执行连续性审查…' : '加载审查问题…'}
+          {isRunning ? '正在执行连续性审查…' : '加载审查记录…'}
         </div>
       ) : null}
 
-      {hasVersion && !isLoading && !hasError && issues.length === 0 ? (
+      {hasVersion && !isLoading && !hasError && runs.length === 0 ? (
         <div className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-center text-slate-500">
-          暂无审查问题，请对当前版本执行审查。
+          尚未执行审查。
+        </div>
+      ) : null}
+
+      {!isLoading && !hasError && run?.status === 'failed' ? (
+        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-4 text-center text-rose-700">
+          本轮审查失败，请重新执行审查。
+        </div>
+      ) : null}
+
+      {!isLoading &&
+      !hasError &&
+      run?.status === 'completed' &&
+      issues.length === 0 ? (
+        <div className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-center text-slate-500">
+          {run.summary || '本轮未发现问题。'}
         </div>
       ) : null}
 
       {!isLoading && issues.length > 0 ? (
         <div className="max-h-80 space-y-2 overflow-auto">
           {issues.map((issue: ReviewIssue) => (
-            <div key={issue.id} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div
+              key={issue.id}
+              className="rounded-md border border-slate-200 bg-slate-50 p-3"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className={`font-medium ${severityLabelColor(issue.severity)}`}>
+                    <span
+                      className={[
+                        'font-medium',
+                        severityLabelColor(issue.severity),
+                      ].join(' ')}
+                    >
                       {label(ISSUE_TYPE_LABELS, issue.issue_type)}
                     </span>
-                    <StatusPill tone={SEVERITY_TONE[issue.severity] ?? 'neutral'}>
+                    <StatusPill
+                      tone={SEVERITY_TONE[issue.severity] ?? 'neutral'}
+                    >
                       {label(REVIEW_SEVERITY_LABELS, issue.severity)}
                     </StatusPill>
                     <StatusPill
@@ -160,12 +278,14 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
 
                   {issue.conflict_rule ? (
                     <p className="mt-2 text-slate-600">
-                      <span className="font-medium">规则：</span> {issue.conflict_rule}
+                      <span className="font-medium">规则：</span>{' '}
+                      {issue.conflict_rule}
                     </p>
                   ) : null}
                   {issue.suggestion ? (
                     <p className="mt-1 text-slate-500">
-                      <span className="font-medium">建议：</span> {issue.suggestion}
+                      <span className="font-medium">建议：</span>{' '}
+                      {issue.suggestion}
                     </p>
                   ) : null}
                   {issue.evidence_json ? (
@@ -184,7 +304,10 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
                   <div className="flex shrink-0 items-center gap-1">
                     <button
                       onClick={() =>
-                        updateIssue.mutate({ issueId: issue.id, status: 'accepted' })
+                        updateIssue.mutate({
+                          issueId: issue.id,
+                          status: 'accepted',
+                        })
                       }
                       disabled={updateIssue.isPending}
                       title="接受"
@@ -195,7 +318,10 @@ export function ReviewIssuePanel({ sceneVersionId }: Props) {
                     </button>
                     <button
                       onClick={() =>
-                        updateIssue.mutate({ issueId: issue.id, status: 'ignored' })
+                        updateIssue.mutate({
+                          issueId: issue.id,
+                          status: 'ignored',
+                        })
                       }
                       disabled={updateIssue.isPending}
                       title="忽略"

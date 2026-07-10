@@ -33,3 +33,8 @@ class ValidationAppError(AppError):
 class ExportError(AppError):
     code = 50020
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class ReviewExecutionError(AppError):
+    code = 50030
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR

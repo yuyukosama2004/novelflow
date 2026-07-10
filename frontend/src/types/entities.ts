@@ -126,7 +126,20 @@ export interface ModelTestResult {
 
 export type ReviewIssueStatus = 'open' | 'accepted' | 'ignored' | 'false_positive';
 
+export type ReviewRunStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface ReviewRun extends EntityBase {
+  scene_version_id: string;
+  model_profile_id: string | null;
+  status: ReviewRunStatus;
+  prompt_snapshot_json: Record<string, unknown>;
+  started_at: string | null;
+  completed_at: string | null;
+  summary: string;
+}
+
 export interface ReviewIssue extends EntityBase {
+  review_run_id: string | null;
   scene_version_id: string;
   issue_type: string;
   severity: string;
@@ -135,6 +148,11 @@ export interface ReviewIssue extends EntityBase {
   suggestion: string;
   confidence: number;
   status: ReviewIssueStatus;
+}
+
+export interface ReviewResult {
+  run: ReviewRun;
+  issues: ReviewIssue[];
 }
 
 export type MemoryCandidateStatus = 'pending' | 'approved' | 'rejected' | 'conflicted';

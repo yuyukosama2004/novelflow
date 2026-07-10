@@ -6,7 +6,7 @@ from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
 from app.models.memory import MemoryCandidate, TimelineEvent
 from app.models.model_profile import ModelProfile
 from app.models.project import NovelProject
-from app.models.review import ReviewIssue
+from app.models.review import ReviewIssue, ReviewRun
 from app.models.workflow import WorkflowRun
 from app.models.world import WorldEntry
 
@@ -22,6 +22,7 @@ __all__ = [
     "ModelProfile",
     "NovelProject",
     "ReviewIssue",
+    "ReviewRun",
     "Scene",
     "SceneVersion",
     "StoryCandidate",

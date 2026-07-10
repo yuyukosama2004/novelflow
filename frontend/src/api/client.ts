@@ -14,6 +14,8 @@ import type {
   ProviderStatus,
   ReviewIssue,
   ReviewIssueStatus,
+  ReviewResult,
+  ReviewRun,
   Scene,
   SceneVersion,
   StoryCandidateEntity,
@@ -191,8 +193,16 @@ export const apiClient = {
     unwrap<ModelTestResult>(api.post("/model/test", payload)),
   // Review APIs
   runReview: (versionId: string) =>
-    unwrap<ReviewIssue[]>(
+    unwrap<ReviewResult>(
       api.post(`/scene-versions/${versionId}/review`),
+    ),
+  listReviewRuns: (versionId: string) =>
+    unwrap<ReviewRun[]>(
+      api.get(`/scene-versions/${versionId}/review-runs`),
+    ),
+  getReviewRun: (runId: string) =>
+    unwrap<ReviewResult>(
+      api.get(`/review-runs/${runId}`),
     ),
   listIssues: (versionId: string) =>
     unwrap<ReviewIssue[]>(

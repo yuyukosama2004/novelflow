@@ -35,7 +35,7 @@ class ContinuityReviewer:
         context: SceneContext,
     ) -> list[ReviewIssue]:
         """Run continuity review on a scene version."""
-        prompt = self._build_review_prompt(version, context)
+        prompt = self.build_prompt(version, context)
 
         request = LLMRequest(
             messages=[
@@ -78,7 +78,7 @@ class ContinuityReviewer:
             for item in issues_data
         ]
 
-    def _build_review_prompt(
+    def build_prompt(
         self,
         version: SceneVersion,
         context: SceneContext,
