@@ -103,6 +103,8 @@ export interface SceneVersion extends EntityBase {
   context_manifest_json: Record<string, unknown>;
   review_status: string;
   created_by: string;
+  approved_at: string | null;
+  approval_override_reason: string | null;
 }
 
 export interface HealthStatus {

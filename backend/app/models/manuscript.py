@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -93,6 +94,8 @@ class SceneVersion(UUIDMixin, TimestampMixin, Base):
     context_manifest_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     review_status: Mapped[str] = mapped_column(String(40), default="not_reviewed")
     created_by: Mapped[str] = mapped_column(String(80), default="user")
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approval_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     scene = relationship("Scene", back_populates="versions", foreign_keys=[scene_id])
     review_runs = relationship(

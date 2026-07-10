@@ -1,6 +1,22 @@
 from __future__ import annotations
 
+from typing import Any
+
+import pytest
 from fastapi.testclient import TestClient
+
+from app.api import review as review_api
+
+
+class NoIssueReviewer:
+    def __init__(self, *_: Any, **__: Any) -> None:
+        pass
+
+    def build_prompt(self, *_: Any) -> str:
+        return "review prompt"
+
+    async def review(self, *_: Any) -> list[Any]:
+        return []
 
 
 def data(response):
@@ -8,7 +24,10 @@ def data(response):
     return response.json()["data"]
 
 
-def test_project_to_scene_version_export_flow(client: TestClient) -> None:
+def test_project_to_scene_version_export_flow(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     project = data(
         client.post(
             "/api/projects",
@@ -85,6 +104,9 @@ def test_project_to_scene_version_export_flow(client: TestClient) -> None:
         )
     )
     assert version["version_no"] == 1
+
+    monkeypatch.setattr(review_api, "ContinuityReviewer", NoIssueReviewer)
+    data(client.post(f"/api/scene-versions/{version['id']}/review"))
 
     approved_scene = data(
         client.post(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,6 +14,7 @@ SceneStatus = Literal[
     "drafting",
     "reviewing",
     "approved",
+    "canonicalizing",
     "needs_revision",
 ]
 SceneSourceType = Literal["human", "ai_generated", "ai_revised", "human_revised", "merged"]
@@ -168,10 +170,13 @@ class SceneVersionRead(EntityBase):
     context_manifest_json: dict[str, Any]
     review_status: str
     created_by: str
+    approved_at: datetime | None
+    approval_override_reason: str | None
 
 
 class ApproveVersionRequest(BaseModel):
     version_id: str
+    override_reason: str | None = None
 
 
 class VersionCompareRead(BaseModel):

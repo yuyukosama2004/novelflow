@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import axios from 'axios';
 import { Check, Save } from 'lucide-react';
 
 import { apiClient } from '../../api/client';
@@ -15,7 +16,10 @@ interface SceneEditorProps {
   onVersionCreated?: (version: SceneVersion) => void;
 }
 
-function selectInitialContent(versions: SceneVersion[] | undefined, scene: Scene | null): string {
+function selectInitialContent(
+  versions: SceneVersion[] | undefined,
+  scene: Scene | null,
+): string {
   if (!versions || versions.length === 0) {
     return '';
   }
@@ -37,11 +41,37 @@ function saveStateLabel(
   return sceneStatus;
 }
 
+function approvalFailureReason(error: unknown): string | undefined {
+  if (!axios.isAxiosError(error)) {
+    return undefined;
+  }
+  const data = error.response?.data as
+    | { details?: { reason?: string } }
+    | undefined;
+  return data?.details?.reason;
+}
+
+function approvalFailureMessage(reason: string | undefined): string {
+  if (reason === 'VERSION_REVIEW_REQUIRED') {
+    return '该版本尚未完成审查，请先执行审查。';
+  }
+  if (reason === 'EMPTY_VERSION_CONTENT') {
+    return '正文为空，不能批准为正式稿。';
+  }
+  if (reason === 'HISTORICAL_REPLACEMENT_NOT_READY') {
+    return '历史正式稿替换尚未开放，请保留当前正式稿。';
+  }
+  return '批准失败，请刷新后重试。';
+}
+
 export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [dirty, setDirty] = useState(false);
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveState, setSaveState] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
+  const [approvalMessage, setApprovalMessage] = useState('');
 
   const versions = useQuery({
     queryKey: ['scene-versions', scene?.id],
@@ -87,20 +117,87 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
     onSuccess: (version) => {
       setDirty(false);
       setSaveState('saved');
-      queryClient.invalidateQueries({ queryKey: ['scene-versions', scene?.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['scene-versions', scene?.id],
+      });
       onVersionCreated?.(version);
     },
     onError: () => setSaveState('error'),
   });
 
   const approveVersion = useMutation({
-    mutationFn: (versionId: string) => apiClient.approveVersion(scene?.id ?? '', versionId),
+    mutationFn: ({
+      versionId,
+      overrideReason,
+    }: {
+      versionId: string;
+      overrideReason?: string;
+    }) => apiClient.approveVersion(scene?.id ?? '', versionId, overrideReason),
     onSuccess: () => {
+      setApprovalMessage('');
       queryClient.invalidateQueries({ queryKey: ['scene', scene?.id] });
-      queryClient.invalidateQueries({ queryKey: ['scene-versions', scene?.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['scene-versions', scene?.id],
+      });
       queryClient.invalidateQueries({ queryKey: ['scenes'] });
     },
   });
+
+  const reviewForApproval = useMutation({
+    mutationFn: (versionId: string) => apiClient.runReview(versionId),
+    onSuccess: (result) => {
+      setApprovalMessage('审查已完成，请确认审查问题后再次批准。');
+      queryClient.setQueryData(['review-run', result.run.id], result);
+      queryClient.invalidateQueries({
+        queryKey: ['review-runs', result.run.scene_version_id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['scene-versions', scene?.id],
+      });
+    },
+    onError: () => {
+      setApprovalMessage('审查失败，请稍后重试。');
+    },
+  });
+
+  async function requestApproval(version: SceneVersion) {
+    setApprovalMessage('');
+    if (version.review_status !== 'completed') {
+      if (!window.confirm('该版本尚未完成审查，是否现在执行审查？')) {
+        return;
+      }
+      await reviewForApproval.mutateAsync(version.id).catch(() => undefined);
+      return;
+    }
+
+    try {
+      await approveVersion.mutateAsync({ versionId: version.id });
+    } catch (error) {
+      const reason = approvalFailureReason(error);
+      if (reason !== 'BLOCKING_REVIEW_ISSUES') {
+        setApprovalMessage(approvalFailureMessage(reason));
+        return;
+      }
+      if (!window.confirm('存在阻断问题。是否填写理由并强制批准？')) {
+        return;
+      }
+      const overrideReason = window.prompt('请输入强制批准理由：', '')?.trim();
+      if (!overrideReason) {
+        setApprovalMessage('强制批准必须填写理由。');
+        return;
+      }
+      try {
+        await approveVersion.mutateAsync({
+          versionId: version.id,
+          overrideReason,
+        });
+      } catch (overrideError) {
+        setApprovalMessage(
+          approvalFailureMessage(approvalFailureReason(overrideError)),
+        );
+      }
+    }
+  }
 
   // 使用 ref 持有 mutate 引用，避免 useEffect 依赖不稳定
   const mutateRef = useRef(createVersion.mutate);
@@ -130,7 +227,9 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
     <section className="min-w-0">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-lg font-semibold text-slate-950">{scene.title}</h2>
+          <h2 className="truncate text-lg font-semibold text-slate-950">
+            {scene.title}
+          </h2>
           <p className="mt-1 text-sm text-slate-500">
             {scene.time_text || '未设定时间'} · 时间线 {scene.timeline_order}
           </p>
@@ -153,7 +252,10 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
             tone="primary"
             disabled={!content.trim() || createVersion.isPending}
             onClick={() =>
-              createVersion.mutate({ content_markdown: content, summary: scene.title })
+              createVersion.mutate({
+                content_markdown: content,
+                summary: scene.title,
+              })
             }
           />
         </div>
@@ -164,8 +266,15 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
       <div className="mt-4 rounded-md border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
           <h3 className="text-sm font-semibold text-slate-900">版本历史</h3>
-          <span className="text-xs text-slate-500">{versions.data?.length ?? 0} 个版本</span>
+          <span className="text-xs text-slate-500">
+            {versions.data?.length ?? 0} 个版本
+          </span>
         </div>
+        {approvalMessage ? (
+          <p className="border-b border-slate-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {approvalMessage}
+          </p>
+        ) : null}
         <div className="max-h-72 divide-y divide-slate-100 overflow-auto">
           {versions.data?.map((version) => (
             <div
@@ -178,7 +287,11 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
                     v{version.version_no}
                   </span>
                   <StatusPill
-                    tone={scene.approved_version_id === version.id ? 'ok' : 'neutral'}
+                    tone={
+                      scene.approved_version_id === version.id
+                        ? 'ok'
+                        : 'neutral'
+                    }
                   >
                     {scene.approved_version_id === version.id
                       ? '正式稿'
@@ -187,16 +300,22 @@ export function SceneEditor({ scene, onVersionCreated }: SceneEditorProps) {
                 </div>
                 <p className="mt-1 truncate text-xs text-slate-500">
                   {version.summary ||
-                    version.content_markdown.replace(/<[^>]+>/g, '').slice(0, 80)}
+                    version.content_markdown
+                      .replace(/<[^>]+>/g, '')
+                      .slice(0, 80)}
                 </p>
               </div>
               <IconButton
                 icon={<Check size={15} />}
-                label="批准"
-                disabled={
-                  scene.approved_version_id === version.id || approveVersion.isPending
+                label={
+                  version.review_status === 'completed' ? '批准' : '先审查'
                 }
-                onClick={() => approveVersion.mutate(version.id)}
+                disabled={
+                  scene.approved_version_id === version.id ||
+                  approveVersion.isPending ||
+                  reviewForApproval.isPending
+                }
+                onClick={() => void requestApproval(version)}
               />
             </div>
           ))}

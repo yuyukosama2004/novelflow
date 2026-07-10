@@ -21,6 +21,8 @@ function makeVersion(
     context_manifest_json: {},
     review_status: 'none',
     created_by: 'author',
+    approved_at: null,
+    approval_override_reason: null,
     created_at: now,
     updated_at: now,
     ...overrides,

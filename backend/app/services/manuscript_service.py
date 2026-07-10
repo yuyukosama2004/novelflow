@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import (
+    ConflictError,
+    NotFoundError,
+    ValidationAppError,
+)
+from app.models.base import utc_now
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
+from app.models.review import ReviewIssue, ReviewRun
 from app.repositories.base import apply_updates
 from app.repositories.manuscript_repository import (
     ChapterRepository,
@@ -146,9 +153,66 @@ class ManuscriptService:
         scene = await self.get_scene(scene_id)
         version = await self.get_version(payload.version_id)
         if version.scene_id != scene_id:
-            raise ConflictError("version does not belong to scene")
+            raise ConflictError(
+                "version does not belong to scene",
+                {"reason": "VERSION_SCENE_MISMATCH"},
+            )
+        if not version.content_markdown.strip():
+            raise ValidationAppError(
+                "version content is empty",
+                {"reason": "EMPTY_VERSION_CONTENT"},
+            )
+        if scene.approved_version_id == version.id:
+            return scene
+        if scene.approved_version_id is not None:
+            raise ConflictError(
+                "historical replacement is not ready",
+                {"reason": "HISTORICAL_REPLACEMENT_NOT_READY"},
+            )
+
+        review_result = await self.session.execute(
+            select(ReviewRun)
+            .where(
+                ReviewRun.scene_version_id == version.id,
+                ReviewRun.status == "completed",
+            )
+            .order_by(
+                ReviewRun.completed_at.desc(),
+                ReviewRun.created_at.desc(),
+                ReviewRun.id.desc(),
+            )
+            .limit(1)
+        )
+        review_run = review_result.scalar_one_or_none()
+        if review_run is None:
+            raise ConflictError(
+                "version review required",
+                {"reason": "VERSION_REVIEW_REQUIRED"},
+            )
+
+        blocking_result = await self.session.execute(
+            select(ReviewIssue).where(
+                ReviewIssue.review_run_id == review_run.id,
+                ReviewIssue.severity == "blocking",
+                ReviewIssue.status != "false_positive",
+            )
+        )
+        blocking_issues = list(blocking_result.scalars().all())
+        override_reason = (payload.override_reason or "").strip()
+        if blocking_issues and not override_reason:
+            raise ConflictError(
+                "blocking review issues require an override reason",
+                {
+                    "reason": "BLOCKING_REVIEW_ISSUES",
+                    "review_run_id": review_run.id,
+                    "issue_count": len(blocking_issues),
+                },
+            )
+
         scene.approved_version_id = version.id
-        scene.status = "approved"
+        scene.status = "canonicalizing"
+        version.approved_at = utc_now()
+        version.approval_override_reason = override_reason if blocking_issues else None
         await self.session.commit()
         await self.session.refresh(scene)
         return scene

@@ -179,10 +179,15 @@ export const apiClient = {
     unwrap<SceneVersion>(
       api.post(`/scenes/${sceneId}/versions`, payload),
     ),
-  approveVersion: (sceneId: string, versionId: string) =>
+  approveVersion: (
+    sceneId: string,
+    versionId: string,
+    overrideReason?: string,
+  ) =>
     unwrap<Scene>(
       api.post(`/scenes/${sceneId}/approve-version`, {
         version_id: versionId,
+        override_reason: overrideReason,
       }),
     ),
 
