@@ -117,3 +117,10 @@ class SceneVersion(UUIDMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         foreign_keys="MemoryCandidate.scene_version_id",
     )
+    memory_extraction_runs = relationship(
+        "MemoryExtractionRun",
+        back_populates="scene_version",
+        cascade="all, delete-orphan",
+        foreign_keys="MemoryExtractionRun.scene_version_id",
+        order_by="MemoryExtractionRun.created_at",
+    )

@@ -194,6 +194,16 @@ async def approve_scene_version(
     return success(SceneRead.model_validate(scene), request)
 
 
+@router.post("/scenes/{scene_id}/complete")
+async def complete_scene(
+    scene_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    scene = await ManuscriptService(session).complete_scene(scene_id)
+    return success(SceneRead.model_validate(scene), request)
+
+
 @router.get("/scenes/{scene_id}/compare")
 async def compare_scene_versions(
     scene_id: str,

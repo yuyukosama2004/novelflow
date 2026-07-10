@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, RefreshCw, Sparkles, X } from 'lucide-react';
+import axios from 'axios';
+import { Check, CheckCircle2, RefreshCw, Sparkles, X } from 'lucide-react';
 
 import { apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
@@ -8,7 +9,9 @@ import type { MemoryCandidate, MemoryCandidateStatus } from '../../types/entitie
 import { label, CANDIDATE_TYPE_LABELS, MEMORY_CANDIDATE_STATUS_LABELS } from '../../utils/enumLabels';
 
 interface Props {
+  sceneId?: string;
   sceneVersionId: string;
+  approvedVersionId?: string | null;
 }
 
 type CandidateAction = Extract<MemoryCandidateStatus, 'approved' | 'rejected'>;
@@ -24,9 +27,30 @@ function formatPayload(payload: Record<string, unknown>): string {
   return JSON.stringify(payload, null, 2);
 }
 
-export function MemoryCandidatePanel({ sceneVersionId }: Props) {
+function completionFailureMessage(error: unknown): string {
+  if (!axios.isAxiosError(error)) return '场景完成失败，请刷新后重试。';
+  const data = error.response?.data as { details?: { reason?: string } } | undefined;
+  if (data?.details?.reason === 'APPROVED_VERSION_REQUIRED') {
+    return '请先批准一个正式版本。';
+  }
+  if (data?.details?.reason === 'MEMORY_EXTRACTION_REQUIRED') {
+    return '请先对正式版本提取记忆。';
+  }
+  if (data?.details?.reason === 'PENDING_MEMORY_CANDIDATES') {
+    return '请先处理完所有待确认的记忆候选。';
+  }
+  return '场景完成失败，请刷新后重试。';
+}
+
+export function MemoryCandidatePanel({
+  sceneId,
+  sceneVersionId,
+  approvedVersionId,
+}: Props) {
   const queryClient = useQueryClient();
   const hasVersion = Boolean(sceneVersionId);
+  const isApprovedVersion =
+    approvedVersionId === undefined || approvedVersionId === sceneVersionId;
 
   const candidatesQuery = useQuery({
     queryKey: ['memory-candidates', sceneVersionId],
@@ -34,10 +58,17 @@ export function MemoryCandidatePanel({ sceneVersionId }: Props) {
     enabled: hasVersion,
   });
 
+  const extractionRunsQuery = useQuery({
+    queryKey: ['memory-extraction-runs', sceneVersionId],
+    queryFn: () => apiClient.listMemoryExtractionRuns(sceneVersionId),
+    enabled: hasVersion,
+  });
+
   const extractMemories = useMutation({
     mutationFn: () => apiClient.extractMemories(sceneVersionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['memory-candidates', sceneVersionId] });
+      queryClient.invalidateQueries({ queryKey: ['memory-extraction-runs', sceneVersionId] });
     },
   });
 
@@ -55,12 +86,38 @@ export function MemoryCandidatePanel({ sceneVersionId }: Props) {
     },
   });
 
+  const completeScene = useMutation({
+    mutationFn: () => apiClient.completeScene(sceneId ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scene', sceneId] });
+      queryClient.invalidateQueries({ queryKey: ['scenes'] });
+    },
+  });
+
   const candidates = candidatesQuery.data ?? [];
   const pendingCount = candidates.filter((candidate) => candidate.status === 'pending').length;
+  const hasCompletedExtraction = (extractionRunsQuery.data ?? []).some(
+    (run) => run.status === 'completed',
+  );
+  const canComplete = Boolean(
+    sceneId &&
+      isApprovedVersion &&
+      hasCompletedExtraction &&
+      !candidatesQuery.isLoading &&
+      !candidatesQuery.isFetching &&
+      pendingCount === 0,
+  );
   const isExtracting = extractMemories.isPending;
-  const isLoading = candidatesQuery.isLoading || candidatesQuery.isFetching || isExtracting;
+  const isLoading =
+    candidatesQuery.isLoading ||
+    candidatesQuery.isFetching ||
+    extractionRunsQuery.isLoading ||
+    isExtracting;
   const hasError =
-    candidatesQuery.isError || extractMemories.isError || updateCandidate.isError;
+    candidatesQuery.isError ||
+    extractionRunsQuery.isError ||
+    extractMemories.isError ||
+    updateCandidate.isError;
 
   function resolveCandidate(candidateId: string, status: CandidateAction) {
     updateCandidate.mutate({ candidateId, status });
@@ -96,6 +153,14 @@ export function MemoryCandidatePanel({ sceneVersionId }: Props) {
           }
           disabled={isLoading || !hasVersion}
         />
+        {sceneId ? (
+          <IconButton
+            icon={<CheckCircle2 size={14} />}
+            label={completeScene.isPending ? '完成中…' : '完成场景'}
+            onClick={() => completeScene.mutate()}
+            disabled={!canComplete || completeScene.isPending}
+          />
+        ) : null}
       </div>
 
       {!hasVersion ? (
@@ -107,6 +172,24 @@ export function MemoryCandidatePanel({ sceneVersionId }: Props) {
       {hasError ? (
         <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-rose-700">
           记忆操作失败，请刷新后重试。
+        </div>
+      ) : null}
+
+      {completeScene.isError ? (
+        <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-rose-700">
+          {completionFailureMessage(completeScene.error)}
+        </div>
+      ) : null}
+
+      {completeScene.isSuccess ? (
+        <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-emerald-700">
+          场景已完成。
+        </div>
+      ) : null}
+
+      {hasVersion && !isApprovedVersion ? (
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-800">
+          这是草稿版本：可以提取和预览候选，也可以拒绝候选；只有当前正式版本的候选可以批准写入正史。
         </div>
       ) : null}
 
@@ -160,8 +243,8 @@ export function MemoryCandidatePanel({ sceneVersionId }: Props) {
                   <div className="flex shrink-0 items-center gap-1">
                     <button
                       onClick={() => resolveCandidate(candidate.id, 'approved')}
-                      disabled={updateCandidate.isPending}
-                      title="批准"
+                      disabled={updateCandidate.isPending || !isApprovedVersion}
+                      title={isApprovedVersion ? '批准' : '只有正式版本的候选可以批准'}
                       aria-label="批准记忆候选"
                       className="rounded p-1 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50"
                     >

@@ -274,7 +274,8 @@ async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
 async def test_repeated_candidate_approval_is_idempotent(
     session: AsyncSession,
 ) -> None:
-    _, character, _, version = await create_story_graph(session, timeline_order=7)
+    _, character, scene, version = await create_story_graph(session, timeline_order=7)
+    scene.approved_version_id = version.id
     candidate = MemoryCandidate(
         scene_version_id=version.id,
         candidate_type="character_state",

@@ -924,7 +924,11 @@ export function WorkspacePage() {
           <SceneCardEditor scene={scene.data ?? null} />
           <ContextChecker sceneId={selectedSceneId} />
           <ReviewIssuePanel sceneVersionId={selectedSceneVersionId} />
-          <MemoryCandidatePanel sceneVersionId={selectedSceneVersionId} />
+          <MemoryCandidatePanel
+            sceneId={selectedSceneId}
+            sceneVersionId={selectedSceneVersionId}
+            approvedVersionId={scene.data?.approved_version_id ?? null}
+          />
         </aside>
       </div>
     </main>

@@ -34,7 +34,7 @@ class MemoryCurator:
         context: SceneContext,
     ) -> list[MemoryCandidate]:
         """Extract memory candidates from an approved version."""
-        prompt = self._build_extract_prompt(version, context)
+        prompt = self.build_prompt(version, context)
 
         request = LLMRequest(
             messages=[
@@ -79,7 +79,7 @@ class MemoryCurator:
             for item in items
         ]
 
-    def _build_extract_prompt(
+    def build_prompt(
         self,
         version: SceneVersion,
         context: SceneContext,

@@ -4,14 +4,21 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { apiClient } from '../../api/client';
-import type { MemoryCandidate, MemoryCandidateStatus } from '../../types/entities';
+import type {
+  MemoryCandidate,
+  MemoryCandidateStatus,
+  MemoryExtractionRun,
+  Scene,
+} from '../../types/entities';
 import { MemoryCandidatePanel } from './MemoryCandidatePanel';
 
 vi.mock('../../api/client', () => ({
   apiClient: {
     listCandidates: vi.fn(),
+    listMemoryExtractionRuns: vi.fn(),
     extractMemories: vi.fn(),
     updateCandidate: vi.fn(),
+    completeScene: vi.fn(),
   },
 }));
 
@@ -32,6 +39,7 @@ const now = new Date('2026-06-13T00:00:00.000Z').toISOString();
 
 const candidate: MemoryCandidate = {
   id: 'candidate-1',
+  extraction_run_id: 'run-1',
   scene_version_id: 'sv-1',
   candidate_type: 'character_knowledge',
   target_entity_type: 'character',
@@ -43,6 +51,18 @@ const candidate: MemoryCandidate = {
   evidence: 'The protagonist sees the hidden letter.',
   confidence: 0.88,
   status: 'pending',
+  created_at: now,
+  updated_at: now,
+};
+
+const completedRun: MemoryExtractionRun = {
+  id: 'run-1',
+  scene_version_id: 'sv-1',
+  model_profile_id: null,
+  status: 'completed',
+  prompt_snapshot_json: {},
+  started_at: now,
+  completed_at: now,
   created_at: now,
   updated_at: now,
 };
@@ -59,11 +79,19 @@ describe('MemoryCandidatePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiClient.listCandidates).mockResolvedValue([]);
-    vi.mocked(apiClient.extractMemories).mockResolvedValue([]);
+    vi.mocked(apiClient.listMemoryExtractionRuns).mockResolvedValue([]);
+    vi.mocked(apiClient.extractMemories).mockResolvedValue({
+      run: completedRun,
+      candidates: [],
+    });
     vi.mocked(apiClient.updateCandidate).mockResolvedValue({
       ...candidate,
       status: 'approved',
     });
+    vi.mocked(apiClient.completeScene).mockResolvedValue({
+      id: 'scene-1',
+      status: 'completed',
+    } as Scene);
   });
 
   it('loads an empty memory candidate state for a scene version', async () => {
@@ -138,7 +166,10 @@ describe('MemoryCandidatePanel', () => {
     vi.mocked(apiClient.listCandidates)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([candidate]);
-    vi.mocked(apiClient.extractMemories).mockResolvedValue([candidate]);
+    vi.mocked(apiClient.extractMemories).mockResolvedValue({
+      run: completedRun,
+      candidates: [candidate],
+    });
 
     renderWithQuery(<MemoryCandidatePanel sceneVersionId="sv-1" />);
 
@@ -229,5 +260,42 @@ describe('MemoryCandidatePanel', () => {
     expect(
       await screen.findByText('记忆操作失败，请刷新后重试。'),
     ).toBeInTheDocument();
+  });
+
+  it('allows preview and rejection for draft candidates but blocks approval', async () => {
+    vi.mocked(apiClient.listCandidates).mockResolvedValue([candidate]);
+
+    renderWithQuery(
+      <MemoryCandidatePanel
+        sceneId="scene-1"
+        sceneVersionId="sv-1"
+        approvedVersionId="sv-approved"
+      />,
+    );
+
+    expect(await screen.findByText(/这是草稿版本/)).toBeInTheDocument();
+    expect(await screen.findByLabelText('批准记忆候选')).toBeDisabled();
+    expect(screen.getByLabelText('拒绝记忆候选')).toBeEnabled();
+  });
+
+  it('completes a scene after extraction when no candidates remain pending', async () => {
+    vi.mocked(apiClient.listMemoryExtractionRuns).mockResolvedValue([completedRun]);
+
+    renderWithQuery(
+      <MemoryCandidatePanel
+        sceneId="scene-1"
+        sceneVersionId="sv-1"
+        approvedVersionId="sv-1"
+      />,
+    );
+
+    const completeButton = await screen.findByRole('button', { name: '完成场景' });
+    await waitFor(() => expect(completeButton).toBeEnabled());
+    fireEvent.click(completeButton);
+
+    await waitFor(() => {
+      expect(apiClient.completeScene).toHaveBeenCalledWith('scene-1');
+    });
+    expect(await screen.findByText('场景已完成。')).toBeInTheDocument();
   });
 });

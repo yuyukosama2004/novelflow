@@ -38,3 +38,8 @@ class ExportError(AppError):
 class ReviewExecutionError(AppError):
     code = 50030
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class MemoryExtractionError(AppError):
+    code = 50040
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR

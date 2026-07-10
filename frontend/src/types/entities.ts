@@ -160,6 +160,7 @@ export interface ReviewResult {
 export type MemoryCandidateStatus = 'pending' | 'approved' | 'rejected' | 'conflicted';
 
 export interface MemoryCandidate extends EntityBase {
+  extraction_run_id: string | null;
   scene_version_id: string;
   candidate_type: string;
   target_entity_type: string;
@@ -168,6 +169,20 @@ export interface MemoryCandidate extends EntityBase {
   evidence: string;
   confidence: number;
   status: MemoryCandidateStatus;
+}
+
+export interface MemoryExtractionRun extends EntityBase {
+  scene_version_id: string;
+  model_profile_id: string | null;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  prompt_snapshot_json: Record<string, unknown>;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface MemoryExtractionResult {
+  run: MemoryExtractionRun;
+  candidates: MemoryCandidate[];
 }
 
 export interface SSEChunk {

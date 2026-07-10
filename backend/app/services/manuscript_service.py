@@ -10,6 +10,7 @@ from app.core.exceptions import (
 )
 from app.models.base import utc_now
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
+from app.models.memory import MemoryCandidate, MemoryExtractionRun
 from app.models.review import ReviewIssue, ReviewRun
 from app.repositories.base import apply_updates
 from app.repositories.manuscript_repository import (
@@ -213,6 +214,52 @@ class ManuscriptService:
         scene.status = "canonicalizing"
         version.approved_at = utc_now()
         version.approval_override_reason = override_reason if blocking_issues else None
+        await self.session.commit()
+        await self.session.refresh(scene)
+        return scene
+
+    async def complete_scene(self, scene_id: str) -> Scene:
+        scene = await self.get_scene(scene_id)
+        if scene.approved_version_id is None:
+            raise ConflictError(
+                "scene has no approved version",
+                {"reason": "APPROVED_VERSION_REQUIRED"},
+            )
+
+        extraction_result = await self.session.execute(
+            select(MemoryExtractionRun)
+            .where(
+                MemoryExtractionRun.scene_version_id == scene.approved_version_id,
+                MemoryExtractionRun.status == "completed",
+            )
+            .order_by(
+                MemoryExtractionRun.completed_at.desc(),
+                MemoryExtractionRun.created_at.desc(),
+                MemoryExtractionRun.id.desc(),
+            )
+            .limit(1)
+        )
+        if extraction_result.scalar_one_or_none() is None:
+            raise ConflictError(
+                "memory extraction required",
+                {"reason": "MEMORY_EXTRACTION_REQUIRED"},
+            )
+
+        pending_result = await self.session.execute(
+            select(MemoryCandidate.id)
+            .where(
+                MemoryCandidate.scene_version_id == scene.approved_version_id,
+                MemoryCandidate.status == "pending",
+            )
+            .limit(1)
+        )
+        if pending_result.scalar_one_or_none() is not None:
+            raise ConflictError(
+                "pending memory candidates must be resolved",
+                {"reason": "PENDING_MEMORY_CANDIDATES"},
+            )
+
+        scene.status = "completed"
         await self.session.commit()
         await self.session.refresh(scene)
         return scene

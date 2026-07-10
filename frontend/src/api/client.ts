@@ -7,6 +7,8 @@ import type {
   HealthStatus,
   InterviewSession,
   MemoryCandidate,
+  MemoryExtractionResult,
+  MemoryExtractionRun,
   ModelProfile,
   MemoryCandidateStatus,
   ModelTestResult,
@@ -161,6 +163,8 @@ export const apiClient = {
     unwrap<{ deleted: boolean }>(api.delete(`/scenes/${sceneId}`)),
   getSceneContext: (sceneId: string) =>
     unwrap<Record<string, unknown>>(api.get(`/scenes/${sceneId}/context`)),
+  completeScene: (sceneId: string) =>
+    unwrap<Scene>(api.post(`/scenes/${sceneId}/complete`)),
 
   listVersions: (sceneId: string) =>
     unwrap<SceneVersion[]>(
@@ -220,8 +224,12 @@ export const apiClient = {
 
   // Memory APIs
   extractMemories: (versionId: string) =>
-    unwrap<MemoryCandidate[]>(
+    unwrap<MemoryExtractionResult>(
       api.post(`/scene-versions/${versionId}/extract-memories`),
+    ),
+  listMemoryExtractionRuns: (versionId: string) =>
+    unwrap<MemoryExtractionRun[]>(
+      api.get(`/scene-versions/${versionId}/memory-extraction-runs`),
     ),
   listCandidates: (versionId: string) =>
     unwrap<MemoryCandidate[]>(

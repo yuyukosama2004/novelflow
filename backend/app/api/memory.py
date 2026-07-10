@@ -1,20 +1,29 @@
 from __future__ import annotations
 
-from typing import Literal
-
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.exceptions import ConflictError, NotFoundError, ValidationAppError
+from app.core.exceptions import (
+    ConflictError,
+    MemoryExtractionError,
+    NotFoundError,
+    ValidationAppError,
+)
 from app.core.responses import success
 from app.database.session import get_session
 from app.llm.router import LLMRouter
+from app.models.base import utc_now
 from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
-from app.models.memory import MemoryCandidate, TimelineEvent
+from app.models.memory import MemoryCandidate, MemoryExtractionRun, TimelineEvent
+from app.schemas.memory import (
+    MemoryCandidateOut,
+    MemoryExtractionResultOut,
+    MemoryExtractionRunOut,
+    UpdateCandidateRequest,
+)
 from app.services.context_builder import ContextBuilder
 from app.services.manuscript_service import ManuscriptService
 from app.services.memory_curator import MemoryCurator
@@ -22,23 +31,14 @@ from app.services.memory_curator import MemoryCurator
 router = APIRouter()
 
 
-class MemoryCandidateOut(BaseModel):
-    id: str
-    scene_version_id: str
-    candidate_type: str
-    target_entity_type: str
-    target_entity_id: str | None
-    content_json: dict
-    evidence: str
-    confidence: float
-    status: str
-
-    model_config = {"from_attributes": True}
-
-
-class UpdateCandidateRequest(BaseModel):
-    status: Literal["approved", "rejected"]
-    content_json: dict | None = None
+def extraction_result(
+    run: MemoryExtractionRun,
+    candidates: list[MemoryCandidate],
+) -> MemoryExtractionResultOut:
+    return MemoryExtractionResultOut(
+        run=MemoryExtractionRunOut.model_validate(run),
+        candidates=[MemoryCandidateOut.model_validate(candidate) for candidate in candidates],
+    )
 
 
 @router.post("/scene-versions/{version_id}/extract-memories")
@@ -52,18 +52,66 @@ async def extract_memories(
     manuscript = ManuscriptService(session)
     version = await manuscript.get_version(version_id)
 
-    builder = ContextBuilder(session)
-    ctx = await builder.build_for_scene(version.scene_id)
-
-    curator = MemoryCurator(LLMRouter(), settings.default_model_provider)
-    candidates = await curator.extract(version, ctx)
-
-    for candidate in candidates:
-        session.add(candidate)
+    run = MemoryExtractionRun(
+        scene_version_id=version.id,
+        model_profile_id=version.model_profile_id,
+        status="pending",
+        prompt_snapshot_json={},
+    )
+    session.add(run)
     await session.commit()
+    run_id = run.id
 
+    try:
+        run.status = "running"
+        run.started_at = utc_now()
+        await session.commit()
+
+        builder = ContextBuilder(session)
+        ctx = await builder.build_for_scene(version.scene_id)
+        curator = MemoryCurator(LLMRouter(), settings.default_model_provider)
+        run.prompt_snapshot_json = {
+            "provider": settings.default_model_provider,
+            "prompt": curator.build_prompt(version, ctx),
+        }
+        candidates = await curator.extract(version, ctx)
+
+        for candidate in candidates:
+            candidate.extraction_run_id = run.id
+            candidate.status = "pending"
+            session.add(candidate)
+        run.status = "completed"
+        run.completed_at = utc_now()
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        failed_run = await session.get(MemoryExtractionRun, run_id)
+        if failed_run is not None:
+            failed_run.status = "failed"
+            failed_run.completed_at = utc_now()
+        await session.commit()
+        raise MemoryExtractionError(
+            "memory extraction failed",
+            {"memory_extraction_run_id": run_id},
+        ) from None
+
+    return success(extraction_result(run, candidates), request)
+
+
+@router.get("/scene-versions/{version_id}/memory-extraction-runs")
+async def list_memory_extraction_runs(
+    version_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    await ManuscriptService(session).get_version(version_id)
+    result = await session.execute(
+        select(MemoryExtractionRun)
+        .where(MemoryExtractionRun.scene_version_id == version_id)
+        .order_by(MemoryExtractionRun.created_at.desc(), MemoryExtractionRun.id.desc())
+    )
     return success(
-        [MemoryCandidateOut.model_validate(c) for c in candidates],
+        [MemoryExtractionRunOut.model_validate(run) for run in result.scalars().all()],
         request,
     )
 
@@ -74,11 +122,15 @@ async def list_candidates(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """List memory candidates for a scene version."""
+    """List all candidates for a version so no older pending item is hidden."""
+    await ManuscriptService(session).get_version(version_id)
     result = await session.execute(
         select(MemoryCandidate)
         .where(MemoryCandidate.scene_version_id == version_id)
-        .order_by(MemoryCandidate.confidence.desc())
+        .order_by(
+            MemoryCandidate.created_at.desc(),
+            MemoryCandidate.confidence.desc(),
+        )
     )
     candidates = result.scalars().all()
     return success(
@@ -111,11 +163,33 @@ async def update_candidate(
         candidate.content_json = payload.content_json
 
     if payload.status == "approved":
+        await _ensure_candidate_source_is_approved(session, candidate)
         await _apply_candidate(session, candidate)
 
     candidate.status = payload.status
     await session.commit()
     return success(MemoryCandidateOut.model_validate(candidate), request)
+
+
+async def _ensure_candidate_source_is_approved(
+    session: AsyncSession,
+    candidate: MemoryCandidate,
+) -> None:
+    result = await session.execute(
+        select(Scene.approved_version_id)
+        .select_from(SceneVersion)
+        .join(Scene, SceneVersion.scene_id == Scene.id)
+        .where(SceneVersion.id == candidate.scene_version_id)
+    )
+    approved_version_id = result.scalar_one_or_none()
+    if approved_version_id != candidate.scene_version_id:
+        raise ConflictError(
+            "memory candidate source is not the approved version",
+            {
+                "reason": "CANDIDATE_SOURCE_NOT_APPROVED",
+                "scene_version_id": candidate.scene_version_id,
+            },
+        )
 
 
 async def _apply_candidate(session: AsyncSession, candidate: MemoryCandidate) -> None:
