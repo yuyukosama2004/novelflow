@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Send, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from "react";
+import { Send, Sparkles } from "lucide-react";
 
-import type { InterviewMessage } from '../../types/entities';
+import type { InterviewMessage } from "../../types/entities";
 
 interface Props {
   messages: InterviewMessage[];
@@ -20,21 +20,21 @@ export function InterviewChat({
   isExtracting,
   disabled,
 }: Props) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   function handleSubmit() {
     const trimmed = input.trim();
     if (!trimmed || isSending || disabled) return;
     onSend(trimmed);
-    setInput('');
+    setInput("");
   }
 
-  const displayMessages = messages.filter((m) => m.role !== 'system');
+  const displayMessages = messages.filter((m) => m.role !== "system");
 
   return (
     <div className="flex flex-col h-full">
@@ -46,7 +46,7 @@ export function InterviewChat({
           className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
         >
           <Sparkles size={13} />
-          {isExtracting ? '提取中…' : '提取候选设定'}
+          {isExtracting ? "提取中…" : "提取候选设定"}
         </button>
       </div>
 
@@ -59,13 +59,13 @@ export function InterviewChat({
           displayMessages.map((msg, i) => (
             <div
               key={msg.timestamp ?? `${msg.role}-${i}`}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
                 className={`max-w-[85%] rounded-lg px-4 py-2.5 text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-white border border-slate-200 text-slate-800'
+                  msg.role === "user"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-white border border-slate-200 text-slate-800"
                 }`}
               >
                 {msg.content}
@@ -88,7 +88,7 @@ export function InterviewChat({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               handleSubmit();
             }

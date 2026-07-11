@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   BookMarked,
@@ -12,124 +12,145 @@ import {
   Trash2,
   UserPlus,
   X,
-} from 'lucide-react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+} from "lucide-react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { API_BASE_URL, apiClient } from '../../api/client';
-import { IconButton } from '../../components/IconButton';
-import { ModelSelector } from '../../components/ModelSelector';
-import { StatusPill } from '../../components/StatusPill';
-import type { Chapter, Scene, SceneVersion, Volume } from '../../types/entities';
-import { label, PROJECT_STATUS_LABELS } from '../../utils/enumLabels';
-import { MemoryCandidatePanel } from './MemoryCandidatePanel';
-import { ReviewIssuePanel } from './ReviewIssuePanel';
-import { SceneCardEditor } from './SceneCardEditor';
-import { SceneEditor } from './SceneEditor';
-import { WritingAssistant } from './WritingAssistant';
-import { SceneVersionSelector } from './SceneVersionSelector';
+import { API_BASE_URL, apiClient } from "../../api/client";
+import { IconButton } from "../../components/IconButton";
+import { ModelSelector } from "../../components/ModelSelector";
+import { StatusPill } from "../../components/StatusPill";
+import type {
+  Chapter,
+  Scene,
+  SceneVersion,
+  Volume,
+} from "../../types/entities";
+import { label, PROJECT_STATUS_LABELS } from "../../utils/enumLabels";
+import { MemoryCandidatePanel } from "./MemoryCandidatePanel";
+import { ReviewIssuePanel } from "./ReviewIssuePanel";
+import { SceneCardEditor } from "./SceneCardEditor";
+import { SceneEditor } from "./SceneEditor";
+import { WritingAssistant } from "./WritingAssistant";
+import { SceneVersionSelector } from "./SceneVersionSelector";
 import {
   getDefaultSceneVersionId,
   resolveSceneVersionSelection,
-} from './sceneVersionSelection';
-import ContextChecker from './ContextChecker';
-import SceneGenerationPanel from '../workflows/SceneGenerationPanel';
+} from "./sceneVersionSelection";
+import ContextChecker from "./ContextChecker";
+import SceneGenerationPanel from "../workflows/SceneGenerationPanel";
 import {
   WorkspacePanelTabs,
   type WorkspacePanelTab,
-} from './WorkspacePanelTabs';
+} from "./WorkspacePanelTabs";
 
-function nextSequence<T extends { sequence_no: number }>(items: T[] | undefined): number {
-  return (items?.reduce((max, item) => Math.max(max, item.sequence_no), 0) ?? 0) + 1;
+function nextSequence<T extends { sequence_no: number }>(
+  items: T[] | undefined,
+): number {
+  return (
+    (items?.reduce((max, item) => Math.max(max, item.sequence_no), 0) ?? 0) + 1
+  );
 }
 
 export function WorkspacePage() {
-  const { projectId = '' } = useParams();
+  const { projectId = "" } = useParams();
   const [searchParams] = useSearchParams();
-  const isQuickEntry = searchParams.get('entry') === 'quick';
+  const isQuickEntry = searchParams.get("entry") === "quick";
   const queryClient = useQueryClient();
-  const [selectedVolumeId, setSelectedVolumeId] = useState<string>('');
-  const [selectedChapterId, setSelectedChapterId] = useState<string>('');
-  const [selectedSceneId, setSelectedSceneId] = useState<string>('');
-  const [selectedSceneVersionId, setSelectedSceneVersionId] = useState<string>('');
-  const [pendingSceneVersionId, setPendingSceneVersionId] = useState<string>('');
-  const [hasExplicitSceneVersionSelection, setHasExplicitSceneVersionSelection] =
-    useState(false);
-  const [characterName, setCharacterName] = useState('');
-  const [worldName, setWorldName] = useState('');
-  const [sceneTitle, setSceneTitle] = useState('');
+  const [selectedVolumeId, setSelectedVolumeId] = useState<string>("");
+  const [selectedChapterId, setSelectedChapterId] = useState<string>("");
+  const [selectedSceneId, setSelectedSceneId] = useState<string>("");
+  const [selectedSceneVersionId, setSelectedSceneVersionId] =
+    useState<string>("");
+  const [pendingSceneVersionId, setPendingSceneVersionId] =
+    useState<string>("");
+  const [
+    hasExplicitSceneVersionSelection,
+    setHasExplicitSceneVersionSelection,
+  ] = useState(false);
+  const [characterName, setCharacterName] = useState("");
+  const [worldName, setWorldName] = useState("");
+  const [sceneTitle, setSceneTitle] = useState("");
 
   // 编辑状态
   const [editingProject, setEditingProject] = useState(false);
-  const [projectTitle, setProjectTitle] = useState('');
-  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null);
-  const [editingCharacterName, setEditingCharacterName] = useState('');
-  const [editingCharacterRole, setEditingCharacterRole] = useState('');
+  const [projectTitle, setProjectTitle] = useState("");
+  const [editingCharacterId, setEditingCharacterId] = useState<string | null>(
+    null,
+  );
+  const [editingCharacterName, setEditingCharacterName] = useState("");
+  const [editingCharacterRole, setEditingCharacterRole] = useState("");
   const [editingWorldId, setEditingWorldId] = useState<string | null>(null);
-  const [editingWorldName, setEditingWorldName] = useState('');
-  const [editingWorldSummary, setEditingWorldSummary] = useState('');
+  const [editingWorldName, setEditingWorldName] = useState("");
+  const [editingWorldSummary, setEditingWorldSummary] = useState("");
   const [editingVolumeId, setEditingVolumeId] = useState<string | null>(null);
-  const [editingVolumeTitle, setEditingVolumeTitle] = useState('');
+  const [editingVolumeTitle, setEditingVolumeTitle] = useState("");
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
-  const [editingChapterTitle, setEditingChapterTitle] = useState('');
+  const [editingChapterTitle, setEditingChapterTitle] = useState("");
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
-  const [editingSceneTitle, setEditingSceneTitle] = useState('');
+  const [editingSceneTitle, setEditingSceneTitle] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [modelProfileId, setModelProfileId] = useState('');
-  const [rightTab, setRightTab] = useState<WorkspacePanelTab>('ai');
+  const [modelProfileId, setModelProfileId] = useState("");
+  const [rightTab, setRightTab] = useState<WorkspacePanelTab>("ai");
   const [focusMode, setFocusMode] = useState(false);
-  const [writingSize, setWritingSize] = useState<'small' | 'medium' | 'large'>('medium');
-  const [writingSpacing, setWritingSpacing] = useState<'compact' | 'relaxed'>('relaxed');
-  const [writingWidth, setWritingWidth] = useState<'narrow' | 'wide'>('wide');
+  const [writingSize, setWritingSize] = useState<"small" | "medium" | "large">(
+    "medium",
+  );
+  const [writingSpacing, setWritingSpacing] = useState<"compact" | "relaxed">(
+    "relaxed",
+  );
+  const [writingWidth, setWritingWidth] = useState<"narrow" | "wide">("wide");
 
   // ── 数据查询 ──
   const project = useQuery({
-    queryKey: ['project', projectId],
+    queryKey: ["project", projectId],
     queryFn: () => apiClient.getProject(projectId),
     enabled: Boolean(projectId),
   });
   const characters = useQuery({
-    queryKey: ['characters', projectId],
+    queryKey: ["characters", projectId],
     queryFn: () => apiClient.listCharacters(projectId),
     enabled: Boolean(projectId),
   });
   const worldEntries = useQuery({
-    queryKey: ['world', projectId],
+    queryKey: ["world", projectId],
     queryFn: () => apiClient.listWorldEntries(projectId),
     enabled: Boolean(projectId),
   });
   const impactReports = useQuery({
-    queryKey: ['impact-reports', projectId],
+    queryKey: ["impact-reports", projectId],
     queryFn: () => apiClient.listImpactReports(projectId),
     enabled: Boolean(projectId),
   });
   const acknowledgeImpact = useMutation({
     mutationFn: (reportId: string) =>
-      apiClient.updateImpactReport(reportId, 'acknowledged'),
+      apiClient.updateImpactReport(reportId, "acknowledged"),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['impact-reports', projectId] }),
+      queryClient.invalidateQueries({
+        queryKey: ["impact-reports", projectId],
+      }),
   });
   const volumes = useQuery({
-    queryKey: ['volumes', projectId],
+    queryKey: ["volumes", projectId],
     queryFn: () => apiClient.listVolumes(projectId),
     enabled: Boolean(projectId),
   });
   const chapters = useQuery({
-    queryKey: ['chapters', selectedVolumeId],
+    queryKey: ["chapters", selectedVolumeId],
     queryFn: () => apiClient.listChapters(selectedVolumeId),
     enabled: Boolean(selectedVolumeId),
   });
   const scenes = useQuery({
-    queryKey: ['scenes', selectedChapterId],
+    queryKey: ["scenes", selectedChapterId],
     queryFn: () => apiClient.listScenes(selectedChapterId),
     enabled: Boolean(selectedChapterId),
   });
   const scene = useQuery({
-    queryKey: ['scene', selectedSceneId],
+    queryKey: ["scene", selectedSceneId],
     queryFn: () => apiClient.getScene(selectedSceneId),
     enabled: Boolean(selectedSceneId),
   });
   const sceneVersions = useQuery({
-    queryKey: ['scene-versions', selectedSceneId],
+    queryKey: ["scene-versions", selectedSceneId],
     queryFn: () => apiClient.listVersions(selectedSceneId),
     enabled: Boolean(selectedSceneId),
   });
@@ -169,15 +190,15 @@ export function WorkspacePage() {
   );
 
   useEffect(() => {
-    setSelectedSceneVersionId('');
-    setPendingSceneVersionId('');
+    setSelectedSceneVersionId("");
+    setPendingSceneVersionId("");
     setHasExplicitSceneVersionSelection(false);
   }, [selectedSceneId]);
 
   useEffect(() => {
     if (!selectedSceneId) {
-      setSelectedSceneVersionId('');
-      setPendingSceneVersionId('');
+      setSelectedSceneVersionId("");
+      setPendingSceneVersionId("");
       setHasExplicitSceneVersionSelection(false);
       return;
     }
@@ -194,7 +215,9 @@ export function WorkspacePage() {
     if (nextSelection.pendingVersionId !== pendingSceneVersionId) {
       setPendingSceneVersionId(nextSelection.pendingVersionId);
     }
-    if (nextSelection.hasExplicitSelection !== hasExplicitSceneVersionSelection) {
+    if (
+      nextSelection.hasExplicitSelection !== hasExplicitSceneVersionSelection
+    ) {
       setHasExplicitSceneVersionSelection(nextSelection.hasExplicitSelection);
     }
   }, [
@@ -207,7 +230,7 @@ export function WorkspacePage() {
   ]);
 
   const handleVersionSelectionChange = useCallback((versionId: string) => {
-    setPendingSceneVersionId('');
+    setPendingSceneVersionId("");
     setHasExplicitSceneVersionSelection(true);
     setSelectedSceneVersionId(versionId);
   }, []);
@@ -217,16 +240,18 @@ export function WorkspacePage() {
       if (version?.id) {
         setPendingSceneVersionId(version.id);
       }
-      queryClient.invalidateQueries({ queryKey: ['scene-versions', selectedSceneId] });
+      queryClient.invalidateQueries({
+        queryKey: ["scene-versions", selectedSceneId],
+      });
       if (version?.id && isQuickEntry) {
         void apiClient
           .runReview(version.id, modelProfileId || undefined)
           .then(() => {
             queryClient.invalidateQueries({
-              queryKey: ['scene-versions', selectedSceneId],
+              queryKey: ["scene-versions", selectedSceneId],
             });
             queryClient.invalidateQueries({
-              queryKey: ['review-runs', version.id],
+              queryKey: ["review-runs", version.id],
             });
           })
           .catch(() => undefined);
@@ -236,33 +261,36 @@ export function WorkspacePage() {
   );
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-    queryClient.invalidateQueries({ queryKey: ['characters', projectId] });
-    queryClient.invalidateQueries({ queryKey: ['world', projectId] });
-    queryClient.invalidateQueries({ queryKey: ['volumes', projectId] });
-    queryClient.invalidateQueries({ queryKey: ['chapters', selectedVolumeId] });
-    queryClient.invalidateQueries({ queryKey: ['scenes', selectedChapterId] });
+    queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["characters", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["world", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["volumes", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["chapters", selectedVolumeId] });
+    queryClient.invalidateQueries({ queryKey: ["scenes", selectedChapterId] });
   };
 
   // ── 创建操作 ──
   const createCharacter = useMutation({
     mutationFn: () =>
-      apiClient.createCharacter(projectId, { name: characterName, role: '角色' }),
+      apiClient.createCharacter(projectId, {
+        name: characterName,
+        role: "角色",
+      }),
     onSuccess: () => {
-      setCharacterName('');
-      queryClient.invalidateQueries({ queryKey: ['characters', projectId] });
+      setCharacterName("");
+      queryClient.invalidateQueries({ queryKey: ["characters", projectId] });
     },
   });
   const createWorld = useMutation({
     mutationFn: () =>
       apiClient.createWorldEntry(projectId, {
         name: worldName,
-        entry_type: 'custom',
-        canon_status: 'draft',
+        entry_type: "custom",
+        canon_status: "draft",
       }),
     onSuccess: () => {
-      setWorldName('');
-      queryClient.invalidateQueries({ queryKey: ['world', projectId] });
+      setWorldName("");
+      queryClient.invalidateQueries({ queryKey: ["world", projectId] });
     },
   });
   const createVolume = useMutation({
@@ -273,9 +301,9 @@ export function WorkspacePage() {
       }),
     onSuccess: (volume: Volume) => {
       setSelectedVolumeId(volume.id);
-      setSelectedChapterId('');
-      setSelectedSceneId('');
-      queryClient.invalidateQueries({ queryKey: ['volumes', projectId] });
+      setSelectedChapterId("");
+      setSelectedSceneId("");
+      queryClient.invalidateQueries({ queryKey: ["volumes", projectId] });
     },
   });
   const createChapter = useMutation({
@@ -286,8 +314,10 @@ export function WorkspacePage() {
       }),
     onSuccess: (chapter: Chapter) => {
       setSelectedChapterId(chapter.id);
-      setSelectedSceneId('');
-      queryClient.invalidateQueries({ queryKey: ['chapters', selectedVolumeId] });
+      setSelectedSceneId("");
+      queryClient.invalidateQueries({
+        queryKey: ["chapters", selectedVolumeId],
+      });
     },
   });
   const createScene = useMutation({
@@ -297,9 +327,11 @@ export function WorkspacePage() {
         title: sceneTitle || `场景 ${nextSequence(scenes.data)}`,
       }),
     onSuccess: (createdScene: Scene) => {
-      setSceneTitle('');
+      setSceneTitle("");
       setSelectedSceneId(createdScene.id);
-      queryClient.invalidateQueries({ queryKey: ['scenes', selectedChapterId] });
+      queryClient.invalidateQueries({
+        queryKey: ["scenes", selectedChapterId],
+      });
     },
   });
 
@@ -325,13 +357,13 @@ export function WorkspacePage() {
       }),
     onSuccess: () => {
       setEditingCharacterId(null);
-      queryClient.invalidateQueries({ queryKey: ['characters', projectId] });
+      queryClient.invalidateQueries({ queryKey: ["characters", projectId] });
     },
   });
   const deleteCharacter = useMutation({
     mutationFn: (id: string) => apiClient.deleteCharacter(id),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['characters', projectId] }),
+      queryClient.invalidateQueries({ queryKey: ["characters", projectId] }),
   });
 
   const saveWorld = useMutation({
@@ -342,13 +374,13 @@ export function WorkspacePage() {
       }),
     onSuccess: () => {
       setEditingWorldId(null);
-      queryClient.invalidateQueries({ queryKey: ['world', projectId] });
+      queryClient.invalidateQueries({ queryKey: ["world", projectId] });
     },
   });
   const deleteWorld = useMutation({
     mutationFn: (id: string) => apiClient.deleteWorldEntry(id),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['world', projectId] }),
+      queryClient.invalidateQueries({ queryKey: ["world", projectId] }),
   });
 
   const saveVolume = useMutation({
@@ -356,7 +388,7 @@ export function WorkspacePage() {
       apiClient.patchVolume(editingVolumeId!, { title: editingVolumeTitle }),
     onSuccess: () => {
       setEditingVolumeId(null);
-      queryClient.invalidateQueries({ queryKey: ['volumes', projectId] });
+      queryClient.invalidateQueries({ queryKey: ["volumes", projectId] });
     },
   });
   const saveChapter = useMutation({
@@ -364,7 +396,9 @@ export function WorkspacePage() {
       apiClient.patchChapter(editingChapterId!, { title: editingChapterTitle }),
     onSuccess: () => {
       setEditingChapterId(null);
-      queryClient.invalidateQueries({ queryKey: ['chapters', selectedVolumeId] });
+      queryClient.invalidateQueries({
+        queryKey: ["chapters", selectedVolumeId],
+      });
     },
   });
   const saveScene = useMutation({
@@ -372,21 +406,26 @@ export function WorkspacePage() {
       apiClient.patchScene(editingSceneId!, { title: editingSceneTitle }),
     onSuccess: () => {
       setEditingSceneId(null);
-      queryClient.invalidateQueries({ queryKey: ['scenes', selectedChapterId] });
+      queryClient.invalidateQueries({
+        queryKey: ["scenes", selectedChapterId],
+      });
     },
   });
   const removeScene = useMutation({
     mutationFn: (id: string) => apiClient.deleteScene(id),
     onSuccess: () => {
       if (selectedSceneId) {
-        setSelectedSceneId('');
+        setSelectedSceneId("");
       }
-      queryClient.invalidateQueries({ queryKey: ['scenes', selectedChapterId] });
+      queryClient.invalidateQueries({
+        queryKey: ["scenes", selectedChapterId],
+      });
     },
   });
 
   const sortedVolumes = useMemo(
-    () => [...(volumes.data ?? [])].sort((a, b) => a.sequence_no - b.sequence_no),
+    () =>
+      [...(volumes.data ?? [])].sort((a, b) => a.sequence_no - b.sequence_no),
     [volumes.data],
   );
 
@@ -435,11 +474,11 @@ export function WorkspacePage() {
               ) : (
                 <>
                   <h1 className="truncate text-xl font-semibold text-slate-950">
-                    {project.data?.title ?? '加载中…'}
+                    {project.data?.title ?? "加载中…"}
                   </h1>
                   <button
                     onClick={() => {
-                      setProjectTitle(project.data?.title ?? '');
+                      setProjectTitle(project.data?.title ?? "");
                       setEditingProject(true);
                     }}
                     className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
@@ -455,13 +494,16 @@ export function WorkspacePage() {
             <StatusPill tone="ok">
               {label(PROJECT_STATUS_LABELS, project.data?.status)}
             </StatusPill>
-            <ModelSelector selectedId={modelProfileId} onChange={setModelProfileId} />
+            <ModelSelector
+              selectedId={modelProfileId}
+              onChange={setModelProfileId}
+            />
             <button
               onClick={() => setFocusMode((value) => !value)}
               className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600"
             >
               {focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              {focusMode ? '退出专注' : '专注写作'}
+              {focusMode ? "退出专注" : "专注写作"}
             </button>
             <Link
               to={`/projects/${projectId}/bible`}
@@ -483,7 +525,9 @@ export function WorkspacePage() {
             </a>
             <button
               onClick={() => {
-                if (confirm('确定要归档此项目吗？归档后仍可在项目列表中查看。')) {
+                if (
+                  confirm("确定要归档此项目吗？归档后仍可在项目列表中查看。")
+                ) {
                   archiveProject.mutate();
                 }
               }}
@@ -498,12 +542,12 @@ export function WorkspacePage() {
       <div
         className={`mx-auto grid gap-4 px-5 py-4 ${
           focusMode
-            ? 'max-w-[1200px] grid-cols-1'
-            : 'max-w-[1600px] xl:grid-cols-[300px_minmax(0,1fr)_340px]'
+            ? "max-w-[1200px] grid-cols-1"
+            : "max-w-[1600px] xl:grid-cols-[300px_minmax(0,1fr)_340px]"
         }`}
       >
         {/* ── 左侧栏：大纲 + 设定库 ── */}
-        <aside className={`space-y-4 ${focusMode ? 'hidden' : ''}`}>
+        <aside className={`space-y-4 ${focusMode ? "hidden" : ""}`}>
           {/* 大纲 */}
           <section className="rounded-md border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
@@ -556,13 +600,13 @@ export function WorkspacePage() {
                       <button
                         onClick={() => {
                           setSelectedVolumeId(volume.id);
-                          setSelectedChapterId('');
-                          setSelectedSceneId('');
+                          setSelectedChapterId("");
+                          setSelectedSceneId("");
                         }}
                         className={`flex-1 rounded-md px-3 py-2 text-left text-sm font-medium ${
                           selectedVolumeId === volume.id
-                            ? 'bg-emerald-50 text-emerald-800'
-                            : 'text-slate-700'
+                            ? "bg-emerald-50 text-emerald-800"
+                            : "text-slate-700"
                         }`}
                       >
                         {volume.sequence_no}. {volume.title}
@@ -588,7 +632,9 @@ export function WorkspacePage() {
                             <div className="flex items-center gap-1 px-1 py-1">
                               <input
                                 value={editingChapterTitle}
-                                onChange={(e) => setEditingChapterTitle(e.target.value)}
+                                onChange={(e) =>
+                                  setEditingChapterTitle(e.target.value)
+                                }
                                 className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-emerald-600"
                                 autoFocus
                               />
@@ -613,12 +659,12 @@ export function WorkspacePage() {
                               <button
                                 onClick={() => {
                                   setSelectedChapterId(chapter.id);
-                                  setSelectedSceneId('');
+                                  setSelectedSceneId("");
                                 }}
                                 className={`flex-1 rounded-md px-2 py-1.5 text-left text-sm ${
                                   selectedChapterId === chapter.id
-                                    ? 'bg-amber-50 text-amber-900'
-                                    : 'text-slate-600'
+                                    ? "bg-amber-50 text-amber-900"
+                                    : "text-slate-600"
                                 }`}
                               >
                                 {chapter.sequence_no}. {chapter.title}
@@ -639,12 +685,17 @@ export function WorkspacePage() {
                           {selectedChapterId === chapter.id ? (
                             <div className="ml-2 mt-1 space-y-1">
                               {scenes.data?.map((item) => (
-                                <div key={item.id} className="group flex items-center gap-1">
+                                <div
+                                  key={item.id}
+                                  className="group flex items-center gap-1"
+                                >
                                   {editingSceneId === item.id ? (
                                     <div className="flex flex-1 items-center gap-1 px-1 py-1">
                                       <input
                                         value={editingSceneTitle}
-                                        onChange={(e) => setEditingSceneTitle(e.target.value)}
+                                        onChange={(e) =>
+                                          setEditingSceneTitle(e.target.value)
+                                        }
                                         className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-emerald-600"
                                         autoFocus
                                       />
@@ -666,11 +717,13 @@ export function WorkspacePage() {
                                     </div>
                                   ) : (
                                     <button
-                                      onClick={() => setSelectedSceneId(item.id)}
+                                      onClick={() =>
+                                        setSelectedSceneId(item.id)
+                                      }
                                       className={`flex-1 rounded-md px-2 py-1.5 text-left text-sm ${
                                         selectedSceneId === item.id
-                                          ? 'bg-slate-900 text-white'
-                                          : 'text-slate-600 hover:bg-slate-50'
+                                          ? "bg-slate-900 text-white"
+                                          : "text-slate-600 hover:bg-slate-50"
                                       }`}
                                     >
                                       {item.sequence_no}. {item.title}
@@ -695,7 +748,11 @@ export function WorkspacePage() {
                                       </button>
                                       <button
                                         onClick={() => {
-                                          if (confirm(`确定要删除场景「${item.title}」吗？`)) {
+                                          if (
+                                            confirm(
+                                              `确定要删除场景「${item.title}」吗？`,
+                                            )
+                                          ) {
                                             removeScene.mutate(item.id);
                                           }
                                         }}
@@ -717,7 +774,9 @@ export function WorkspacePage() {
                 </div>
               ))}
               {sortedVolumes.length === 0 ? (
-                <p className="p-3 text-sm text-slate-500">暂无大纲，请新建一个卷</p>
+                <p className="p-3 text-sm text-slate-500">
+                  暂无大纲，请新建一个卷
+                </p>
               ) : null}
             </div>
           </section>
@@ -749,7 +808,9 @@ export function WorkspacePage() {
               className="flex w-full items-center justify-between border-b border-slate-200 px-3 py-2"
             >
               <h2 className="text-sm font-semibold text-slate-900">设定库</h2>
-              <span className="text-xs text-slate-400">{showSettings ? '收起' : '展开'}</span>
+              <span className="text-xs text-slate-400">
+                {showSettings ? "收起" : "展开"}
+              </span>
             </button>
             {showSettings ? (
               <div className="space-y-3 p-3">
@@ -774,7 +835,9 @@ export function WorkspacePage() {
                       icon={<UserPlus size={15} />}
                       label="添加"
                       onClick={() => createCharacter.mutate()}
-                      disabled={!characterName.trim() || createCharacter.isPending}
+                      disabled={
+                        !characterName.trim() || createCharacter.isPending
+                      }
                     />
                   </div>
                   <div className="mt-2 space-y-1">
@@ -785,13 +848,17 @@ export function WorkspacePage() {
                             <div className="min-w-0 flex-1 space-y-1">
                               <input
                                 value={editingCharacterName}
-                                onChange={(e) => setEditingCharacterName(e.target.value)}
+                                onChange={(e) =>
+                                  setEditingCharacterName(e.target.value)
+                                }
                                 className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-emerald-600"
                                 placeholder="名称"
                               />
                               <input
                                 value={editingCharacterRole}
-                                onChange={(e) => setEditingCharacterRole(e.target.value)}
+                                onChange={(e) =>
+                                  setEditingCharacterRole(e.target.value)
+                                }
                                 className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-emerald-600"
                                 placeholder="身份/角色"
                               />
@@ -821,7 +888,7 @@ export function WorkspacePage() {
                                 {character.name}
                               </span>
                               <span className="ml-2 text-xs text-slate-500">
-                                {character.role || '未设置身份'}
+                                {character.role || "未设置身份"}
                               </span>
                             </div>
                             <div className="hidden items-center gap-1 group-hover:flex">
@@ -829,7 +896,7 @@ export function WorkspacePage() {
                                 onClick={() => {
                                   setEditingCharacterId(character.id);
                                   setEditingCharacterName(character.name);
-                                  setEditingCharacterRole(character.role || '');
+                                  setEditingCharacterRole(character.role || "");
                                 }}
                                 className="rounded p-1 text-slate-400 hover:text-slate-600"
                                 title="编辑"
@@ -838,7 +905,11 @@ export function WorkspacePage() {
                               </button>
                               <button
                                 onClick={() => {
-                                  if (confirm(`确定要删除人物「${character.name}」吗？`)) {
+                                  if (
+                                    confirm(
+                                      `确定要删除人物「${character.name}」吗？`,
+                                    )
+                                  ) {
                                     deleteCharacter.mutate(character.id);
                                   }
                                 }}
@@ -887,13 +958,17 @@ export function WorkspacePage() {
                             <div className="min-w-0 flex-1 space-y-1">
                               <input
                                 value={editingWorldName}
-                                onChange={(e) => setEditingWorldName(e.target.value)}
+                                onChange={(e) =>
+                                  setEditingWorldName(e.target.value)
+                                }
                                 className="w-full rounded border border-slate-300 px-2 py-1 text-sm outline-none focus:border-emerald-600"
                                 placeholder="名称"
                               />
                               <input
                                 value={editingWorldSummary}
-                                onChange={(e) => setEditingWorldSummary(e.target.value)}
+                                onChange={(e) =>
+                                  setEditingWorldSummary(e.target.value)
+                                }
                                 className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-emerald-600"
                                 placeholder="摘要"
                               />
@@ -931,7 +1006,7 @@ export function WorkspacePage() {
                                 onClick={() => {
                                   setEditingWorldId(entry.id);
                                   setEditingWorldName(entry.name);
-                                  setEditingWorldSummary(entry.summary || '');
+                                  setEditingWorldSummary(entry.summary || "");
                                 }}
                                 className="rounded p-1 text-slate-400 hover:text-slate-600"
                                 title="编辑"
@@ -940,7 +1015,11 @@ export function WorkspacePage() {
                               </button>
                               <button
                                 onClick={() => {
-                                  if (confirm(`确定要删除世界观条目「${entry.name}」吗？`)) {
+                                  if (
+                                    confirm(
+                                      `确定要删除世界观条目「${entry.name}」吗？`,
+                                    )
+                                  ) {
                                     deleteWorld.mutate(entry.id);
                                   }
                                 }}
@@ -964,17 +1043,17 @@ export function WorkspacePage() {
         {/* ── 中间：写作辅助 + 场景编辑器 ── */}
         <div
           className={`mx-auto w-full space-y-4 ${
-            writingWidth === 'narrow' ? 'max-w-3xl' : 'max-w-5xl'
+            writingWidth === "narrow" ? "max-w-3xl" : "max-w-5xl"
           } ${
-            writingSize === 'small'
-              ? '[&_.ProseMirror]:text-sm'
-              : writingSize === 'large'
-                ? '[&_.ProseMirror]:text-lg'
-                : '[&_.ProseMirror]:text-base'
+            writingSize === "small"
+              ? "[&_.ProseMirror]:text-sm"
+              : writingSize === "large"
+                ? "[&_.ProseMirror]:text-lg"
+                : "[&_.ProseMirror]:text-base"
           } ${
-            writingSpacing === 'compact'
-              ? '[&_.ProseMirror]:leading-6'
-              : '[&_.ProseMirror]:leading-9'
+            writingSpacing === "compact"
+              ? "[&_.ProseMirror]:leading-6"
+              : "[&_.ProseMirror]:leading-9"
           }`}
         >
           {focusMode ? (
@@ -984,7 +1063,11 @@ export function WorkspacePage() {
                 value={writingSize}
                 onChange={(event) => {
                   const value = event.target.value;
-                  if (value === 'small' || value === 'medium' || value === 'large') {
+                  if (
+                    value === "small" ||
+                    value === "medium" ||
+                    value === "large"
+                  ) {
                     setWritingSize(value);
                   }
                 }}
@@ -999,7 +1082,7 @@ export function WorkspacePage() {
                 value={writingSpacing}
                 onChange={(event) =>
                   setWritingSpacing(
-                    event.target.value === 'compact' ? 'compact' : 'relaxed',
+                    event.target.value === "compact" ? "compact" : "relaxed",
                   )
                 }
                 className="rounded border border-slate-300 bg-white px-2 py-1"
@@ -1009,28 +1092,30 @@ export function WorkspacePage() {
               </select>
               <button
                 onClick={() =>
-                  setWritingWidth((value) => (value === 'wide' ? 'narrow' : 'wide'))
+                  setWritingWidth((value) =>
+                    value === "wide" ? "narrow" : "wide",
+                  )
                 }
                 className="rounded border border-slate-300 bg-white px-2 py-1"
               >
-                {writingWidth === 'wide' ? '窄版正文' : '宽版正文'}
+                {writingWidth === "wide" ? "窄版正文" : "宽版正文"}
               </button>
             </div>
           ) : (
             <WritingAssistant sceneId={selectedSceneId} />
           )}
           <SceneEditor
-              scene={scene.data ?? null}
-              onVersionCreated={handleVersionCreated}
-              modelProfileId={modelProfileId}
-            />
+            scene={scene.data ?? null}
+            onVersionCreated={handleVersionCreated}
+            modelProfileId={modelProfileId}
+          />
         </div>
 
         {/* ── 右侧栏：当前场景版本工具 ── */}
-        <aside className={`min-w-0 space-y-3 ${focusMode ? 'hidden' : ''}`}>
+        <aside className={`min-w-0 space-y-3 ${focusMode ? "hidden" : ""}`}>
           <WorkspacePanelTabs value={rightTab} onChange={setRightTab} />
 
-          {rightTab === 'ai' ? (
+          {rightTab === "ai" ? (
             <SceneGenerationPanel
               sceneId={selectedSceneId}
               modelProfileId={modelProfileId}
@@ -1038,34 +1123,37 @@ export function WorkspacePage() {
             />
           ) : null}
 
-          {rightTab === 'review' ? (
+          {rightTab === "review" ? (
             <>
               <ReviewIssuePanel
                 sceneVersionId={selectedSceneVersionId}
                 modelProfileId={modelProfileId}
               />
-              {impactReports.data?.filter((report) => report.status === 'open').map((report) => (
-            <section
-              key={report.id}
-              className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
-            >
-              <p className="font-semibold">正式稿替换影响</p>
-              <p className="mt-1">
-                以下 {report.affected_scene_ids_json.length} 个后续场景需要复查：
-                {report.affected_scene_ids_json.join('、') || '无'}
-              </p>
-              <button
-                className="mt-2 rounded border border-amber-300 bg-white px-2 py-1"
-                onClick={() => acknowledgeImpact.mutate(report.id)}
-              >
-                已查看影响
-              </button>
-            </section>
-              ))}
+              {impactReports.data
+                ?.filter((report) => report.status === "open")
+                .map((report) => (
+                  <section
+                    key={report.id}
+                    className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+                  >
+                    <p className="font-semibold">正式稿替换影响</p>
+                    <p className="mt-1">
+                      以下 {report.affected_scene_ids_json.length}{" "}
+                      个后续场景需要复查：
+                      {report.affected_scene_ids_json.join("、") || "无"}
+                    </p>
+                    <button
+                      className="mt-2 rounded border border-amber-300 bg-white px-2 py-1"
+                      onClick={() => acknowledgeImpact.mutate(report.id)}
+                    >
+                      已查看影响
+                    </button>
+                  </section>
+                ))}
             </>
           ) : null}
 
-          {rightTab === 'memory' ? (
+          {rightTab === "memory" ? (
             <MemoryCandidatePanel
               sceneId={selectedSceneId}
               sceneVersionId={selectedSceneVersionId}
@@ -1074,7 +1162,7 @@ export function WorkspacePage() {
             />
           ) : null}
 
-          {rightTab === 'history' ? (
+          {rightTab === "history" ? (
             <SceneVersionSelector
               versions={sceneVersions.data ?? []}
               approvedVersionId={scene.data?.approved_version_id ?? null}
@@ -1083,7 +1171,7 @@ export function WorkspacePage() {
             />
           ) : null}
 
-          {rightTab === 'advanced' ? (
+          {rightTab === "advanced" ? (
             <div className="space-y-3">
               <SceneCardEditor
                 scene={scene.data ?? null}

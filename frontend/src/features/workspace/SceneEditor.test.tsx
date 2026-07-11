@@ -1,28 +1,36 @@
-import type { ReactElement } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReactElement } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { apiClient } from '../../api/client';
+import { apiClient } from "../../api/client";
 import type {
   ReviewResult,
   ReviewRun,
   Scene,
   SceneVersion,
-} from '../../types/entities';
-import { SceneEditor } from './SceneEditor';
+} from "../../types/entities";
+import { SceneEditor } from "./SceneEditor";
 
 const { editorMock, editorOptions } = vi.hoisted(() => ({
   editorMock: {
     commands: { setContent: vi.fn() },
     getJSON: vi.fn(),
   },
-  editorOptions: { current: undefined as
-    | { onUpdate?: (event: { editor: unknown }) => void }
-    | undefined },
+  editorOptions: {
+    current: undefined as
+      | { onUpdate?: (event: { editor: unknown }) => void }
+      | undefined,
+  },
 }));
 
-vi.mock('@tiptap/react', () => ({
+vi.mock("@tiptap/react", () => ({
   EditorContent: () => <div data-testid="editor" />,
   useEditor: (options: { onUpdate?: (event: { editor: unknown }) => void }) => {
     editorOptions.current = options;
@@ -30,7 +38,7 @@ vi.mock('@tiptap/react', () => ({
   },
 }));
 
-vi.mock('../../api/client', () => ({
+vi.mock("../../api/client", () => ({
   apiClient: {
     listVersions: vi.fn(),
     createVersion: vi.fn(),
@@ -50,25 +58,25 @@ function renderWithQuery(ui: ReactElement) {
   );
 }
 
-const now = '2026-07-11T00:00:00.000Z';
+const now = "2026-07-11T00:00:00.000Z";
 
 const scene: Scene = {
-  id: 'scene-1',
-  chapter_id: 'chapter-1',
+  id: "scene-1",
+  chapter_id: "chapter-1",
   sequence_no: 1,
-  title: '测试场景',
+  title: "测试场景",
   pov_character_id: null,
-  time_text: '',
+  time_text: "",
   story_time_order: 1,
   location_id: null,
-  goal: '',
-  conflict: '',
-  turning_point: '',
-  ending_hook: '',
+  goal: "",
+  conflict: "",
+  turning_point: "",
+  ending_hook: "",
   must_include_json: [],
   must_not_reveal_json: [],
   forbidden_actions_json: [],
-  status: 'reviewing',
+  status: "reviewing",
   approved_version_id: null,
   is_stale: false,
   created_at: now,
@@ -77,20 +85,20 @@ const scene: Scene = {
 
 function version(reviewStatus: string): SceneVersion {
   return {
-    id: 'version-1',
+    id: "version-1",
     scene_id: scene.id,
     version_no: 1,
     parent_version_id: null,
-    branch_name: 'main',
-    content_json: { type: 'doc', content: [{ type: 'paragraph' }] },
-    content_markdown: '正文',
-    summary: '',
-    source_type: 'human',
+    branch_name: "main",
+    content_json: { type: "doc", content: [{ type: "paragraph" }] },
+    content_markdown: "正文",
+    summary: "",
+    source_type: "human",
     model_profile_id: null,
     prompt_snapshot_json: {},
     context_manifest_json: {},
     review_status: reviewStatus,
-    created_by: 'user',
+    created_by: "user",
     approved_at: null,
     approval_override_reason: null,
     superseded_at: null,
@@ -101,16 +109,16 @@ function version(reviewStatus: string): SceneVersion {
 }
 
 const completedRun: ReviewRun = {
-  id: 'run-1',
-  scene_version_id: 'version-1',
+  id: "run-1",
+  scene_version_id: "version-1",
   model_profile_id: null,
-  provider: 'fake',
-  model: 'fake-model',
-  status: 'completed',
+  provider: "fake",
+  model: "fake-model",
+  status: "completed",
   prompt_snapshot_json: {},
   started_at: now,
   completed_at: now,
-  summary: '未发现问题',
+  summary: "未发现问题",
   created_at: now,
   updated_at: now,
 };
@@ -124,41 +132,41 @@ function apiError(reason: string) {
   };
 }
 
-describe('SceneEditor approval gate', () => {
+describe("SceneEditor approval gate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    vi.spyOn(window, 'prompt').mockReturnValue('作者确认这是有意安排');
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(window, "prompt").mockReturnValue("作者确认这是有意安排");
     vi.mocked(apiClient.createVersion).mockResolvedValue(
-      version('not_reviewed'),
+      version("not_reviewed"),
     );
     vi.mocked(apiClient.getWorkingDraft).mockResolvedValue({
       scene_id: scene.id,
-      content_json: { type: 'doc', content: [{ type: 'paragraph' }] },
-      content_markdown: '',
+      content_json: { type: "doc", content: [{ type: "paragraph" }] },
+      content_markdown: "",
       revision: 0,
       updated_at: null,
     });
     vi.mocked(apiClient.updateWorkingDraft).mockResolvedValue({
       scene_id: scene.id,
-      content_json: { type: 'doc', content: [{ type: 'paragraph' }] },
-      content_markdown: '新草稿',
+      content_json: { type: "doc", content: [{ type: "paragraph" }] },
+      content_markdown: "新草稿",
       revision: 1,
       updated_at: now,
     });
     vi.mocked(apiClient.runReview).mockResolvedValue(reviewResult);
     vi.mocked(apiClient.approveVersion).mockResolvedValue({
       ...scene,
-      approved_version_id: 'version-1',
-      status: 'canonicalizing',
+      approved_version_id: "version-1",
+      status: "canonicalizing",
     });
   });
 
-  it('normalizes legacy HTML before loading and saving a version', async () => {
+  it("normalizes legacy HTML before loading and saving a version", async () => {
     vi.mocked(apiClient.listVersions).mockResolvedValue([
       {
-        ...version('not_reviewed'),
-        content_markdown: '<p><strong>重点</strong><br>下一行</p>',
+        ...version("not_reviewed"),
+        content_markdown: "<p><strong>重点</strong><br>下一行</p>",
       },
     ]);
     renderWithQuery(<SceneEditor scene={scene} />);
@@ -166,14 +174,14 @@ describe('SceneEditor approval gate', () => {
     await waitFor(() => {
       expect(editorMock.commands.setContent).toHaveBeenCalledWith(
         {
-          type: 'doc',
+          type: "doc",
           content: [
             {
-              type: 'paragraph',
+              type: "paragraph",
               content: [
-                { type: 'text', text: '重点', marks: [{ type: 'bold' }] },
-                { type: 'hardBreak' },
-                { type: 'text', text: '下一行', marks: [] },
+                { type: "text", text: "重点", marks: [{ type: "bold" }] },
+                { type: "hardBreak" },
+                { type: "text", text: "下一行", marks: [] },
               ],
             },
           ],
@@ -181,33 +189,33 @@ describe('SceneEditor approval gate', () => {
         false,
       );
     });
-    expect(screen.getByText('5 字')).toBeInTheDocument();
+    expect(screen.getByText("5 字")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '保存版本' }));
+    fireEvent.click(screen.getByRole("button", { name: "保存版本" }));
 
     await waitFor(() => {
       expect(apiClient.createVersion).toHaveBeenCalledWith(scene.id, {
-        content_markdown: '**重点**  \n下一行',
+        content_markdown: "**重点**  \n下一行",
         content_json: {
-          type: 'doc',
+          type: "doc",
           content: [
             {
-              type: 'paragraph',
+              type: "paragraph",
               content: [
-                { type: 'text', text: '重点', marks: [{ type: 'bold' }] },
-                { type: 'hardBreak' },
-                { type: 'text', text: '下一行', marks: [] },
+                { type: "text", text: "重点", marks: [{ type: "bold" }] },
+                { type: "hardBreak" },
+                { type: "text", text: "下一行", marks: [] },
               ],
             },
           ],
         },
         summary: scene.title,
-        source_type: 'human_revised',
+        source_type: "human_revised",
       });
     });
   });
 
-  it('autosaves only the working draft without creating a version', async () => {
+  it("autosaves only the working draft without creating a version", async () => {
     vi.mocked(apiClient.listVersions).mockResolvedValue([]);
     renderWithQuery(<SceneEditor scene={scene} />);
 
@@ -216,9 +224,9 @@ describe('SceneEditor approval gate', () => {
     });
 
     const document = {
-      type: 'doc',
+      type: "doc",
       content: [
-        { type: 'paragraph', content: [{ type: 'text', text: '新草稿' }] },
+        { type: "paragraph", content: [{ type: "text", text: "新草稿" }] },
       ],
     };
     editorMock.getJSON.mockReturnValue(document);
@@ -234,13 +242,13 @@ describe('SceneEditor approval gate', () => {
 
     expect(apiClient.updateWorkingDraft).toHaveBeenCalledWith(scene.id, {
       revision: 0,
-      content_markdown: '新草稿',
+      content_markdown: "新草稿",
       content_json: document,
     });
     expect(apiClient.createVersion).not.toHaveBeenCalled();
   });
 
-  it('saves a pending draft before manually creating a version', async () => {
+  it("saves a pending draft before manually creating a version", async () => {
     vi.mocked(apiClient.listVersions).mockResolvedValue([]);
     renderWithQuery(<SceneEditor scene={scene} />);
 
@@ -248,9 +256,9 @@ describe('SceneEditor approval gate', () => {
       expect(editorMock.commands.setContent).toHaveBeenCalled();
     });
     const document = {
-      type: 'doc',
+      type: "doc",
       content: [
-        { type: 'paragraph', content: [{ type: 'text', text: '立即保存' }] },
+        { type: "paragraph", content: [{ type: "text", text: "立即保存" }] },
       ],
     };
     editorMock.getJSON.mockReturnValue(document);
@@ -258,96 +266,101 @@ describe('SceneEditor approval gate', () => {
       editorOptions.current?.onUpdate?.({ editor: editorMock });
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '保存版本' }));
+    fireEvent.click(screen.getByRole("button", { name: "保存版本" }));
 
     await waitFor(() => {
       expect(apiClient.createVersion).toHaveBeenCalled();
     });
     expect(apiClient.updateWorkingDraft).toHaveBeenCalledWith(scene.id, {
       revision: 0,
-      content_markdown: '立即保存',
+      content_markdown: "立即保存",
       content_json: document,
     });
     expect(
       vi.mocked(apiClient.updateWorkingDraft).mock.invocationCallOrder[0],
-    ).toBeLessThan(vi.mocked(apiClient.createVersion).mock.invocationCallOrder[0]);
+    ).toBeLessThan(
+      vi.mocked(apiClient.createVersion).mock.invocationCallOrder[0],
+    );
   });
 
-  it('guides an unreviewed version through review before approval', async () => {
+  it("guides an unreviewed version through review before approval", async () => {
     vi.mocked(apiClient.listVersions).mockResolvedValue([
-      version('not_reviewed'),
+      version("not_reviewed"),
     ]);
     renderWithQuery(<SceneEditor scene={scene} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '先审查' }));
+    fireEvent.click(await screen.findByRole("button", { name: "先审查" }));
 
     await waitFor(() => {
-      expect(apiClient.runReview).toHaveBeenCalledWith('version-1');
+      expect(apiClient.runReview).toHaveBeenCalledWith("version-1");
     });
     expect(apiClient.approveVersion).not.toHaveBeenCalled();
   });
 
-  it('uses the selected model profile for approval review', async () => {
+  it("uses the selected model profile for approval review", async () => {
     vi.mocked(apiClient.listVersions).mockResolvedValue([
-      version('not_reviewed'),
+      version("not_reviewed"),
     ]);
     renderWithQuery(<SceneEditor scene={scene} modelProfileId="profile-1" />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '先审查' }));
+    fireEvent.click(await screen.findByRole("button", { name: "先审查" }));
 
     await waitFor(() => {
-      expect(apiClient.runReview).toHaveBeenCalledWith('version-1', 'profile-1');
+      expect(apiClient.runReview).toHaveBeenCalledWith(
+        "version-1",
+        "profile-1",
+      );
     });
   });
 
-  it('approves a completed review without an override', async () => {
-    vi.mocked(apiClient.listVersions).mockResolvedValue([version('completed')]);
+  it("approves a completed review without an override", async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([version("completed")]);
     renderWithQuery(<SceneEditor scene={scene} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '批准' }));
+    fireEvent.click(await screen.findByRole("button", { name: "批准" }));
 
     await waitFor(() => {
       expect(apiClient.approveVersion).toHaveBeenCalledWith(
         scene.id,
-        'version-1',
+        "version-1",
         undefined,
       );
     });
   });
 
-  it('collects a reason before forcing approval with blocking issues', async () => {
-    vi.mocked(apiClient.listVersions).mockResolvedValue([version('completed')]);
+  it("collects a reason before forcing approval with blocking issues", async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([version("completed")]);
     vi.mocked(apiClient.approveVersion)
-      .mockRejectedValueOnce(apiError('BLOCKING_REVIEW_ISSUES'))
+      .mockRejectedValueOnce(apiError("BLOCKING_REVIEW_ISSUES"))
       .mockResolvedValueOnce({
         ...scene,
-        approved_version_id: 'version-1',
-        status: 'canonicalizing',
+        approved_version_id: "version-1",
+        status: "canonicalizing",
       });
     renderWithQuery(<SceneEditor scene={scene} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '批准' }));
+    fireEvent.click(await screen.findByRole("button", { name: "批准" }));
 
     await waitFor(() => {
       expect(apiClient.approveVersion).toHaveBeenLastCalledWith(
         scene.id,
-        'version-1',
-        '作者确认这是有意安排',
+        "version-1",
+        "作者确认这是有意安排",
       );
     });
   });
 
-  it('shows a clear message when historical replacement is unavailable', async () => {
-    vi.mocked(apiClient.listVersions).mockResolvedValue([version('completed')]);
+  it("shows a clear message when historical replacement is unavailable", async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([version("completed")]);
     vi.mocked(apiClient.approveVersion).mockRejectedValue(
-      apiError('HISTORICAL_REPLACEMENT_NOT_READY'),
+      apiError("HISTORICAL_REPLACEMENT_NOT_READY"),
     );
     renderWithQuery(<SceneEditor scene={scene} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '批准' }));
+    fireEvent.click(await screen.findByRole("button", { name: "批准" }));
 
     expect(
-      await screen.findByText('历史正式稿替换尚未开放，请保留当前正式稿。'),
+      await screen.findByText("历史正式稿替换尚未开放，请保留当前正式稿。"),
     ).toBeInTheDocument();
   });
 });

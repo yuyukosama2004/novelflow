@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Cpu } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Cpu } from "lucide-react";
+import { Link } from "react-router-dom";
 
-import { apiClient } from '../api/client';
+import { apiClient } from "../api/client";
 
 interface Props {
   selectedId: string;
@@ -12,7 +12,7 @@ interface Props {
 
 export function ModelSelector({ selectedId, onChange }: Props) {
   const profiles = useQuery({
-    queryKey: ['model-profiles'],
+    queryKey: ["model-profiles"],
     queryFn: () => apiClient.listModelProfiles(),
     staleTime: 60000,
   });
@@ -45,13 +45,13 @@ export function ModelSelector({ selectedId, onChange }: Props) {
     <div className="flex items-center gap-1.5">
       <Cpu size={14} className="text-slate-400" />
       <select
-        value={selected?.id ?? fallback?.id ?? ''}
+        value={selected?.id ?? fallback?.id ?? ""}
         onChange={(e) => onChange(e.target.value)}
         className="rounded border border-slate-300 bg-white py-1.5 pl-2 pr-6 text-xs text-slate-700 outline-none focus:border-emerald-600"
       >
         {enabledProfiles.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.name || p.provider} · {p.model_name || '默认模型'}
+            {p.name || p.provider} · {p.model_name || "默认模型"}
           </option>
         ))}
       </select>

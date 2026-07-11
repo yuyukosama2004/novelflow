@@ -1,12 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
-import { Check, CheckCircle2, RefreshCw, Sparkles, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
+import { Check, CheckCircle2, RefreshCw, Sparkles, X } from "lucide-react";
 
-import { apiClient } from '../../api/client';
-import { IconButton } from '../../components/IconButton';
-import { StatusPill } from '../../components/StatusPill';
-import type { MemoryCandidate, MemoryCandidateStatus } from '../../types/entities';
-import { label, CANDIDATE_TYPE_LABELS, MEMORY_CANDIDATE_STATUS_LABELS } from '../../utils/enumLabels';
+import { apiClient } from "../../api/client";
+import { IconButton } from "../../components/IconButton";
+import { StatusPill } from "../../components/StatusPill";
+import type {
+  MemoryCandidate,
+  MemoryCandidateStatus,
+} from "../../types/entities";
+import {
+  label,
+  CANDIDATE_TYPE_LABELS,
+  MEMORY_CANDIDATE_STATUS_LABELS,
+} from "../../utils/enumLabels";
 
 interface Props {
   sceneId?: string;
@@ -15,14 +22,14 @@ interface Props {
   modelProfileId?: string;
 }
 
-type CandidateAction = Extract<MemoryCandidateStatus, 'approved' | 'rejected'>;
+type CandidateAction = Extract<MemoryCandidateStatus, "approved" | "rejected">;
 
-const STATUS_TONE: Record<MemoryCandidateStatus, 'neutral' | 'ok' | 'warn'> = {
-  pending: 'warn',
-  approved: 'ok',
-  rejected: 'neutral',
-  conflicted: 'warn',
-  invalidated: 'neutral',
+const STATUS_TONE: Record<MemoryCandidateStatus, "neutral" | "ok" | "warn"> = {
+  pending: "warn",
+  approved: "ok",
+  rejected: "neutral",
+  conflicted: "warn",
+  invalidated: "neutral",
 };
 
 function formatPayload(payload: Record<string, unknown>): string {
@@ -30,25 +37,27 @@ function formatPayload(payload: Record<string, unknown>): string {
 }
 
 function completionFailureMessage(error: unknown): string {
-  if (!axios.isAxiosError(error)) return '场景完成失败，请刷新后重试。';
-  const data = error.response?.data as { details?: { reason?: string } } | undefined;
-  if (data?.details?.reason === 'APPROVED_VERSION_REQUIRED') {
-    return '请先批准一个正式版本。';
+  if (!axios.isAxiosError(error)) return "场景完成失败，请刷新后重试。";
+  const data = error.response?.data as
+    | { details?: { reason?: string } }
+    | undefined;
+  if (data?.details?.reason === "APPROVED_VERSION_REQUIRED") {
+    return "请先批准一个正式版本。";
   }
-  if (data?.details?.reason === 'MEMORY_EXTRACTION_REQUIRED') {
-    return '请先对正式版本提取记忆。';
+  if (data?.details?.reason === "MEMORY_EXTRACTION_REQUIRED") {
+    return "请先对正式版本提取记忆。";
   }
-  if (data?.details?.reason === 'PENDING_MEMORY_CANDIDATES') {
-    return '请先处理完所有待确认的记忆候选。';
+  if (data?.details?.reason === "PENDING_MEMORY_CANDIDATES") {
+    return "请先处理完所有待确认的记忆候选。";
   }
-  return '场景完成失败，请刷新后重试。';
+  return "场景完成失败，请刷新后重试。";
 }
 
 export function MemoryCandidatePanel({
   sceneId,
   sceneVersionId,
   approvedVersionId,
-  modelProfileId = '',
+  modelProfileId = "",
 }: Props) {
   const queryClient = useQueryClient();
   const hasVersion = Boolean(sceneVersionId);
@@ -56,13 +65,13 @@ export function MemoryCandidatePanel({
     approvedVersionId === undefined || approvedVersionId === sceneVersionId;
 
   const candidatesQuery = useQuery({
-    queryKey: ['memory-candidates', sceneVersionId],
+    queryKey: ["memory-candidates", sceneVersionId],
     queryFn: () => apiClient.listCandidates(sceneVersionId),
     enabled: hasVersion,
   });
 
   const extractionRunsQuery = useQuery({
-    queryKey: ['memory-extraction-runs', sceneVersionId],
+    queryKey: ["memory-extraction-runs", sceneVersionId],
     queryFn: () => apiClient.listMemoryExtractionRuns(sceneVersionId),
     enabled: hasVersion,
   });
@@ -73,8 +82,12 @@ export function MemoryCandidatePanel({
         ? apiClient.extractMemories(sceneVersionId, modelProfileId)
         : apiClient.extractMemories(sceneVersionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['memory-candidates', sceneVersionId] });
-      queryClient.invalidateQueries({ queryKey: ['memory-extraction-runs', sceneVersionId] });
+      queryClient.invalidateQueries({
+        queryKey: ["memory-candidates", sceneVersionId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["memory-extraction-runs", sceneVersionId],
+      });
     },
   });
 
@@ -87,31 +100,35 @@ export function MemoryCandidatePanel({
       status: CandidateAction;
     }) => apiClient.updateCandidate(candidateId, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['memory-candidates', sceneVersionId] });
-      queryClient.invalidateQueries({ queryKey: ['context'] });
+      queryClient.invalidateQueries({
+        queryKey: ["memory-candidates", sceneVersionId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["context"] });
     },
   });
 
   const completeScene = useMutation({
-    mutationFn: () => apiClient.completeScene(sceneId ?? ''),
+    mutationFn: () => apiClient.completeScene(sceneId ?? ""),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scene', sceneId] });
-      queryClient.invalidateQueries({ queryKey: ['scenes'] });
+      queryClient.invalidateQueries({ queryKey: ["scene", sceneId] });
+      queryClient.invalidateQueries({ queryKey: ["scenes"] });
     },
   });
 
   const candidates = candidatesQuery.data ?? [];
-  const pendingCount = candidates.filter((candidate) => candidate.status === 'pending').length;
+  const pendingCount = candidates.filter(
+    (candidate) => candidate.status === "pending",
+  ).length;
   const hasCompletedExtraction = (extractionRunsQuery.data ?? []).some(
-    (run) => run.status === 'completed',
+    (run) => run.status === "completed",
   );
   const canComplete = Boolean(
     sceneId &&
-      isApprovedVersion &&
-      hasCompletedExtraction &&
-      !candidatesQuery.isLoading &&
-      !candidatesQuery.isFetching &&
-      pendingCount === 0,
+    isApprovedVersion &&
+    hasCompletedExtraction &&
+    !candidatesQuery.isLoading &&
+    !candidatesQuery.isFetching &&
+    pendingCount === 0,
   );
   const isExtracting = extractMemories.isPending;
   const isLoading =
@@ -138,15 +155,15 @@ export function MemoryCandidatePanel({
             从此版本提取事实变更，仅批准应成为正史的内容。
           </p>
         </div>
-        <StatusPill tone={pendingCount > 0 ? 'warn' : 'neutral'}>
-          {hasVersion ? `${pendingCount} 条待确认` : '暂无版本'}
+        <StatusPill tone={pendingCount > 0 ? "warn" : "neutral"}>
+          {hasVersion ? `${pendingCount} 条待确认` : "暂无版本"}
         </StatusPill>
       </div>
 
       <div className="mb-3 flex flex-wrap gap-2">
         <IconButton
           icon={<Sparkles size={14} />}
-          label={isExtracting ? '提取中…' : '提取记忆'}
+          label={isExtracting ? "提取中…" : "提取记忆"}
           tone="primary"
           onClick={() => extractMemories.mutate()}
           disabled={isExtracting || !hasVersion}
@@ -155,14 +172,16 @@ export function MemoryCandidatePanel({
           icon={<RefreshCw size={14} />}
           label="刷新"
           onClick={() =>
-            queryClient.invalidateQueries({ queryKey: ['memory-candidates', sceneVersionId] })
+            queryClient.invalidateQueries({
+              queryKey: ["memory-candidates", sceneVersionId],
+            })
           }
           disabled={isLoading || !hasVersion}
         />
         {sceneId ? (
           <IconButton
             icon={<CheckCircle2 size={14} />}
-            label={completeScene.isPending ? '完成中…' : '完成场景'}
+            label={completeScene.isPending ? "完成中…" : "完成场景"}
             onClick={() => completeScene.mutate()}
             disabled={!canComplete || completeScene.isPending}
           />
@@ -201,7 +220,7 @@ export function MemoryCandidatePanel({
 
       {hasVersion && isLoading ? (
         <div className="py-4 text-center text-slate-500">
-          {isExtracting ? '正在提取记忆候选…' : '加载候选…'}
+          {isExtracting ? "正在提取记忆候选…" : "加载候选…"}
         </div>
       ) : null}
 
@@ -214,7 +233,10 @@ export function MemoryCandidatePanel({
       {!isLoading && candidates.length > 0 ? (
         <div className="max-h-96 space-y-2 overflow-auto">
           {candidates.map((candidate: MemoryCandidate) => (
-            <div key={candidate.id} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div
+              key={candidate.id}
+              className="rounded-md border border-slate-200 bg-slate-50 p-3"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -231,7 +253,8 @@ export function MemoryCandidatePanel({
 
                   {candidate.evidence ? (
                     <p className="mt-2 text-slate-600">
-                      <span className="font-medium">证据：</span> {candidate.evidence}
+                      <span className="font-medium">证据：</span>{" "}
+                      {candidate.evidence}
                     </p>
                   ) : null}
 
@@ -245,19 +268,23 @@ export function MemoryCandidatePanel({
                   </details>
                 </div>
 
-                {candidate.status === 'pending' ? (
+                {candidate.status === "pending" ? (
                   <div className="flex shrink-0 items-center gap-1">
                     <button
-                      onClick={() => resolveCandidate(candidate.id, 'approved')}
+                      onClick={() => resolveCandidate(candidate.id, "approved")}
                       disabled={updateCandidate.isPending || !isApprovedVersion}
-                      title={isApprovedVersion ? '批准' : '只有正式版本的候选可以批准'}
+                      title={
+                        isApprovedVersion
+                          ? "批准"
+                          : "只有正式版本的候选可以批准"
+                      }
                       aria-label="批准记忆候选"
                       className="rounded p-1 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50"
                     >
                       <Check size={14} />
                     </button>
                     <button
-                      onClick={() => resolveCandidate(candidate.id, 'rejected')}
+                      onClick={() => resolveCandidate(candidate.id, "rejected")}
                       disabled={updateCandidate.isPending}
                       title="拒绝"
                       aria-label="拒绝记忆候选"

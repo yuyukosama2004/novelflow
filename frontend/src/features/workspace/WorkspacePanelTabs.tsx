@@ -1,16 +1,16 @@
 export type WorkspacePanelTab =
-  | 'ai'
-  | 'review'
-  | 'memory'
-  | 'history'
-  | 'advanced';
+  | "ai"
+  | "review"
+  | "memory"
+  | "history"
+  | "advanced";
 
 const TABS: readonly [WorkspacePanelTab, string][] = [
-  ['ai', 'AI 写作'],
-  ['review', '审查'],
-  ['memory', '记忆'],
-  ['history', '历史'],
-  ['advanced', '高级'],
+  ["ai", "AI 写作"],
+  ["review", "审查"],
+  ["memory", "记忆"],
+  ["history", "历史"],
+  ["advanced", "高级"],
 ];
 
 interface Props {
@@ -27,8 +27,8 @@ export function WorkspacePanelTabs({ value, onChange }: Props) {
           onClick={() => onChange(key)}
           className={`rounded px-1 py-2 ${
             value === key
-              ? 'bg-slate-900 text-white'
-              : 'text-slate-500 hover:bg-slate-50'
+              ? "bg-slate-900 text-white"
+              : "text-slate-500 hover:bg-slate-50"
           }`}
         >
           {text}

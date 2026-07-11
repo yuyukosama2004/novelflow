@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.responses import success
-from app.database.session import get_session
+from app.database.session import get_session as get_db_session
 from app.services.interview_service import InterviewService
 
 router = APIRouter()
@@ -33,7 +33,7 @@ async def start_interview(
     project_id: str,
     payload: StartSessionRequest,
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """开始创作访谈会话。"""
     result = await InterviewService(session).start_session(
@@ -50,7 +50,7 @@ async def send_message(
     session_id: str,
     payload: SendMessageRequest,
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """发送消息到访谈会话，获取 LLM 回复。"""
     result = await InterviewService(session).send_message(
@@ -64,7 +64,7 @@ async def send_message(
 async def get_session(
     session_id: str,
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """获取访谈会话详情。"""
     result = await InterviewService(session).get_session(session_id)
@@ -75,7 +75,7 @@ async def get_session(
 async def extract_candidates(
     session_id: str,
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """从访谈对话中提取结构化候选。"""
     candidates = await InterviewService(session).extract_candidates(session_id)
@@ -86,7 +86,7 @@ async def extract_candidates(
 async def list_candidates(
     session_id: str,
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """列出会话的所有候选。"""
     candidates = await InterviewService(session).list_candidates(session_id)
@@ -98,7 +98,7 @@ async def update_candidate(
     candidate_id: str,
     payload: UpdateCandidateRequest,
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """更新候选状态或内容。"""
     result = await InterviewService(session).update_candidate(
@@ -113,7 +113,7 @@ async def update_candidate(
 async def apply_candidate(
     candidate_id: str,
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """将已批准的候选应用到实际实体。"""
     result = await InterviewService(session).apply_candidate(candidate_id)

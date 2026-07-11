@@ -1,17 +1,17 @@
-import type { ReactElement } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReactElement } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { apiClient } from '../../api/client';
+import { apiClient } from "../../api/client";
 import type {
   ReviewIssue,
   ReviewResult,
   ReviewRun,
-} from '../../types/entities';
-import { ReviewIssuePanel } from './ReviewIssuePanel';
+} from "../../types/entities";
+import { ReviewIssuePanel } from "./ReviewIssuePanel";
 
-vi.mock('../../api/client', () => ({
+vi.mock("../../api/client", () => ({
   apiClient: {
     listReviewRuns: vi.fn(),
     getReviewRun: vi.fn(),
@@ -29,45 +29,45 @@ function renderWithQuery(ui: ReactElement) {
   );
 }
 
-const now = '2026-07-11T00:00:00.000Z';
+const now = "2026-07-11T00:00:00.000Z";
 
 const latestRun: ReviewRun = {
-  id: 'run-latest',
-  scene_version_id: 'sv-1',
+  id: "run-latest",
+  scene_version_id: "sv-1",
   model_profile_id: null,
-  provider: 'fake',
-  model: 'fake-model',
-  status: 'completed',
+  provider: "fake",
+  model: "fake-model",
+  status: "completed",
   prompt_snapshot_json: {},
   started_at: now,
   completed_at: now,
-  summary: '发现 1 个问题',
+  summary: "发现 1 个问题",
   created_at: now,
   updated_at: now,
 };
 
 const olderRun: ReviewRun = {
   ...latestRun,
-  id: 'run-older',
-  summary: '未发现问题',
-  created_at: '2026-07-10T00:00:00.000Z',
-  updated_at: '2026-07-10T00:00:00.000Z',
+  id: "run-older",
+  summary: "未发现问题",
+  created_at: "2026-07-10T00:00:00.000Z",
+  updated_at: "2026-07-10T00:00:00.000Z",
 };
 
 const issue: ReviewIssue = {
-  id: 'issue-1',
+  id: "issue-1",
   review_run_id: latestRun.id,
-  scene_version_id: 'sv-1',
-  issue_type: 'timeline_conflict',
-  severity: 'high',
+  scene_version_id: "sv-1",
+  issue_type: "timeline_conflict",
+  severity: "high",
   evidence_json: '{"line":42}',
-  conflict_rule: 'The scene reveals a secret too early.',
-  suggestion: 'Move the reveal to a later scene.',
+  conflict_rule: "The scene reveals a secret too early.",
+  suggestion: "Move the reveal to a later scene.",
   confidence: 0.92,
   source_chunk_index: 0,
   source_start: 0,
   source_end: 20,
-  status: 'open',
+  status: "open",
   created_at: now,
   updated_at: now,
 };
@@ -76,23 +76,23 @@ const latestResult: ReviewResult = { run: latestRun, issues: [issue] };
 const olderResult: ReviewResult = { run: olderRun, issues: [] };
 const issueActions = [
   {
-    status: 'accepted' as const,
-    buttonLabel: '接受问题',
-    statusLabel: '已接受',
+    status: "accepted" as const,
+    buttonLabel: "接受问题",
+    statusLabel: "已接受",
   },
   {
-    status: 'ignored' as const,
-    buttonLabel: '忽略问题',
-    statusLabel: '已忽略',
+    status: "ignored" as const,
+    buttonLabel: "忽略问题",
+    statusLabel: "已忽略",
   },
   {
-    status: 'false_positive' as const,
-    buttonLabel: '标记为误报',
-    statusLabel: '误报',
+    status: "false_positive" as const,
+    buttonLabel: "标记为误报",
+    statusLabel: "误报",
   },
 ];
 
-describe('ReviewIssuePanel', () => {
+describe("ReviewIssuePanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiClient.listReviewRuns).mockResolvedValue([]);
@@ -100,47 +100,47 @@ describe('ReviewIssuePanel', () => {
     vi.mocked(apiClient.runReview).mockResolvedValue(latestResult);
     vi.mocked(apiClient.updateIssue).mockResolvedValue({
       ...issue,
-      status: 'accepted',
+      status: "accepted",
     });
   });
 
-  it('shows the empty state before any review run exists', async () => {
+  it("shows the empty state before any review run exists", async () => {
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
     await waitFor(() => {
-      expect(apiClient.listReviewRuns).toHaveBeenCalledWith('sv-1');
+      expect(apiClient.listReviewRuns).toHaveBeenCalledWith("sv-1");
     });
-    expect(await screen.findByText('尚未执行审查。')).toBeInTheDocument();
+    expect(await screen.findByText("尚未执行审查。")).toBeInTheDocument();
   });
 
-  it('starts a new review run for the selected version', async () => {
+  it("starts a new review run for the selected version", async () => {
     vi.mocked(apiClient.listReviewRuns)
       .mockResolvedValueOnce([])
       .mockResolvedValue([latestRun]);
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '执行审查' }));
+    fireEvent.click(screen.getByRole("button", { name: "执行审查" }));
 
     await waitFor(() => {
-      expect(apiClient.runReview).toHaveBeenCalledWith('sv-1');
+      expect(apiClient.runReview).toHaveBeenCalledWith("sv-1");
     });
-    expect(await screen.findByText('timeline_conflict')).toBeInTheDocument();
+    expect(await screen.findByText("timeline_conflict")).toBeInTheDocument();
   });
 
-  it('passes the selected model profile to review', async () => {
+  it("passes the selected model profile to review", async () => {
     renderWithQuery(
       <ReviewIssuePanel sceneVersionId="sv-1" modelProfileId="profile-1" />,
     );
 
-    await screen.findByText('尚未执行审查。');
-    fireEvent.click(screen.getByRole('button', { name: '执行审查' }));
+    await screen.findByText("尚未执行审查。");
+    fireEvent.click(screen.getByRole("button", { name: "执行审查" }));
 
     await waitFor(() => {
-      expect(apiClient.runReview).toHaveBeenCalledWith('sv-1', 'profile-1');
+      expect(apiClient.runReview).toHaveBeenCalledWith("sv-1", "profile-1");
     });
   });
 
-  it('shows the latest run and allows reading an older run', async () => {
+  it("shows the latest run and allows reading an older run", async () => {
     vi.mocked(apiClient.listReviewRuns).mockResolvedValue([
       latestRun,
       olderRun,
@@ -151,21 +151,21 @@ describe('ReviewIssuePanel', () => {
 
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    expect(await screen.findByText('timeline_conflict')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('审查轮次'), {
+    expect(await screen.findByText("timeline_conflict")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("审查轮次"), {
       target: { value: olderRun.id },
     });
 
-    expect(await screen.findByText('未发现问题')).toBeInTheDocument();
+    expect(await screen.findByText("未发现问题")).toBeInTheDocument();
     expect(apiClient.getReviewRun).toHaveBeenLastCalledWith(olderRun.id);
   });
 
-  it('does not present a failed run as no issues', async () => {
+  it("does not present a failed run as no issues", async () => {
     const failedRun: ReviewRun = {
       ...latestRun,
-      id: 'run-failed',
-      status: 'failed',
-      summary: '审查执行失败',
+      id: "run-failed",
+      status: "failed",
+      summary: "审查执行失败",
     };
     vi.mocked(apiClient.listReviewRuns).mockResolvedValue([failedRun]);
     vi.mocked(apiClient.getReviewRun).mockResolvedValue({
@@ -176,13 +176,13 @@ describe('ReviewIssuePanel', () => {
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
     expect(
-      await screen.findByText('本轮审查失败，请重新执行审查。'),
+      await screen.findByText("本轮审查失败，请重新执行审查。"),
     ).toBeInTheDocument();
-    expect(screen.queryByText('未发现问题')).not.toBeInTheDocument();
+    expect(screen.queryByText("未发现问题")).not.toBeInTheDocument();
   });
 
   it.each(issueActions)(
-    'updates an issue to $status in the selected run and refetches it',
+    "updates an issue to $status in the selected run and refetches it",
     async ({ status, buttonLabel, statusLabel }) => {
       vi.mocked(apiClient.listReviewRuns).mockResolvedValue([latestRun]);
       vi.mocked(apiClient.getReviewRun)
@@ -198,19 +198,19 @@ describe('ReviewIssuePanel', () => {
       fireEvent.click(await screen.findByLabelText(buttonLabel));
 
       await waitFor(() => {
-        expect(apiClient.updateIssue).toHaveBeenCalledWith('issue-1', status);
+        expect(apiClient.updateIssue).toHaveBeenCalledWith("issue-1", status);
       });
       expect(await screen.findByText(statusLabel)).toBeInTheDocument();
     },
   );
 
-  it('refreshes the run list and selected run', async () => {
+  it("refreshes the run list and selected run", async () => {
     vi.mocked(apiClient.listReviewRuns).mockResolvedValue([latestRun]);
 
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    await screen.findByText('timeline_conflict');
-    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+    await screen.findByText("timeline_conflict");
+    fireEvent.click(screen.getByRole("button", { name: "刷新" }));
 
     await waitFor(() => {
       expect(apiClient.listReviewRuns).toHaveBeenCalledTimes(2);
@@ -218,24 +218,24 @@ describe('ReviewIssuePanel', () => {
     });
   });
 
-  it('does not call APIs when sceneVersionId is empty', () => {
+  it("does not call APIs when sceneVersionId is empty", () => {
     renderWithQuery(<ReviewIssuePanel sceneVersionId="" />);
 
-    expect(screen.getByRole('button', { name: '执行审查' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '刷新' })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "执行审查" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "刷新" })).toBeDisabled();
     expect(apiClient.listReviewRuns).not.toHaveBeenCalled();
     expect(apiClient.runReview).not.toHaveBeenCalled();
   });
 
-  it('shows a retryable error when starting a review fails', async () => {
-    vi.mocked(apiClient.runReview).mockRejectedValue(new Error('network'));
+  it("shows a retryable error when starting a review fails", async () => {
+    vi.mocked(apiClient.runReview).mockRejectedValue(new Error("network"));
     renderWithQuery(<ReviewIssuePanel sceneVersionId="sv-1" />);
 
-    await screen.findByText('尚未执行审查。');
-    fireEvent.click(screen.getByRole('button', { name: '执行审查' }));
+    await screen.findByText("尚未执行审查。");
+    fireEvent.click(screen.getByRole("button", { name: "执行审查" }));
 
     expect(
-      await screen.findByText('审查操作失败，请刷新后重试。'),
+      await screen.findByText("审查操作失败，请刷新后重试。"),
     ).toBeInTheDocument();
   });
 });

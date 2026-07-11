@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
 import { apiClient, createSSEStream } from "../../api/client";
 import type { SceneVersion } from "../../types/entities";
@@ -20,11 +20,11 @@ export default function SceneGenerationPanel({
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [version, setVersion] = useState<SceneVersion | null>(null);
-  const [runId, setRunId] = useState('');
+  const [runId, setRunId] = useState("");
   const controllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLPreElement>(null);
   const runs = useQuery({
-    queryKey: ['workflow-runs', sceneId],
+    queryKey: ["workflow-runs", sceneId],
     queryFn: () => apiClient.listWorkflowRuns(sceneId),
     enabled: Boolean(sceneId),
   });
@@ -34,10 +34,10 @@ export default function SceneGenerationPanel({
     if (!latest) return;
     setRunId(latest.id);
     setContent(latest.draft || latest.final_content);
-    setGenerating(['pending', 'planning', 'drafting'].includes(latest.status));
-    setDone(['waiting_review', 'done'].includes(latest.status));
-    if (latest.status === 'error' || latest.status === 'cancelled') {
-      setError(latest.error || '生成任务未完成');
+    setGenerating(["pending", "planning", "drafting"].includes(latest.status));
+    setDone(["waiting_review", "done"].includes(latest.status));
+    if (latest.status === "error" || latest.status === "cancelled") {
+      setError(latest.error || "生成任务未完成");
     }
   }, [runs.data]);
 
@@ -87,15 +87,13 @@ export default function SceneGenerationPanel({
     controllerRef.current?.abort();
     if (runId) void apiClient.cancelWorkflowRun(runId);
     setGenerating(false);
-    setError('用户已取消生成');
+    setError("用户已取消生成");
   }
 
   return (
     <div className="flex flex-col gap-3 h-full">
       <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold text-gray-700">
-          AI 场景生成
-        </h3>
+        <h3 className="text-sm font-semibold text-gray-700">AI 场景生成</h3>
         {!generating && !done && (
           <button
             onClick={handleGenerate}
@@ -113,9 +111,7 @@ export default function SceneGenerationPanel({
           </button>
         )}
         {generating && (
-          <span className="text-xs text-indigo-600 animate-pulse">
-            生成中…
-          </span>
+          <span className="text-xs text-indigo-600 animate-pulse">生成中…</span>
         )}
       </div>
 
@@ -131,7 +127,9 @@ export default function SceneGenerationPanel({
           className="flex-1 p-3 bg-gray-50 border rounded text-sm text-gray-800 whitespace-pre-wrap overflow-auto max-h-80"
         >
           {content}
-          {generating && <span className="inline-block w-2 h-4 bg-indigo-600 animate-pulse" />}
+          {generating && (
+            <span className="inline-block w-2 h-4 bg-indigo-600 animate-pulse" />
+          )}
         </pre>
       )}
 
@@ -139,9 +137,7 @@ export default function SceneGenerationPanel({
         <div className="text-xs text-green-700">
           生成完成。
           {version && (
-            <span className="ml-1">
-              已保存为版本 #{version.version_no}。
-            </span>
+            <span className="ml-1">已保存为版本 #{version.version_no}。</span>
           )}
         </div>
       )}

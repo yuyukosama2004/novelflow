@@ -118,15 +118,20 @@ export default function ContextChecker({ sceneId }: Props) {
                   <p>已知：{ch.knowledge_known.join("、")}</p>
                 )}
                 {ch.knowledge_unknown.length > 0 && (
-                  <p className="text-red-500">禁止获知：{ch.knowledge_unknown.join("、")}</p>
+                  <p className="text-red-500">
+                    禁止获知：{ch.knowledge_unknown.join("、")}
+                  </p>
                 )}
                 {ch.knowledge_future_locked.length > 0 && (
                   <p className="text-amber-600">
-                    后续场景信息（禁止提前泄露）：{ch.knowledge_future_locked.join("、")}
+                    后续场景信息（禁止提前泄露）：
+                    {ch.knowledge_future_locked.join("、")}
                   </p>
                 )}
                 {ch.forbidden_behaviors.length > 0 && (
-                  <p className="text-orange-600">禁止行为：{ch.forbidden_behaviors.join("、")}</p>
+                  <p className="text-orange-600">
+                    禁止行为：{ch.forbidden_behaviors.join("、")}
+                  </p>
                 )}
               </div>
             </details>

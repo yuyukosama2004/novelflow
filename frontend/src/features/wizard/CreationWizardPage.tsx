@@ -1,28 +1,31 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, MessageSquare, Sparkles } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, ArrowRight, MessageSquare, Sparkles } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 
-import { apiClient } from '../../api/client';
-import { ModelSelector } from '../../components/ModelSelector';
-import type { InterviewMessage, StoryCandidateEntity } from '../../types/entities';
-import { CandidateCard } from './CandidateCard';
-import { EntrySelector } from './EntrySelector';
-import { InterviewChat } from './InterviewChat';
+import { apiClient } from "../../api/client";
+import { ModelSelector } from "../../components/ModelSelector";
+import type {
+  InterviewMessage,
+  StoryCandidateEntity,
+} from "../../types/entities";
+import { CandidateCard } from "./CandidateCard";
+import { EntrySelector } from "./EntrySelector";
+import { InterviewChat } from "./InterviewChat";
 
-type Step = 'entry' | 'interview';
+type Step = "entry" | "interview";
 
 export function CreationWizardPage() {
-  const { projectId = '' } = useParams();
+  const { projectId = "" } = useParams();
   const queryClient = useQueryClient();
-  const [step, setStep] = useState<Step>('entry');
-  const [sessionId, setSessionId] = useState<string>('');
-  const [modelProfileId, setModelProfileId] = useState('');
+  const [step, setStep] = useState<Step>("entry");
+  const [sessionId, setSessionId] = useState<string>("");
+  const [modelProfileId, setModelProfileId] = useState("");
   const [messages, setMessages] = useState<InterviewMessage[]>([]);
 
   // ── 加载项目信息 ──
   const project = useQuery({
-    queryKey: ['project', projectId],
+    queryKey: ["project", projectId],
     queryFn: () => apiClient.getProject(projectId),
     enabled: Boolean(projectId),
   });
@@ -35,7 +38,7 @@ export function CreationWizardPage() {
 
   // ── 候选列表 ──
   const candidatesQuery = useQuery({
-    queryKey: ['story-candidates', sessionId],
+    queryKey: ["story-candidates", sessionId],
     queryFn: () => apiClient.listStoryCandidates(sessionId),
     enabled: Boolean(sessionId),
   });
@@ -47,7 +50,7 @@ export function CreationWizardPage() {
     onSuccess: (data) => {
       setSessionId(data.id);
       setMessages(data.messages);
-      setStep('interview');
+      setStep("interview");
     },
   });
 
@@ -62,41 +65,56 @@ export function CreationWizardPage() {
   const extractCandidates = useMutation({
     mutationFn: () => apiClient.extractStoryCandidates(sessionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['story-candidates', sessionId] });
+      queryClient.invalidateQueries({
+        queryKey: ["story-candidates", sessionId],
+      });
     },
   });
 
   const approveCandidate = useMutation({
     mutationFn: (id: string) =>
-      apiClient.updateStoryCandidate(id, { status: 'approved' }),
+      apiClient.updateStoryCandidate(id, { status: "approved" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['story-candidates', sessionId] });
+      queryClient.invalidateQueries({
+        queryKey: ["story-candidates", sessionId],
+      });
     },
   });
 
   const rejectCandidate = useMutation({
     mutationFn: (id: string) =>
-      apiClient.updateStoryCandidate(id, { status: 'rejected' }),
+      apiClient.updateStoryCandidate(id, { status: "rejected" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['story-candidates', sessionId] });
+      queryClient.invalidateQueries({
+        queryKey: ["story-candidates", sessionId],
+      });
     },
   });
 
   const editCandidate = useMutation({
-    mutationFn: ({ id, contentJson }: { id: string; contentJson: Record<string, unknown> }) =>
-      apiClient.updateStoryCandidate(id, { content_json: contentJson }),
+    mutationFn: ({
+      id,
+      contentJson,
+    }: {
+      id: string;
+      contentJson: Record<string, unknown>;
+    }) => apiClient.updateStoryCandidate(id, { content_json: contentJson }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['story-candidates', sessionId] });
+      queryClient.invalidateQueries({
+        queryKey: ["story-candidates", sessionId],
+      });
     },
   });
 
   const applyCandidate = useMutation({
     mutationFn: (id: string) => apiClient.applyCandidate(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['story-candidates', sessionId] });
-      queryClient.invalidateQueries({ queryKey: ['characters', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['world', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      queryClient.invalidateQueries({
+        queryKey: ["story-candidates", sessionId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["characters", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["world", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
     },
   });
 
@@ -115,8 +133,10 @@ export function CreationWizardPage() {
   );
 
   const candidates = candidatesQuery.data ?? [];
-  const pendingCount = candidates.filter((c) => c.status === 'pending').length;
-  const approvedCount = candidates.filter((c) => c.status === 'approved').length;
+  const pendingCount = candidates.filter((c) => c.status === "pending").length;
+  const approvedCount = candidates.filter(
+    (c) => c.status === "approved",
+  ).length;
   const isUpdating =
     approveCandidate.isPending ||
     rejectCandidate.isPending ||
@@ -137,12 +157,15 @@ export function CreationWizardPage() {
             </Link>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold text-slate-950">
-                {project.data?.title ?? '加载中…'} · 创作向导
+                {project.data?.title ?? "加载中…"} · 创作向导
               </h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <ModelSelector selectedId={modelProfileId} onChange={setModelProfileId} />
+            <ModelSelector
+              selectedId={modelProfileId}
+              onChange={setModelProfileId}
+            />
             <Link
               to={`/projects/${projectId}/bible`}
               className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
@@ -166,17 +189,25 @@ export function CreationWizardPage() {
           <section className="rounded-md border border-slate-200 bg-white p-3">
             <h2 className="text-sm font-semibold text-slate-900">创作步骤</h2>
             <div className="mt-3 space-y-1">
-              <div className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
-                step === 'entry' ? 'bg-indigo-50 text-indigo-800 font-medium' : 'text-slate-600'
-              }`}>
+              <div
+                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
+                  step === "entry"
+                    ? "bg-indigo-50 text-indigo-800 font-medium"
+                    : "text-slate-600"
+                }`}
+              >
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-xs">
                   1
                 </span>
                 选择入口
               </div>
-              <div className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
-                step === 'interview' ? 'bg-indigo-50 text-indigo-800 font-medium' : 'text-slate-600'
-              }`}>
+              <div
+                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
+                  step === "interview"
+                    ? "bg-indigo-50 text-indigo-800 font-medium"
+                    : "text-slate-600"
+                }`}
+              >
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-xs">
                   2
                 </span>
@@ -191,11 +222,15 @@ export function CreationWizardPage() {
               <div className="mt-2 space-y-1 text-xs text-slate-600">
                 <div className="flex justify-between">
                   <span>待确认</span>
-                  <span className="font-medium text-amber-700">{pendingCount}</span>
+                  <span className="font-medium text-amber-700">
+                    {pendingCount}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>已确认</span>
-                  <span className="font-medium text-emerald-700">{approvedCount}</span>
+                  <span className="font-medium text-emerald-700">
+                    {approvedCount}
+                  </span>
                 </div>
               </div>
             </section>
@@ -204,7 +239,7 @@ export function CreationWizardPage() {
 
         {/* 中间：主要内容 */}
         <section className="min-h-[500px] rounded-md border border-slate-200 bg-white p-6 flex flex-col">
-          {step === 'entry' ? (
+          {step === "entry" ? (
             <EntrySelector
               onSelect={handleSelectEntry}
               disabled={startSession.isPending}
@@ -238,7 +273,8 @@ export function CreationWizardPage() {
               </div>
               {candidates.length === 0 ? (
                 <p className="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
-                  在访谈中积累足够的讨论后，点击「提取候选设定」让 LLM 整理可确认的设定条目。
+                  在访谈中积累足够的讨论后，点击「提取候选设定」让 LLM
+                  整理可确认的设定条目。
                 </p>
               ) : (
                 <div className="max-h-[600px] space-y-2 overflow-auto">

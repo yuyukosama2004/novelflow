@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, BookOpen, CheckCircle } from 'lucide-react';
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, BookOpen, CheckCircle } from "lucide-react";
 
-import { apiClient } from '../../api/client';
+import { apiClient } from "../../api/client";
 
 interface Props {
   sceneId: string;
@@ -23,7 +23,7 @@ interface ContextData {
 
 export function WritingAssistant({ sceneId }: Props) {
   const ctx = useQuery({
-    queryKey: ['context', sceneId],
+    queryKey: ["context", sceneId],
     queryFn: async () => {
       const data = await apiClient.getSceneContext(sceneId);
       return data as unknown as ContextData;
@@ -42,7 +42,11 @@ export function WritingAssistant({ sceneId }: Props) {
   }
 
   if (ctx.isLoading) {
-    return <div className="rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-400">加载中…</div>;
+    return (
+      <div className="rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-400">
+        加载中…
+      </div>
+    );
   }
 
   const data = ctx.data;
@@ -51,14 +55,16 @@ export function WritingAssistant({ sceneId }: Props) {
   const constraints: string[] = [];
   data.characters.forEach((ch) => {
     if (ch.forbidden_behaviors.length > 0) {
-      constraints.push(`${ch.name} 禁止：${ch.forbidden_behaviors.join('、')}`);
+      constraints.push(`${ch.name} 禁止：${ch.forbidden_behaviors.join("、")}`);
     }
     if (ch.knowledge_unknown.length > 0) {
-      constraints.push(`${ch.name} 不应知道：${ch.knowledge_unknown.join('、')}`);
+      constraints.push(
+        `${ch.name} 不应知道：${ch.knowledge_unknown.join("、")}`,
+      );
     }
     if (ch.knowledge_future_locked.length > 0) {
       constraints.push(
-        `${ch.name} 不得提前获知：${ch.knowledge_future_locked.join('、')}`,
+        `${ch.name} 不得提前获知：${ch.knowledge_future_locked.join("、")}`,
       );
     }
   });
@@ -71,7 +77,9 @@ export function WritingAssistant({ sceneId }: Props) {
           <BookOpen size={13} /> 写作辅助
         </span>
         {data.manifest.token_estimate ? (
-          <span className="text-slate-400">上下文 ~{data.manifest.token_estimate as number} tokens</span>
+          <span className="text-slate-400">
+            上下文 ~{data.manifest.token_estimate as number} tokens
+          </span>
         ) : null}
       </div>
 
@@ -90,7 +98,12 @@ export function WritingAssistant({ sceneId }: Props) {
             <AlertTriangle size={12} /> 写作约束
           </div>
           {constraints.map((c, i) => (
-            <div key={i} className="rounded bg-amber-50 px-2 py-1 text-amber-800">{c}</div>
+            <div
+              key={i}
+              className="rounded bg-amber-50 px-2 py-1 text-amber-800"
+            >
+              {c}
+            </div>
           ))}
         </div>
       ) : null}
@@ -105,13 +118,18 @@ export function WritingAssistant({ sceneId }: Props) {
             <span className="font-medium text-emerald-800">{ch.name}</span>
             <span className="text-emerald-600">（{ch.role}）</span>
             {ch.knowledge_known.length > 0 ? (
-              <span className="text-emerald-600"> 已知：{ch.knowledge_known.join('、')}</span>
+              <span className="text-emerald-600">
+                {" "}
+                已知：{ch.knowledge_known.join("、")}
+              </span>
             ) : null}
           </div>
         ))}
         {data.world_facts.slice(0, 3).map((wf) => (
           <div key={wf.name} className="rounded bg-emerald-50 px-2 py-1">
-            <span className="font-medium text-emerald-800">[{wf.entry_type}] {wf.name}</span>
+            <span className="font-medium text-emerald-800">
+              [{wf.entry_type}] {wf.name}
+            </span>
             <span className="text-emerald-600"> {wf.summary}</span>
           </div>
         ))}

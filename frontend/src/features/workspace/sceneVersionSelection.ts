@@ -1,6 +1,6 @@
-import type { SceneVersion } from '../../types/entities';
+import type { SceneVersion } from "../../types/entities";
 
-type VersionOption = Pick<SceneVersion, 'id' | 'version_no'>;
+type VersionOption = Pick<SceneVersion, "id" | "version_no">;
 
 export interface SceneVersionSelectionState {
   selectedVersionId: string;
@@ -18,12 +18,15 @@ export function getDefaultSceneVersionId(
   approvedVersionId: string | null | undefined,
 ): string {
   if (versions.length === 0) {
-    return '';
+    return "";
   }
   const approved = approvedVersionId
     ? versions.find((version) => version.id === approvedVersionId)
     : null;
-  return approved?.id ?? [...versions].sort((a, b) => b.version_no - a.version_no)[0].id;
+  return (
+    approved?.id ??
+    [...versions].sort((a, b) => b.version_no - a.version_no)[0].id
+  );
 }
 
 export function resolveSceneVersionSelection({
@@ -35,8 +38,8 @@ export function resolveSceneVersionSelection({
 }: ResolveSceneVersionSelectionInput): SceneVersionSelectionState {
   if (versions.length === 0) {
     return {
-      selectedVersionId: '',
-      pendingVersionId: '',
+      selectedVersionId: "",
+      pendingVersionId: "",
       hasExplicitSelection: false,
     };
   }
@@ -51,7 +54,7 @@ export function resolveSceneVersionSelection({
     if (hasVersion(pendingVersionId)) {
       return {
         selectedVersionId: pendingVersionId,
-        pendingVersionId: '',
+        pendingVersionId: "",
         hasExplicitSelection: true,
       };
     }
@@ -60,21 +63,22 @@ export function resolveSceneVersionSelection({
         ? selectedVersionId
         : repairedDefaultVersionId,
       pendingVersionId,
-      hasExplicitSelection: hasExplicitSelection && hasVersion(selectedVersionId),
+      hasExplicitSelection:
+        hasExplicitSelection && hasVersion(selectedVersionId),
     };
   }
 
   if (hasExplicitSelection && hasVersion(selectedVersionId)) {
     return {
       selectedVersionId,
-      pendingVersionId: '',
+      pendingVersionId: "",
       hasExplicitSelection: true,
     };
   }
 
   return {
     selectedVersionId: repairedDefaultVersionId,
-    pendingVersionId: '',
+    pendingVersionId: "",
     hasExplicitSelection: false,
   };
 }

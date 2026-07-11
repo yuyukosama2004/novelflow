@@ -1,56 +1,56 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, EyeOff, RefreshCw, Search, X } from 'lucide-react';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, EyeOff, RefreshCw, Search, X } from "lucide-react";
 
-import { apiClient } from '../../api/client';
-import { IconButton } from '../../components/IconButton';
-import { StatusPill } from '../../components/StatusPill';
+import { apiClient } from "../../api/client";
+import { IconButton } from "../../components/IconButton";
+import { StatusPill } from "../../components/StatusPill";
 import type {
   ReviewIssue,
   ReviewIssueStatus,
   ReviewRunStatus,
-} from '../../types/entities';
+} from "../../types/entities";
 import {
   label,
   ISSUE_STATUS_LABELS,
   ISSUE_TYPE_LABELS,
   REVIEW_SEVERITY_LABELS,
-} from '../../utils/enumLabels';
+} from "../../utils/enumLabels";
 
 interface Props {
   sceneVersionId: string;
   modelProfileId?: string;
 }
 
-type IssueAction = Exclude<ReviewIssueStatus, 'open'>;
+type IssueAction = Exclude<ReviewIssueStatus, "open">;
 
-const SEVERITY_TONE: Record<string, 'neutral' | 'ok' | 'warn'> = {
-  low: 'ok',
-  medium: 'neutral',
-  high: 'warn',
-  blocking: 'warn',
+const SEVERITY_TONE: Record<string, "neutral" | "ok" | "warn"> = {
+  low: "ok",
+  medium: "neutral",
+  high: "warn",
+  blocking: "warn",
 };
 
 const RUN_STATUS_LABELS: Record<ReviewRunStatus, string> = {
-  pending: '等待审查',
-  running: '审查中',
-  completed: '审查完成',
-  failed: '审查失败',
+  pending: "等待审查",
+  running: "审查中",
+  completed: "审查完成",
+  failed: "审查失败",
 };
 
 function severityLabelColor(severity: string): string {
-  if (severity === 'blocking' || severity === 'high') {
-    return 'text-rose-700';
+  if (severity === "blocking" || severity === "high") {
+    return "text-rose-700";
   }
-  if (severity === 'medium') {
-    return 'text-amber-700';
+  if (severity === "medium") {
+    return "text-amber-700";
   }
-  return 'text-emerald-700';
+  return "text-emerald-700";
 }
 
 function formatEvidence(evidence: string): string {
   if (!evidence.trim()) {
-    return '';
+    return "";
   }
   try {
     return JSON.stringify(JSON.parse(evidence), null, 2);
@@ -62,28 +62,31 @@ function formatEvidence(evidence: string): string {
 function runOptionLabel(status: ReviewRunStatus, createdAt: string): string {
   return (
     RUN_STATUS_LABELS[status] +
-    ' · ' +
-    new Date(createdAt).toLocaleString('zh-CN')
+    " · " +
+    new Date(createdAt).toLocaleString("zh-CN")
   );
 }
 
-export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props) {
+export function ReviewIssuePanel({
+  sceneVersionId,
+  modelProfileId = "",
+}: Props) {
   const queryClient = useQueryClient();
-  const [selectedRunId, setSelectedRunId] = useState('');
+  const [selectedRunId, setSelectedRunId] = useState("");
   const hasVersion = Boolean(sceneVersionId);
 
   const runsQuery = useQuery({
-    queryKey: ['review-runs', sceneVersionId],
+    queryKey: ["review-runs", sceneVersionId],
     queryFn: () => apiClient.listReviewRuns(sceneVersionId),
     enabled: hasVersion,
   });
   const runs = runsQuery.data ?? [];
   const activeRunId = runs.some((run) => run.id === selectedRunId)
     ? selectedRunId
-    : (runs[0]?.id ?? '');
+    : (runs[0]?.id ?? "");
 
   const runQuery = useQuery({
-    queryKey: ['review-run', activeRunId],
+    queryKey: ["review-run", activeRunId],
     queryFn: () => apiClient.getReviewRun(activeRunId),
     enabled: Boolean(activeRunId),
   });
@@ -95,9 +98,9 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
         : apiClient.runReview(sceneVersionId),
     onSuccess: (result) => {
       setSelectedRunId(result.run.id);
-      queryClient.setQueryData(['review-run', result.run.id], result);
+      queryClient.setQueryData(["review-run", result.run.id], result);
       queryClient.invalidateQueries({
-        queryKey: ['review-runs', sceneVersionId],
+        queryKey: ["review-runs", sceneVersionId],
       });
     },
   });
@@ -112,7 +115,7 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
     }) => apiClient.updateIssue(issueId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['review-run', activeRunId],
+        queryKey: ["review-run", activeRunId],
       });
     },
   });
@@ -120,7 +123,7 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
   const result = runQuery.data;
   const run = result?.run;
   const issues = result?.issues ?? [];
-  const isRunning = runReview.isPending || run?.status === 'running';
+  const isRunning = runReview.isPending || run?.status === "running";
   const isLoading =
     runsQuery.isLoading ||
     runsQuery.isFetching ||
@@ -135,11 +138,11 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
 
   function refresh() {
     queryClient.invalidateQueries({
-      queryKey: ['review-runs', sceneVersionId],
+      queryKey: ["review-runs", sceneVersionId],
     });
     if (activeRunId) {
       queryClient.invalidateQueries({
-        queryKey: ['review-run', activeRunId],
+        queryKey: ["review-run", activeRunId],
       });
     }
   }
@@ -155,21 +158,21 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
         </div>
         <StatusPill
           tone={
-            issues.length > 0 || run?.status === 'failed' ? 'warn' : 'neutral'
+            issues.length > 0 || run?.status === "failed" ? "warn" : "neutral"
           }
         >
           {!hasVersion
-            ? '暂无版本'
+            ? "暂无版本"
             : run
               ? RUN_STATUS_LABELS[run.status]
-              : '尚未审查'}
+              : "尚未审查"}
         </StatusPill>
       </div>
 
       <div className="mb-3 flex flex-wrap gap-2">
         <IconButton
           icon={<Search size={14} />}
-          label={isRunning ? '审查中…' : '执行审查'}
+          label={isRunning ? "审查中…" : "执行审查"}
           tone="primary"
           onClick={() => runReview.mutate()}
           disabled={isRunning || !hasVersion}
@@ -214,7 +217,7 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
 
       {hasVersion && isLoading ? (
         <div className="py-4 text-center text-slate-500">
-          {isRunning ? '正在执行连续性审查…' : '加载审查记录…'}
+          {isRunning ? "正在执行连续性审查…" : "加载审查记录…"}
         </div>
       ) : null}
 
@@ -224,7 +227,7 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
         </div>
       ) : null}
 
-      {!isLoading && !hasError && run?.status === 'failed' ? (
+      {!isLoading && !hasError && run?.status === "failed" ? (
         <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-4 text-center text-rose-700">
           本轮审查失败，请重新执行审查。
         </div>
@@ -232,10 +235,10 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
 
       {!isLoading &&
       !hasError &&
-      run?.status === 'completed' &&
+      run?.status === "completed" &&
       issues.length === 0 ? (
         <div className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-center text-slate-500">
-          {run.summary || '本轮未发现问题。'}
+          {run.summary || "本轮未发现问题。"}
         </div>
       ) : null}
 
@@ -251,24 +254,24 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span
                       className={[
-                        'font-medium',
+                        "font-medium",
                         severityLabelColor(issue.severity),
-                      ].join(' ')}
+                      ].join(" ")}
                     >
                       {label(ISSUE_TYPE_LABELS, issue.issue_type)}
                     </span>
                     <StatusPill
-                      tone={SEVERITY_TONE[issue.severity] ?? 'neutral'}
+                      tone={SEVERITY_TONE[issue.severity] ?? "neutral"}
                     >
                       {label(REVIEW_SEVERITY_LABELS, issue.severity)}
                     </StatusPill>
                     <StatusPill
                       tone={
-                        issue.status === 'accepted'
-                          ? 'ok'
-                          : issue.status === 'open'
-                            ? 'warn'
-                            : 'neutral'
+                        issue.status === "accepted"
+                          ? "ok"
+                          : issue.status === "open"
+                            ? "warn"
+                            : "neutral"
                       }
                     >
                       {label(ISSUE_STATUS_LABELS, issue.status)}
@@ -282,13 +285,13 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
 
                   {issue.conflict_rule ? (
                     <p className="mt-2 text-slate-600">
-                      <span className="font-medium">规则：</span>{' '}
+                      <span className="font-medium">规则：</span>{" "}
                       {issue.conflict_rule}
                     </p>
                   ) : null}
                   {issue.suggestion ? (
                     <p className="mt-1 text-slate-500">
-                      <span className="font-medium">建议：</span>{' '}
+                      <span className="font-medium">建议：</span>{" "}
                       {issue.suggestion}
                     </p>
                   ) : null}
@@ -304,13 +307,13 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
                   ) : null}
                 </div>
 
-                {issue.status === 'open' ? (
+                {issue.status === "open" ? (
                   <div className="flex shrink-0 items-center gap-1">
                     <button
                       onClick={() =>
                         updateIssue.mutate({
                           issueId: issue.id,
-                          status: 'accepted',
+                          status: "accepted",
                         })
                       }
                       disabled={updateIssue.isPending}
@@ -324,7 +327,7 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
                       onClick={() =>
                         updateIssue.mutate({
                           issueId: issue.id,
-                          status: 'ignored',
+                          status: "ignored",
                         })
                       }
                       disabled={updateIssue.isPending}
@@ -338,7 +341,7 @@ export function ReviewIssuePanel({ sceneVersionId, modelProfileId = '' }: Props)
                       onClick={() =>
                         updateIssue.mutate({
                           issueId: issue.id,
-                          status: 'false_positive',
+                          status: "false_positive",
                         })
                       }
                       disabled={updateIssue.isPending}

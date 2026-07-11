@@ -1,18 +1,25 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: ReactNode;
   label: string;
-  tone?: 'primary' | 'subtle' | 'danger';
+  tone?: "primary" | "subtle" | "danger";
 }
 
 const toneClasses = {
-  primary: 'bg-slate-900 text-white hover:bg-slate-700',
-  subtle: 'border border-slate-200 bg-white text-slate-700 hover:border-emerald-400',
-  danger: 'border border-rose-200 bg-white text-rose-700 hover:border-rose-400',
+  primary: "bg-slate-900 text-white hover:bg-slate-700",
+  subtle:
+    "border border-slate-200 bg-white text-slate-700 hover:border-emerald-400",
+  danger: "border border-rose-200 bg-white text-rose-700 hover:border-rose-400",
 };
 
-export function IconButton({ icon, label, tone = 'subtle', className = '', ...props }: IconButtonProps) {
+export function IconButton({
+  icon,
+  label,
+  tone = "subtle",
+  className = "",
+  ...props
+}: IconButtonProps) {
   return (
     <button
       {...props}

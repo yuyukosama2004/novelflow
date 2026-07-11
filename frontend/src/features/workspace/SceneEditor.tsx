@@ -1,22 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { EditorContent, useEditor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import axios from 'axios';
-import { Check, Save } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import axios from "axios";
+import { Check, Save } from "lucide-react";
 
-import { apiClient } from '../../api/client';
-import { IconButton } from '../../components/IconButton';
-import { StatusPill } from '../../components/StatusPill';
-import type { Scene, SceneVersion } from '../../types/entities';
-import { label, SOURCE_TYPE_LABELS } from '../../utils/enumLabels';
+import { apiClient } from "../../api/client";
+import { IconButton } from "../../components/IconButton";
+import { StatusPill } from "../../components/StatusPill";
+import type { Scene, SceneVersion } from "../../types/entities";
+import { label, SOURCE_TYPE_LABELS } from "../../utils/enumLabels";
 import {
   RichTextCodec,
   RichTextCodecError,
   type RichTextNode,
-} from '../../utils/richTextCodec';
+} from "../../utils/richTextCodec";
 
-type SaveState = 'idle' | 'saving' | 'draft_saved' | 'version_saved' | 'error';
+type SaveState = "idle" | "saving" | "draft_saved" | "version_saved" | "error";
 
 interface SceneEditorProps {
   scene: Scene | null;
@@ -29,7 +29,7 @@ function selectInitialContent(
   scene: Scene | null,
 ): string {
   if (!versions || versions.length === 0) {
-    return '';
+    return "";
   }
   const approved = scene?.approved_version_id
     ? versions.find((version) => version.id === scene.approved_version_id)
@@ -42,11 +42,11 @@ function saveStateLabel(
   dirty: boolean,
   sceneStatus: string,
 ): string {
-  if (saveState === 'saving') return '保存中';
-  if (saveState === 'draft_saved') return '草稿已保存';
-  if (saveState === 'version_saved') return '版本已保存';
-  if (saveState === 'error') return '保存失败';
-  if (dirty) return '未保存';
+  if (saveState === "saving") return "保存中";
+  if (saveState === "draft_saved") return "草稿已保存";
+  if (saveState === "version_saved") return "版本已保存";
+  if (saveState === "error") return "保存失败";
+  if (dirty) return "未保存";
   return sceneStatus;
 }
 
@@ -61,22 +61,22 @@ function approvalFailureReason(error: unknown): string | undefined {
 }
 
 function approvalFailureMessage(reason: string | undefined): string {
-  if (reason === 'VERSION_REVIEW_REQUIRED') {
-    return '该版本尚未完成审查，请先执行审查。';
+  if (reason === "VERSION_REVIEW_REQUIRED") {
+    return "该版本尚未完成审查，请先执行审查。";
   }
-  if (reason === 'EMPTY_VERSION_CONTENT') {
-    return '正文为空，不能批准为正式稿。';
+  if (reason === "EMPTY_VERSION_CONTENT") {
+    return "正文为空，不能批准为正式稿。";
   }
-  if (reason === 'HISTORICAL_REPLACEMENT_NOT_READY') {
-    return '历史正式稿替换尚未开放，请保留当前正式稿。';
+  if (reason === "HISTORICAL_REPLACEMENT_NOT_READY") {
+    return "历史正式稿替换尚未开放，请保留当前正式稿。";
   }
-  return '批准失败，请刷新后重试。';
+  return "批准失败，请刷新后重试。";
 }
 
 function codecFailureMessage(error: unknown): string {
   return error instanceof RichTextCodecError
     ? error.message
-    : '正文格式转换失败，请检查内容后重试。';
+    : "正文格式转换失败，请检查内容后重试。";
 }
 
 function draftFailureReason(error: unknown): string | undefined {
@@ -90,59 +90,62 @@ function draftFailureReason(error: unknown): string | undefined {
 }
 
 function draftFailureMessage(error: unknown): string {
-  return draftFailureReason(error) === 'DRAFT_REVISION_CONFLICT'
-    ? '草稿已在别处更新，请刷新页面后继续编辑。'
-    : '草稿保存失败，请稍后重试。';
+  return draftFailureReason(error) === "DRAFT_REVISION_CONFLICT"
+    ? "草稿已在别处更新，请刷新页面后继续编辑。"
+    : "草稿保存失败，请稍后重试。";
 }
 
 function contentPreview(value: string): string {
   try {
-    return RichTextCodec.toPlaintext(RichTextCodec.toTiptapJson(value)).slice(0, 80);
+    return RichTextCodec.toPlaintext(RichTextCodec.toTiptapJson(value)).slice(
+      0,
+      80,
+    );
   } catch {
-    return value.replace(/<[^>]+>/g, '').slice(0, 80);
+    return value.replace(/<[^>]+>/g, "").slice(0, 80);
   }
 }
 
 export function SceneEditor({
   scene,
   onVersionCreated,
-  modelProfileId = '',
+  modelProfileId = "",
 }: SceneEditorProps) {
   const queryClient = useQueryClient();
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState("");
   const [contentJson, setContentJson] = useState<RichTextNode>({
-    type: 'doc',
-    content: [{ type: 'paragraph' }],
+    type: "doc",
+    content: [{ type: "paragraph" }],
   });
   const [dirty, setDirty] = useState(false);
-  const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [approvalMessage, setApprovalMessage] = useState('');
-  const [codecMessage, setCodecMessage] = useState('');
-  const [draftMessage, setDraftMessage] = useState('');
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [approvalMessage, setApprovalMessage] = useState("");
+  const [codecMessage, setCodecMessage] = useState("");
+  const [draftMessage, setDraftMessage] = useState("");
 
   const versions = useQuery({
-    queryKey: ['scene-versions', scene?.id],
-    queryFn: () => apiClient.listVersions(scene?.id ?? ''),
+    queryKey: ["scene-versions", scene?.id],
+    queryFn: () => apiClient.listVersions(scene?.id ?? ""),
     enabled: Boolean(scene?.id),
   });
 
   const workingDraft = useQuery({
-    queryKey: ['scene-working-draft', scene?.id],
-    queryFn: () => apiClient.getWorkingDraft(scene?.id ?? ''),
+    queryKey: ["scene-working-draft", scene?.id],
+    queryFn: () => apiClient.getWorkingDraft(scene?.id ?? ""),
     enabled: Boolean(scene?.id),
   });
 
   const draftRevisionRef = useRef(0);
-  const contentRef = useRef('');
+  const contentRef = useRef("");
   const initializedSceneRef = useRef<string | null>(null);
 
   const editor = useEditor({
     extensions: [StarterKit],
-    content: '',
+    content: "",
     editorProps: {
       attributes: {
         class:
-          'prose prose-slate max-w-none rounded-md border border-slate-200 bg-white p-4 text-[15px] leading-7',
+          "prose prose-slate max-w-none rounded-md border border-slate-200 bg-white p-4 text-[15px] leading-7",
       },
     },
     onUpdate: ({ editor: activeEditor }) => {
@@ -152,12 +155,12 @@ export function SceneEditor({
         setContent(markdown);
         contentRef.current = markdown;
         setContentJson(document);
-        setCodecMessage('');
+        setCodecMessage("");
         setDirty(true);
-        setSaveState('idle');
+        setSaveState("idle");
       } catch (error) {
         setCodecMessage(codecFailureMessage(error));
-        setSaveState('error');
+        setSaveState("error");
       }
     },
   });
@@ -167,8 +170,7 @@ export function SceneEditor({
     [scene, versions.data],
   );
   const wordCount = useMemo(
-    () =>
-      RichTextCodec.toPlaintext(contentJson).replace(/\s+/g, '').length,
+    () => RichTextCodec.toPlaintext(contentJson).replace(/\s+/g, "").length,
     [contentJson],
   );
 
@@ -196,18 +198,18 @@ export function SceneEditor({
       contentRef.current = markdown;
       setContentJson(document);
       draftRevisionRef.current = draft?.revision ?? 0;
-      setCodecMessage('');
-      setDraftMessage('');
+      setCodecMessage("");
+      setDraftMessage("");
       setDirty(false);
-      setSaveState('idle');
+      setSaveState("idle");
       editor.commands.setContent(document, false);
       initializedSceneRef.current = scene.id;
     } catch (error) {
-      setContent('');
-      contentRef.current = '';
+      setContent("");
+      contentRef.current = "";
       setCodecMessage(codecFailureMessage(error));
       setDirty(false);
-      setSaveState('error');
+      setSaveState("error");
       initializedSceneRef.current = scene.id;
     }
   }, [
@@ -224,26 +226,26 @@ export function SceneEditor({
       content_markdown: string;
       content_json: RichTextNode;
     }) =>
-      apiClient.updateWorkingDraft(scene?.id ?? '', {
+      apiClient.updateWorkingDraft(scene?.id ?? "", {
         revision: draftRevisionRef.current,
         content_markdown: payload.content_markdown,
-        content_json: payload.content_json as unknown as Record<string, unknown>,
+        content_json: payload.content_json as unknown as Record<
+          string,
+          unknown
+        >,
       }),
     onSuccess: (draft, payload) => {
       draftRevisionRef.current = draft.revision;
-      setDraftMessage('');
+      setDraftMessage("");
       if (contentRef.current === payload.content_markdown) {
         setDirty(false);
-        setSaveState('draft_saved');
+        setSaveState("draft_saved");
       }
-      queryClient.setQueryData(
-        ['scene-working-draft', scene?.id],
-        draft,
-      );
+      queryClient.setQueryData(["scene-working-draft", scene?.id], draft);
     },
     onError: (error) => {
       setDraftMessage(draftFailureMessage(error));
-      setSaveState('error');
+      setSaveState("error");
     },
   });
 
@@ -253,21 +255,24 @@ export function SceneEditor({
       content_json: RichTextNode;
       summary?: string;
     }) =>
-      apiClient.createVersion(scene?.id ?? '', {
+      apiClient.createVersion(scene?.id ?? "", {
         content_markdown: payload.content_markdown,
-        content_json: payload.content_json as unknown as Record<string, unknown>,
-        summary: payload.summary ?? '',
-        source_type: 'human_revised',
+        content_json: payload.content_json as unknown as Record<
+          string,
+          unknown
+        >,
+        summary: payload.summary ?? "",
+        source_type: "human_revised",
       }),
     onSuccess: (version) => {
       setDirty(false);
-      setSaveState('version_saved');
+      setSaveState("version_saved");
       queryClient.invalidateQueries({
-        queryKey: ['scene-versions', scene?.id],
+        queryKey: ["scene-versions", scene?.id],
       });
       onVersionCreated?.(version);
     },
-    onError: () => setSaveState('error'),
+    onError: () => setSaveState("error"),
   });
 
   const approveVersion = useMutation({
@@ -277,15 +282,15 @@ export function SceneEditor({
     }: {
       versionId: string;
       overrideReason?: string;
-    }) => apiClient.approveVersion(scene?.id ?? '', versionId, overrideReason),
+    }) => apiClient.approveVersion(scene?.id ?? "", versionId, overrideReason),
     onSuccess: () => {
-      setApprovalMessage('');
-      queryClient.invalidateQueries({ queryKey: ['scene', scene?.id] });
+      setApprovalMessage("");
+      queryClient.invalidateQueries({ queryKey: ["scene", scene?.id] });
       queryClient.invalidateQueries({
-        queryKey: ['scene-versions', scene?.id],
+        queryKey: ["scene-versions", scene?.id],
       });
-      queryClient.invalidateQueries({ queryKey: ['scenes'] });
-      queryClient.invalidateQueries({ queryKey: ['impact-reports'] });
+      queryClient.invalidateQueries({ queryKey: ["scenes"] });
+      queryClient.invalidateQueries({ queryKey: ["impact-reports"] });
     },
   });
 
@@ -295,25 +300,25 @@ export function SceneEditor({
         ? apiClient.runReview(versionId, modelProfileId)
         : apiClient.runReview(versionId),
     onSuccess: (result) => {
-      setApprovalMessage('审查已完成，请确认审查问题后再次批准。');
-      queryClient.setQueryData(['review-run', result.run.id], result);
+      setApprovalMessage("审查已完成，请确认审查问题后再次批准。");
+      queryClient.setQueryData(["review-run", result.run.id], result);
       queryClient.invalidateQueries({
-        queryKey: ['review-runs', result.run.scene_version_id],
+        queryKey: ["review-runs", result.run.scene_version_id],
       });
       queryClient.invalidateQueries({
-        queryKey: ['scene-versions', scene?.id],
+        queryKey: ["scene-versions", scene?.id],
       });
     },
     onError: () => {
-      setApprovalMessage('审查失败，请稍后重试。');
+      setApprovalMessage("审查失败，请稍后重试。");
     },
   });
 
   const clearStale = useMutation({
-    mutationFn: () => apiClient.clearSceneStale(scene?.id ?? ''),
+    mutationFn: () => apiClient.clearSceneStale(scene?.id ?? ""),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scene', scene?.id] });
-      queryClient.invalidateQueries({ queryKey: ['scenes'] });
+      queryClient.invalidateQueries({ queryKey: ["scene", scene?.id] });
+      queryClient.invalidateQueries({ queryKey: ["scenes"] });
     },
   });
 
@@ -331,14 +336,14 @@ export function SceneEditor({
     createVersion.mutate({
       content_markdown: content,
       content_json: contentJson,
-      summary: scene?.title ?? '',
+      summary: scene?.title ?? "",
     });
   }
 
   async function requestApproval(version: SceneVersion) {
-    setApprovalMessage('');
-    if (version.review_status !== 'completed') {
-      if (!window.confirm('该版本尚未完成审查，是否现在执行审查？')) {
+    setApprovalMessage("");
+    if (version.review_status !== "completed") {
+      if (!window.confirm("该版本尚未完成审查，是否现在执行审查？")) {
         return;
       }
       await reviewForApproval.mutateAsync(version.id).catch(() => undefined);
@@ -349,7 +354,7 @@ export function SceneEditor({
       scene?.approved_version_id &&
       scene.approved_version_id !== version.id &&
       !window.confirm(
-        '替换正式稿会使后续场景标记为“需复查”，并使旧版本产生的记忆失效。确认继续吗？',
+        "替换正式稿会使后续场景标记为“需复查”，并使旧版本产生的记忆失效。确认继续吗？",
       )
     ) {
       return;
@@ -359,16 +364,16 @@ export function SceneEditor({
       await approveVersion.mutateAsync({ versionId: version.id });
     } catch (error) {
       const reason = approvalFailureReason(error);
-      if (reason !== 'BLOCKING_REVIEW_ISSUES') {
+      if (reason !== "BLOCKING_REVIEW_ISSUES") {
         setApprovalMessage(approvalFailureMessage(reason));
         return;
       }
-      if (!window.confirm('存在阻断问题。是否填写理由并强制批准？')) {
+      if (!window.confirm("存在阻断问题。是否填写理由并强制批准？")) {
         return;
       }
-      const overrideReason = window.prompt('请输入强制批准理由：', '')?.trim();
+      const overrideReason = window.prompt("请输入强制批准理由：", "")?.trim();
       if (!overrideReason) {
-        setApprovalMessage('强制批准必须填写理由。');
+        setApprovalMessage("强制批准必须填写理由。");
         return;
       }
       try {
@@ -394,7 +399,7 @@ export function SceneEditor({
       return;
     }
     const timer = window.setTimeout(() => {
-      setSaveState('saving');
+      setSaveState("saving");
       updateDraftRef.current({
         content_markdown: content,
         content_json: contentJson,
@@ -419,18 +424,18 @@ export function SceneEditor({
             {scene.title}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            {scene.time_text || '未设定时间'}
+            {scene.time_text || "未设定时间"}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">{wordCount} 字</span>
           <StatusPill
             tone={
-              saveState === 'error'
-                ? 'warn'
-                : saveState === 'draft_saved' || saveState === 'version_saved'
-                  ? 'ok'
-                  : 'neutral'
+              saveState === "error"
+                ? "warn"
+                : saveState === "draft_saved" || saveState === "version_saved"
+                  ? "ok"
+                  : "neutral"
             }
           >
             {saveStateLabel(saveState, dirty, scene.status)}
@@ -448,7 +453,9 @@ export function SceneEditor({
             label="保存版本"
             tone="primary"
             disabled={
-              !content.trim() || createVersion.isPending || updateDraft.isPending
+              !content.trim() ||
+              createVersion.isPending ||
+              updateDraft.isPending
             }
             onClick={() => void saveVersion()}
           />
@@ -495,24 +502,23 @@ export function SceneEditor({
                   <StatusPill
                     tone={
                       scene.approved_version_id === version.id
-                        ? 'ok'
-                        : 'neutral'
+                        ? "ok"
+                        : "neutral"
                     }
                   >
                     {scene.approved_version_id === version.id
-                      ? '正式稿'
+                      ? "正式稿"
                       : label(SOURCE_TYPE_LABELS, version.source_type)}
                   </StatusPill>
                 </div>
                 <p className="mt-1 truncate text-xs text-slate-500">
-                  {version.summary ||
-                    contentPreview(version.content_markdown)}
+                  {version.summary || contentPreview(version.content_markdown)}
                 </p>
               </div>
               <IconButton
                 icon={<Check size={15} />}
                 label={
-                  version.review_status === 'completed' ? '批准' : '先审查'
+                  version.review_status === "completed" ? "批准" : "先审查"
                 }
                 disabled={
                   scene.approved_version_id === version.id ||

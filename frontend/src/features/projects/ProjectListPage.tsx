@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, BookOpen, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
-import { apiClient } from '../../api/client';
-import { IconButton } from '../../components/IconButton';
-import { StatusPill } from '../../components/StatusPill';
-import type { HealthStatus, NovelProject } from '../../types/entities';
-import { label, PROJECT_STATUS_LABELS } from '../../utils/enumLabels';
+import { apiClient } from "../../api/client";
+import { IconButton } from "../../components/IconButton";
+import { StatusPill } from "../../components/StatusPill";
+import type { HealthStatus, NovelProject } from "../../types/entities";
+import { label, PROJECT_STATUS_LABELS } from "../../utils/enumLabels";
 
 interface ProjectListViewProps {
   health?: HealthStatus;
@@ -28,8 +28,8 @@ export function ProjectListView({
   isCreating,
   onArchive,
 }: ProjectListViewProps) {
-  const [title, setTitle] = useState('');
-  const [genre, setGenre] = useState('悬疑');
+  const [title, setTitle] = useState("");
+  const [genre, setGenre] = useState("悬疑");
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -40,12 +40,14 @@ export function ProjectListView({
               <BookOpen size={20} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-slate-950">NovelFlow</h1>
+              <h1 className="text-xl font-semibold text-slate-950">
+                NovelFlow
+              </h1>
               <p className="text-sm text-slate-500">长篇小说创作工作台</p>
             </div>
           </div>
-          <StatusPill tone={health?.database === 'ok' ? 'ok' : 'warn'}>
-            {health?.database === 'ok' ? `API ${health.version}` : 'API 未连接'}
+          <StatusPill tone={health?.database === "ok" ? "ok" : "warn"}>
+            {health?.database === "ok" ? `API ${health.version}` : "API 未连接"}
           </StatusPill>
           <Link
             to="/quick"
@@ -84,7 +86,7 @@ export function ProjectListView({
               disabled={!title.trim() || isCreating}
               onClick={() => {
                 onCreate(title.trim(), genre.trim());
-                setTitle('');
+                setTitle("");
               }}
               className="w-full"
             />
@@ -94,9 +96,13 @@ export function ProjectListView({
         <section className="rounded-md border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
             <h2 className="text-base font-semibold text-slate-900">小说项目</h2>
-            {isLoading ? <RefreshCw size={16} className="animate-spin text-slate-500" /> : null}
+            {isLoading ? (
+              <RefreshCw size={16} className="animate-spin text-slate-500" />
+            ) : null}
           </div>
-          {error ? <p className="px-4 py-3 text-sm text-rose-700">{error}</p> : null}
+          {error ? (
+            <p className="px-4 py-3 text-sm text-rose-700">{error}</p>
+          ) : null}
           <div className="divide-y divide-slate-100">
             {projects.length === 0 && !isLoading ? (
               <p className="px-4 py-8 text-sm text-slate-500">暂无项目</p>
@@ -106,10 +112,7 @@ export function ProjectListView({
                 key={project.id}
                 className="flex items-center justify-between px-4 py-4 transition hover:bg-slate-50"
               >
-                <Link
-                  to={`/projects/${project.id}`}
-                  className="min-w-0 flex-1"
-                >
+                <Link to={`/projects/${project.id}`} className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-base font-semibold text-slate-950">
                       {project.title}
@@ -122,11 +125,11 @@ export function ProjectListView({
                     ) : null}
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm text-slate-500">
-                    {project.summary || project.tone || '未填写简介'}
+                    {project.summary || project.tone || "未填写简介"}
                   </p>
                 </Link>
                 <div className="ml-4 flex shrink-0 items-center gap-2">
-                  {project.status !== 'archived' ? (
+                  {project.status !== "archived" ? (
                     <button
                       onClick={(e) => {
                         e.preventDefault();
@@ -160,28 +163,28 @@ export function ProjectListPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const health = useQuery({
-    queryKey: ['health'],
+    queryKey: ["health"],
     queryFn: apiClient.health,
   });
   const projects = useQuery({
-    queryKey: ['projects'],
+    queryKey: ["projects"],
     queryFn: apiClient.listProjects,
   });
-  const [mutationError, setMutationError] = useState('');
+  const [mutationError, setMutationError] = useState("");
 
   const createProject = useMutation({
     mutationFn: ({ title, genre }: { title: string; genre: string }) =>
       apiClient.createProject({
         title,
         genre,
-        status: 'active',
-        language: 'zh-CN',
-        pov_type: '第三人称限知',
-        tone: '克制、现实',
+        status: "active",
+        language: "zh-CN",
+        pov_type: "第三人称限知",
+        tone: "克制、现实",
       }),
     onSuccess: (data) => {
-      setMutationError('');
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setMutationError("");
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       navigate(`/projects/${data.id}/wizard`);
     },
     onError: (err: Error) => setMutationError(err.message),
@@ -189,8 +192,8 @@ export function ProjectListPage() {
   const archiveProject = useMutation({
     mutationFn: (id: string) => apiClient.archiveProject(id),
     onSuccess: () => {
-      setMutationError('');
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setMutationError("");
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
     onError: (err: Error) => setMutationError(err.message),
   });
@@ -200,7 +203,10 @@ export function ProjectListPage() {
       health={health.data}
       projects={projects.data ?? []}
       isLoading={projects.isLoading}
-      error={mutationError || (projects.error instanceof Error ? projects.error.message : undefined)}
+      error={
+        mutationError ||
+        (projects.error instanceof Error ? projects.error.message : undefined)
+      }
       onCreate={(title, genre) => createProject.mutate({ title, genre })}
       isCreating={createProject.isPending}
       onArchive={(id) => archiveProject.mutate(id)}

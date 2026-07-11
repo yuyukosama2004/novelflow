@@ -1,8 +1,8 @@
-import { ChevronsUpDown, Layers } from 'lucide-react';
+import { ChevronsUpDown, Layers } from "lucide-react";
 
-import { StatusPill } from '../../components/StatusPill';
-import type { SceneVersion } from '../../types/entities';
-import { label, SOURCE_TYPE_LABELS } from '../../utils/enumLabels';
+import { StatusPill } from "../../components/StatusPill";
+import type { SceneVersion } from "../../types/entities";
+import { label, SOURCE_TYPE_LABELS } from "../../utils/enumLabels";
 
 interface Props {
   versions: SceneVersion[];
@@ -12,7 +12,7 @@ interface Props {
 }
 
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, '');
+  return html.replace(/<[^>]+>/g, "");
 }
 
 function versionPreview(version: SceneVersion): string {
@@ -20,14 +20,14 @@ function versionPreview(version: SceneVersion): string {
     return version.summary;
   }
   const text = stripHtml(version.content_markdown).trim();
-  return text.slice(0, 100) || '（空）';
+  return text.slice(0, 100) || "（空）";
 }
 
 function reviewStatusLabel(reviewStatus: string): string {
-  if (!reviewStatus || reviewStatus === 'none') {
-    return '';
+  if (!reviewStatus || reviewStatus === "none") {
+    return "";
   }
-  return reviewStatus.replace(/_/g, ' ');
+  return reviewStatus.replace(/_/g, " ");
 }
 
 export function SceneVersionSelector({
@@ -52,7 +52,7 @@ export function SceneVersionSelector({
 
   const sorted = [...versions].sort((a, b) => b.version_no - a.version_no);
   const selected = selectedVersionId
-    ? versions.find((version) => version.id === selectedVersionId) ?? null
+    ? (versions.find((version) => version.id === selectedVersionId) ?? null)
     : null;
 
   return (
@@ -64,7 +64,7 @@ export function SceneVersionSelector({
 
       <div className="relative">
         <select
-          value={selected?.id ?? ''}
+          value={selected?.id ?? ""}
           onChange={(event) => onSelect(event.target.value)}
           aria-label="选择用于审查和记忆操作的场景版本"
           className="w-full appearance-none rounded-md border border-slate-300 bg-white py-2 pl-3 pr-8 text-sm text-slate-800 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
@@ -77,7 +77,7 @@ export function SceneVersionSelector({
               label(SOURCE_TYPE_LABELS, version.source_type),
             ];
             if (isApproved) {
-              labelParts.push('正式');
+              labelParts.push("正式");
             }
             if (reviewLabel) {
               labelParts.push(reviewLabel);
@@ -85,7 +85,8 @@ export function SceneVersionSelector({
 
             return (
               <option key={version.id} value={version.id}>
-                {labelParts.join(' / ')} - {versionPreview(version).slice(0, 60)}
+                {labelParts.join(" / ")} -{" "}
+                {versionPreview(version).slice(0, 60)}
               </option>
             );
           })}
@@ -99,10 +100,14 @@ export function SceneVersionSelector({
       {selected ? (
         <div className="mt-2 rounded-md border border-slate-100 bg-slate-50 p-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-medium text-slate-900">v{selected.version_no}</span>
-            <StatusPill tone={selected.id === approvedVersionId ? 'ok' : 'neutral'}>
+            <span className="font-medium text-slate-900">
+              v{selected.version_no}
+            </span>
+            <StatusPill
+              tone={selected.id === approvedVersionId ? "ok" : "neutral"}
+            >
               {`${label(SOURCE_TYPE_LABELS, selected.source_type)}${
-                selected.id === approvedVersionId ? '（正式）' : ''
+                selected.id === approvedVersionId ? "（正式）" : ""
               }`}
             </StatusPill>
             {reviewStatusLabel(selected.review_status) ? (
@@ -111,7 +116,9 @@ export function SceneVersionSelector({
               </StatusPill>
             ) : null}
           </div>
-          <p className="mt-1 line-clamp-2 text-slate-500">{versionPreview(selected)}</p>
+          <p className="mt-1 line-clamp-2 text-slate-500">
+            {versionPreview(selected)}
+          </p>
         </div>
       ) : null}
     </section>

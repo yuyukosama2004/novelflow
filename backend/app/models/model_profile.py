@@ -23,9 +23,7 @@ class ModelProfile(UUIDMixin, TimestampMixin, Base):
     )  # deepseek | ollama | openai_compatible
     base_url: Mapped[str] = mapped_column(String(300), default="")
     api_key: Mapped[str] = mapped_column(Text, default="")
-    model_name: Mapped[str] = mapped_column(
-        String(100), default=""
-    )  # 默认模型名
+    model_name: Mapped[str] = mapped_column(String(100), default="")  # 默认模型名
     extra_models_json: Mapped[list[str]] = mapped_column(
         String, default="[]"
     )  # JSON 编码的额外可选模型列表（兼容 SQLite 无原生 JSON 类型）

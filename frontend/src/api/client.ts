@@ -19,8 +19,8 @@ import type {
   ReviewIssueStatus,
   ReviewResult,
   ReviewRun,
-    Scene,
-    SceneContextLinks,
+  Scene,
+  SceneContextLinks,
   SceneVersion,
   SceneWorkingDraft,
   StoryCandidateEntity,
@@ -55,9 +55,8 @@ export const apiClient = {
   health: () => unwrap<HealthStatus>(api.get("/health")),
 
   listProjects: () => unwrap<NovelProject[]>(api.get("/projects")),
-  createProject: (
-    payload: Partial<NovelProject> & { title: string },
-  ) => unwrap<NovelProject>(api.post("/projects", payload)),
+  createProject: (payload: Partial<NovelProject> & { title: string }) =>
+    unwrap<NovelProject>(api.post("/projects", payload)),
   getProject: (projectId: string) =>
     unwrap<NovelProject>(api.get(`/projects/${projectId}`)),
   patchProject: (
@@ -74,30 +73,19 @@ export const apiClient = {
     unwrap<NovelProject>(api.delete(`/projects/${projectId}`)),
 
   listCharacters: (projectId: string) =>
-    unwrap<Character[]>(
-      api.get(`/projects/${projectId}/characters`),
-    ),
+    unwrap<Character[]>(api.get(`/projects/${projectId}/characters`)),
   createCharacter: (
     projectId: string,
     payload: { name: string; role?: string },
   ) =>
-    unwrap<Character>(
-      api.post(`/projects/${projectId}/characters`, payload),
-    ),
-  patchCharacter: (
-    characterId: string,
-    payload: Record<string, unknown>,
-  ) =>
+    unwrap<Character>(api.post(`/projects/${projectId}/characters`, payload)),
+  patchCharacter: (characterId: string, payload: Record<string, unknown>) =>
     unwrap<Character>(api.patch(`/characters/${characterId}`, payload)),
   deleteCharacter: (characterId: string) =>
-    unwrap<{ deleted: boolean }>(
-      api.delete(`/characters/${characterId}`),
-    ),
+    unwrap<{ deleted: boolean }>(api.delete(`/characters/${characterId}`)),
 
   listWorldEntries: (projectId: string) =>
-    unwrap<WorldEntry[]>(
-      api.get(`/projects/${projectId}/world-entries`),
-    ),
+    unwrap<WorldEntry[]>(api.get(`/projects/${projectId}/world-entries`)),
   createWorldEntry: (
     projectId: string,
     payload: {
@@ -114,48 +102,38 @@ export const apiClient = {
     unwrap<WorldEntry>(api.post(`/world-entries/${entryId}/approve`)),
   patchWorldEntry: (
     entryId: string,
-    payload: { name?: string; summary?: string; entry_type?: string; content?: string },
-  ) =>
-    unwrap<WorldEntry>(api.patch(`/world-entries/${entryId}`, payload)),
+    payload: {
+      name?: string;
+      summary?: string;
+      entry_type?: string;
+      content?: string;
+    },
+  ) => unwrap<WorldEntry>(api.patch(`/world-entries/${entryId}`, payload)),
   deleteWorldEntry: (entryId: string) =>
-    unwrap<{ deleted: boolean }>(
-      api.delete(`/world-entries/${entryId}`),
-    ),
+    unwrap<{ deleted: boolean }>(api.delete(`/world-entries/${entryId}`)),
 
   listVolumes: (projectId: string) =>
-    unwrap<Volume[]>(
-      api.get(`/projects/${projectId}/volumes`),
-    ),
+    unwrap<Volume[]>(api.get(`/projects/${projectId}/volumes`)),
   createVolume: (
     projectId: string,
     payload: { sequence_no: number; title: string },
-  ) =>
-    unwrap<Volume>(
-      api.post(`/projects/${projectId}/volumes`, payload),
-    ),
+  ) => unwrap<Volume>(api.post(`/projects/${projectId}/volumes`, payload)),
   patchVolume: (
     volumeId: string,
     payload: { title?: string; summary?: string; goal?: string },
   ) => unwrap<Volume>(api.patch(`/volumes/${volumeId}`, payload)),
   listChapters: (volumeId: string) =>
-    unwrap<Chapter[]>(
-      api.get(`/volumes/${volumeId}/chapters`),
-    ),
+    unwrap<Chapter[]>(api.get(`/volumes/${volumeId}/chapters`)),
   createChapter: (
     volumeId: string,
     payload: { sequence_no: number; title: string },
-  ) =>
-    unwrap<Chapter>(
-      api.post(`/volumes/${volumeId}/chapters`, payload),
-    ),
+  ) => unwrap<Chapter>(api.post(`/volumes/${volumeId}/chapters`, payload)),
   patchChapter: (
     chapterId: string,
     payload: { title?: string; summary?: string; goal?: string },
   ) => unwrap<Chapter>(api.patch(`/chapters/${chapterId}`, payload)),
   listScenes: (chapterId: string) =>
-    unwrap<Scene[]>(
-      api.get(`/chapters/${chapterId}/scenes`),
-    ),
+    unwrap<Scene[]>(api.get(`/chapters/${chapterId}/scenes`)),
   createScene: (
     chapterId: string,
     payload: {
@@ -165,12 +143,8 @@ export const apiClient = {
       goal?: string;
       ending_hook?: string;
     },
-  ) =>
-    unwrap<Scene>(
-      api.post(`/chapters/${chapterId}/scenes`, payload),
-    ),
-  getScene: (sceneId: string) =>
-    unwrap<Scene>(api.get(`/scenes/${sceneId}`)),
+  ) => unwrap<Scene>(api.post(`/chapters/${chapterId}/scenes`, payload)),
+  getScene: (sceneId: string) => unwrap<Scene>(api.get(`/scenes/${sceneId}`)),
   patchScene: (
     sceneId: string,
     payload: {
@@ -188,14 +162,16 @@ export const apiClient = {
   getSceneContextLinks: (sceneId: string) =>
     unwrap<SceneContextLinks>(api.get(`/scenes/${sceneId}/context-links`)),
   replaceSceneContextLinks: (sceneId: string, payload: SceneContextLinks) =>
-    unwrap<SceneContextLinks>(api.put(`/scenes/${sceneId}/context-links`, payload)),
+    unwrap<SceneContextLinks>(
+      api.put(`/scenes/${sceneId}/context-links`, payload),
+    ),
   completeScene: (sceneId: string) =>
     unwrap<Scene>(api.post(`/scenes/${sceneId}/complete`)),
   clearSceneStale: (sceneId: string) =>
     unwrap<Scene>(api.post(`/scenes/${sceneId}/clear-stale`)),
   listImpactReports: (projectId: string) =>
     unwrap<ImpactReport[]>(api.get(`/projects/${projectId}/impact-reports`)),
-  updateImpactReport: (reportId: string, status: 'acknowledged' | 'resolved') =>
+  updateImpactReport: (reportId: string, status: "acknowledged" | "resolved") =>
     unwrap<ImpactReport>(api.patch(`/impact-reports/${reportId}`, { status })),
   listWorkflowRuns: (sceneId: string) =>
     unwrap<WorkflowRun[]>(api.get(`/scenes/${sceneId}/workflow-runs`)),
@@ -203,9 +179,7 @@ export const apiClient = {
     unwrap<WorkflowRun>(api.post(`/workflows/runs/${runId}/cancel`)),
 
   listVersions: (sceneId: string) =>
-    unwrap<SceneVersion[]>(
-      api.get(`/scenes/${sceneId}/versions`),
-    ),
+    unwrap<SceneVersion[]>(api.get(`/scenes/${sceneId}/versions`)),
   createVersion: (
     sceneId: string,
     payload: {
@@ -216,10 +190,7 @@ export const apiClient = {
       branch_name?: string;
       parent_version_id?: string | null;
     },
-  ) =>
-    unwrap<SceneVersion>(
-      api.post(`/scenes/${sceneId}/versions`, payload),
-    ),
+  ) => unwrap<SceneVersion>(api.post(`/scenes/${sceneId}/versions`, payload)),
   getWorkingDraft: (sceneId: string) =>
     unwrap<SceneWorkingDraft>(api.get(`/scenes/${sceneId}/working-draft`)),
   updateWorkingDraft: (
@@ -246,8 +217,7 @@ export const apiClient = {
     ),
 
   // Model APIs
-  getProviders: () =>
-    unwrap<ProviderStatus>(api.get("/model/providers")),
+  getProviders: () => unwrap<ProviderStatus>(api.get("/model/providers")),
   testModel: (payload: { provider?: string; message?: string }) =>
     unwrap<ModelTestResult>(api.post("/model/test", payload)),
   // Review APIs
@@ -258,21 +228,13 @@ export const apiClient = {
       }),
     ),
   listReviewRuns: (versionId: string) =>
-    unwrap<ReviewRun[]>(
-      api.get(`/scene-versions/${versionId}/review-runs`),
-    ),
+    unwrap<ReviewRun[]>(api.get(`/scene-versions/${versionId}/review-runs`)),
   getReviewRun: (runId: string) =>
-    unwrap<ReviewResult>(
-      api.get(`/review-runs/${runId}`),
-    ),
+    unwrap<ReviewResult>(api.get(`/review-runs/${runId}`)),
   listIssues: (versionId: string) =>
-    unwrap<ReviewIssue[]>(
-      api.get(`/scene-versions/${versionId}/issues`),
-    ),
-  updateIssue: (issueId: string, status: Exclude<ReviewIssueStatus, 'open'>) =>
-    unwrap<ReviewIssue>(
-      api.patch(`/issues/${issueId}`, { status }),
-    ),
+    unwrap<ReviewIssue[]>(api.get(`/scene-versions/${versionId}/issues`)),
+  updateIssue: (issueId: string, status: Exclude<ReviewIssueStatus, "open">) =>
+    unwrap<ReviewIssue>(api.patch(`/issues/${issueId}`, { status })),
 
   // Memory APIs
   extractMemories: (versionId: string, modelProfileId?: string) =>
@@ -291,7 +253,7 @@ export const apiClient = {
     ),
   updateCandidate: (
     candidateId: string,
-    status: Extract<MemoryCandidateStatus, 'approved' | 'rejected'>,
+    status: Extract<MemoryCandidateStatus, "approved" | "rejected">,
     contentJson?: Record<string, unknown>,
   ) =>
     unwrap<MemoryCandidate>(
@@ -308,9 +270,13 @@ export const apiClient = {
     max_tokens?: number;
     temperature?: number;
   }) =>
-    unwrap<{ content: string; model: string; prompt_tokens: number; completion_tokens: number; finish_reason: string }>(
-      api.post("/model/generate", payload),
-    ),
+    unwrap<{
+      content: string;
+      model: string;
+      prompt_tokens: number;
+      completion_tokens: number;
+      finish_reason: string;
+    }>(api.post("/model/generate", payload)),
 
   // Interview APIs
   startInterview: (
@@ -372,7 +338,11 @@ export const apiClient = {
     ),
   patchRelationship: (
     relationshipId: string,
-    payload: { relation_type?: string; description?: string; timeline_info?: string },
+    payload: {
+      relation_type?: string;
+      description?: string;
+      timeline_info?: string;
+    },
   ) =>
     unwrap<CharacterRelationship>(
       api.patch(`/relationships/${relationshipId}`, payload),
@@ -389,8 +359,7 @@ export const apiClient = {
     unwrap<WorldEntry>(api.get(`/world-entries/${entryId}`)),
 
   // Model Profile APIs
-  listModelProfiles: () =>
-    unwrap<ModelProfile[]>(api.get("/model/profiles")),
+  listModelProfiles: () => unwrap<ModelProfile[]>(api.get("/model/profiles")),
   createModelProfile: (payload: Record<string, unknown>) =>
     unwrap<ModelProfile>(api.post("/model/profiles", payload)),
   patchModelProfile: (id: string, payload: Record<string, unknown>) =>
@@ -400,9 +369,12 @@ export const apiClient = {
   clearModelProfileApiKey: (id: string) =>
     unwrap<ModelProfile>(api.delete(`/model/profiles/${id}/api-key`)),
   testModelProfile: (id: string) =>
-    unwrap<{ connected: boolean; provider: string; model: string; error?: string }>(
-      api.post(`/model/profiles/${id}/test`),
-    ),
+    unwrap<{
+      connected: boolean;
+      provider: string;
+      model: string;
+      error?: string;
+    }>(api.post(`/model/profiles/${id}/test`)),
   listProviderModels: (provider: string) =>
     unwrap<{ provider: string; models: string[] }>(
       api.get(`/model/providers/${provider}/models`),

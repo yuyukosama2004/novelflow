@@ -169,9 +169,13 @@ export interface ModelTestResult {
   error: string;
 }
 
-export type ReviewIssueStatus = 'open' | 'accepted' | 'ignored' | 'false_positive';
+export type ReviewIssueStatus =
+  | "open"
+  | "accepted"
+  | "ignored"
+  | "false_positive";
 
-export type ReviewRunStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type ReviewRunStatus = "pending" | "running" | "completed" | "failed";
 
 export interface ReviewRun extends EntityBase {
   scene_version_id: string;
@@ -206,11 +210,11 @@ export interface ReviewResult {
 }
 
 export type MemoryCandidateStatus =
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'conflicted'
-  | 'invalidated';
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "conflicted"
+  | "invalidated";
 
 export interface MemoryCandidate extends EntityBase {
   extraction_run_id: string | null;
@@ -232,7 +236,7 @@ export interface MemoryExtractionRun extends EntityBase {
   model_profile_id: string | null;
   provider: string;
   model: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   prompt_snapshot_json: Record<string, unknown>;
   started_at: string | null;
   completed_at: string | null;
@@ -271,8 +275,11 @@ export interface InterviewSession {
   messages: InterviewMessage[];
 }
 
-export type StoryCandidateType = 'project_setting' | 'character' | 'world_entry';
-export type StoryCandidateStatus = 'pending' | 'approved' | 'rejected';
+export type StoryCandidateType =
+  | "project_setting"
+  | "character"
+  | "world_entry";
+export type StoryCandidateStatus = "pending" | "approved" | "rejected";
 
 export interface StoryCandidateEntity {
   id: string;
