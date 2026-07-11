@@ -21,6 +21,7 @@ from app.services.context_builder import ContextBuilder
 from app.services.continuity_reviewer import ContinuityReviewer
 from app.services.manuscript_service import ManuscriptService
 from app.services.model_runtime import ModelRuntimeResolver
+from app.services.text_chunks import split_text_chunks
 
 router = APIRouter()
 
@@ -69,10 +70,13 @@ async def review_version(
         builder = ContextBuilder(session)
         ctx = await builder.build_for_scene(version.scene_id, purpose="review")
         reviewer = ContinuityReviewer(runtime.router, runtime.provider)
+        chunks = split_text_chunks(version.content_markdown)
         run.prompt_snapshot_json = {
             "provider": runtime.provider,
             "model": runtime.model,
-            "prompt": reviewer.build_prompt(version, ctx),
+            "chunk_ranges": [
+                {"index": chunk.index, "start": chunk.start, "end": chunk.end} for chunk in chunks
+            ],
         }
         issues = await reviewer.review(version, ctx)
 

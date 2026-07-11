@@ -35,6 +35,9 @@ class ReviewIssueOut(BaseModel):
     conflict_rule: str
     suggestion: str
     confidence: float
+    source_chunk_index: int
+    source_start: int
+    source_end: int
     status: str
     created_at: datetime
     updated_at: datetime

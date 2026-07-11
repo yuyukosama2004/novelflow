@@ -19,6 +19,9 @@ from app.models.manuscript import (
 )
 from app.models.world import WorldEntry
 
+CONTEXT_TOKEN_BUDGET = 6000
+PREVIOUS_SCENE_TAIL_CHARS = 800
+
 
 @dataclass
 class CharacterCard:
@@ -113,6 +116,26 @@ class ContextBuilder:
         # Explicitly linked entries plus project-level hard rules.
         world_facts = await self._approved_world(project_id, world_entry_ids)
 
+        trimmed: list[str] = []
+        while await self._estimate_tokens(scene, prev, characters, world_facts) > CONTEXT_TOKEN_BUDGET:
+            removable_world = next(
+                (fact for fact in reversed(world_facts) if fact.entry_type != "rule"),
+                None,
+            )
+            if removable_world is not None:
+                world_facts.remove(removable_world)
+                trimmed.append(f"world:{removable_world.id}")
+                continue
+            removable_character = next(
+                (character for character in reversed(characters) if character.id != scene.pov_character_id),
+                None,
+            )
+            if removable_character is not None:
+                characters.remove(removable_character)
+                trimmed.append(f"character:{removable_character.id}")
+                continue
+            break
+
         manifest = {
             "scene_id": scene_id,
             "scene_title": scene.title,
@@ -127,10 +150,13 @@ class ContextBuilder:
             "world_fact_count": len(world_facts),
             "has_previous_scene": prev is not None,
             "context_purpose": purpose,
+            "token_budget": CONTEXT_TOKEN_BUDGET,
+            "trimmed_items": trimmed,
         }
 
         token_estimate = await self._estimate_tokens(scene, prev, characters, world_facts)
         manifest["token_estimate"] = token_estimate
+        manifest["budget_exceeded"] = token_estimate > CONTEXT_TOKEN_BUDGET
 
         return SceneContext(
             current_scene=scene,
@@ -178,13 +204,14 @@ class ContextBuilder:
         if prev_version is None:
             return None
 
+        summary = prev_version.summary.strip()
+        tail = prev_version.content_markdown[-PREVIOUS_SCENE_TAIL_CHARS:]
+        preview = f"摘要：{summary}\n\n结尾：{tail}" if summary else tail
         return PreviousScene(
             scene_id=prev_scene.id,
             title=prev_scene.title,
             version_no=prev_version.version_no,
-            content_preview=(prev_version.content_markdown[:500] + "...")
-            if len(prev_version.content_markdown) > 500
-            else prev_version.content_markdown,
+            content_preview=preview,
         )
 
     async def _character_cards(

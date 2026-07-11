@@ -158,6 +158,7 @@ async def test_previous_scene_uses_narrative_order_across_chapters_and_volumes(
         scene_id=previous.id,
         version_no=1,
         content_markdown="Previous content",
+        summary="Previous summary",
     )
     session.add_all([earlier_version, previous_version])
     await session.flush()
@@ -181,6 +182,6 @@ async def test_previous_scene_uses_narrative_order_across_chapters_and_volumes(
 
     assert context.previous_scene is not None
     assert context.previous_scene.scene_id == previous.id
-    assert context.previous_scene.content_preview == "Previous content"
+    assert context.previous_scene.content_preview == ("摘要：Previous summary\n\n结尾：Previous content")
     assert [character.id for character in context.characters] == [linked_character.id]
     assert [fact.id for fact in context.world_facts] == [linked_world.id]

@@ -25,6 +25,7 @@ from app.services.manuscript_service import ManuscriptService
 from app.services.memory_application import MemoryApplicationService
 from app.services.memory_curator import MemoryCurator
 from app.services.model_runtime import ModelRuntimeResolver
+from app.services.text_chunks import split_text_chunks
 
 router = APIRouter()
 
@@ -74,10 +75,13 @@ async def extract_memories(
         builder = ContextBuilder(session)
         ctx = await builder.build_for_scene(version.scene_id)
         curator = MemoryCurator(runtime.router, runtime.provider)
+        chunks = split_text_chunks(version.content_markdown)
         run.prompt_snapshot_json = {
             "provider": runtime.provider,
             "model": runtime.model,
-            "prompt": curator.build_prompt(version, ctx),
+            "chunk_ranges": [
+                {"index": chunk.index, "start": chunk.start, "end": chunk.end} for chunk in chunks
+            ],
         }
         candidates = await curator.extract(version, ctx)
 

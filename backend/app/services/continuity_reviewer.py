@@ -11,6 +11,7 @@ from app.models.manuscript import SceneVersion
 from app.models.review import ReviewIssue
 from app.services.context_builder import SceneContext
 from app.services.structured_output import generate_json_array
+from app.services.text_chunks import TextChunk, split_text_chunks
 
 
 class ReviewItem(BaseModel):
@@ -35,57 +36,70 @@ class ContinuityReviewer:
         context: SceneContext,
     ) -> list[ReviewIssue]:
         """Run continuity review on a scene version."""
-        prompt = self.build_prompt(version, context)
-
-        request = LLMRequest(
-            messages=[
-                LLMMessage(
-                    role="system",
-                    content=(
-                        "You are a continuity editor for fiction. "
-                        "Given a scene draft and character/world constraints, "
-                        "find all issues where the draft violates a constraint. "
-                        "Output ONLY a JSON array of issues. "
-                        "Each issue must have: issue_type, severity, "
-                        "evidence, conflict_rule, suggestion, confidence. "
-                        "If no issues found, output []. No other text."
+        issues: dict[tuple[str, str, str], ReviewIssue] = {}
+        for chunk in split_text_chunks(version.content_markdown):
+            request = LLMRequest(
+                messages=[
+                    LLMMessage(
+                        role="system",
+                        content=(
+                            "You are a continuity editor for fiction. "
+                            "Given a scene draft chunk and character/world constraints, "
+                            "find all issues where the draft violates a constraint. "
+                            "Output ONLY a JSON array of issues. "
+                            "Each issue must have: issue_type, severity, evidence, "
+                            "conflict_rule, suggestion, confidence. If no issues found, "
+                            "output []. No other text."
+                        ),
                     ),
-                ),
-                LLMMessage(role="user", content=prompt),
-            ],
-            max_tokens=1024,
-            temperature=0.3,
-        )
-
-        issues_data = await generate_json_array(
-            self.llm,
-            self.provider,
-            request,
-            ReviewItem,
-        )
-
-        return [
-            ReviewIssue(
-                scene_version_id=version.id,
-                issue_type=item.issue_type,
-                severity=item.severity,
-                evidence_json=json.dumps(item.evidence, ensure_ascii=False),
-                conflict_rule=item.conflict_rule,
-                suggestion=item.suggestion,
-                confidence=item.confidence,
-                status="open",
+                    LLMMessage(
+                        role="user",
+                        content=self.build_prompt(version, context, chunk),
+                    ),
+                ],
+                max_tokens=1024,
+                temperature=0.3,
             )
-            for item in issues_data
-        ]
+            items = await generate_json_array(
+                self.llm,
+                self.provider,
+                request,
+                ReviewItem,
+            )
+            for item in items:
+                evidence = json.dumps(item.evidence, ensure_ascii=False)
+                key = (item.issue_type, item.conflict_rule, evidence)
+                issues.setdefault(
+                    key,
+                    ReviewIssue(
+                        scene_version_id=version.id,
+                        issue_type=item.issue_type,
+                        severity=item.severity,
+                        evidence_json=evidence,
+                        conflict_rule=item.conflict_rule,
+                        suggestion=item.suggestion,
+                        confidence=item.confidence,
+                        source_chunk_index=chunk.index,
+                        source_start=chunk.start,
+                        source_end=chunk.end,
+                        status="open",
+                    ),
+                )
+        return list(issues.values())
 
     def build_prompt(
         self,
         version: SceneVersion,
         context: SceneContext,
+        chunk: TextChunk | None = None,
     ) -> str:
+        active_chunk = chunk or split_text_chunks(version.content_markdown)[0]
         parts: list[str] = []
-        parts.append("## Scene Draft")
-        parts.append(version.content_markdown[:3000])
+        parts.append(
+            f"## Scene Draft Chunk {active_chunk.index + 1} "
+            f"(characters {active_chunk.start}-{active_chunk.end})"
+        )
+        parts.append(active_chunk.text)
         parts.append("")
 
         if context.previous_scene:

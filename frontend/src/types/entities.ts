@@ -166,6 +166,9 @@ export interface ReviewIssue extends EntityBase {
   conflict_rule: string;
   suggestion: string;
   confidence: number;
+  source_chunk_index: number;
+  source_start: number;
+  source_end: number;
   status: ReviewIssueStatus;
 }
 
@@ -185,6 +188,9 @@ export interface MemoryCandidate extends EntityBase {
   content_json: Record<string, unknown>;
   evidence: string;
   confidence: number;
+  source_chunk_index: number;
+  source_start: number;
+  source_end: number;
   status: MemoryCandidateStatus;
 }
 

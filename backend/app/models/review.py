@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -42,6 +42,9 @@ class ReviewIssue(UUIDMixin, TimestampMixin, Base):
     conflict_rule: Mapped[str] = mapped_column(Text, default="")
     suggestion: Mapped[str] = mapped_column(Text, default="")
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    source_chunk_index: Mapped[int] = mapped_column(Integer, default=0)
+    source_start: Mapped[int] = mapped_column(Integer, default=0)
+    source_end: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(
         String(40), default="open"
     )  # open | accepted | ignored | false_positive

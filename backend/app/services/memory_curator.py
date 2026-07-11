@@ -9,6 +9,7 @@ from app.models.memory import MemoryCandidate
 from app.schemas.memory import MemoryItem
 from app.services.context_builder import SceneContext
 from app.services.structured_output import generate_json_array
+from app.services.text_chunks import TextChunk, split_text_chunks
 
 
 class MemoryCurator:
@@ -24,60 +25,72 @@ class MemoryCurator:
         context: SceneContext,
     ) -> list[MemoryCandidate]:
         """Extract memory candidates from a scene version."""
-        prompt = self.build_prompt(version, context)
-
-        request = LLMRequest(
-            messages=[
-                LLMMessage(
-                    role="system",
-                    content=(
-                        "You extract story state changes from fiction. "
-                        "Given a scene and character context, identify "
-                        "what changed: injuries, knowledge gained, "
-                        "emotional shifts, relationship changes, "
-                        "timeline events. "
-                        "Output ONLY a JSON array. Each item: "
-                        "candidate_type, target_entity_type, "
-                        "target_entity_id (or null), content_json, "
-                        "evidence (quote from text), confidence. "
-                        "Use only the IDs supplied in the context."
+        candidates: dict[tuple[str, str | None, str], MemoryCandidate] = {}
+        for chunk in split_text_chunks(version.content_markdown):
+            request = LLMRequest(
+                messages=[
+                    LLMMessage(
+                        role="system",
+                        content=(
+                            "You extract story state changes from fiction. "
+                            "Given a scene chunk and character context, identify what "
+                            "changed. Output ONLY a JSON array. Each item: candidate_type, "
+                            "target_entity_type, target_entity_id (or null), content_json, "
+                            "evidence, confidence. Use only IDs supplied in the context."
+                        ),
                     ),
-                ),
-                LLMMessage(role="user", content=prompt),
-            ],
-            max_tokens=1024,
-            temperature=0.3,
-        )
-
-        items = await generate_json_array(
-            self.llm,
-            self.provider,
-            request,
-            MemoryItem,
-        )
-
-        return [
-            MemoryCandidate(
-                scene_version_id=version.id,
-                candidate_type=item.root.candidate_type,
-                target_entity_type=item.root.target_entity_type,
-                target_entity_id=item.root.target_entity_id,
-                content_json=item.root.content_json.model_dump(),
-                evidence=item.root.evidence,
-                confidence=item.root.confidence,
-                status="pending",
+                    LLMMessage(
+                        role="user",
+                        content=self.build_prompt(version, context, chunk),
+                    ),
+                ],
+                max_tokens=1024,
+                temperature=0.3,
             )
-            for item in items
-        ]
+            items = await generate_json_array(
+                self.llm,
+                self.provider,
+                request,
+                MemoryItem,
+            )
+            for item in items:
+                content_json = item.root.content_json.model_dump()
+                key = (
+                    item.root.candidate_type,
+                    item.root.target_entity_id,
+                    json.dumps(content_json, ensure_ascii=False, sort_keys=True),
+                )
+                candidates.setdefault(
+                    key,
+                    MemoryCandidate(
+                        scene_version_id=version.id,
+                        candidate_type=item.root.candidate_type,
+                        target_entity_type=item.root.target_entity_type,
+                        target_entity_id=item.root.target_entity_id,
+                        content_json=content_json,
+                        evidence=item.root.evidence,
+                        confidence=item.root.confidence,
+                        source_chunk_index=chunk.index,
+                        source_start=chunk.start,
+                        source_end=chunk.end,
+                        status="pending",
+                    ),
+                )
+        return list(candidates.values())
 
     def build_prompt(
         self,
         version: SceneVersion,
         context: SceneContext,
+        chunk: TextChunk | None = None,
     ) -> str:
+        active_chunk = chunk or split_text_chunks(version.content_markdown)[0]
         parts: list[str] = []
-        parts.append("## Scene Content")
-        parts.append(version.content_markdown[:3000])
+        parts.append(
+            f"## Scene Content Chunk {active_chunk.index + 1} "
+            f"(characters {active_chunk.start}-{active_chunk.end})"
+        )
+        parts.append(active_chunk.text)
         parts.append("")
 
         parts.append("## Characters Before This Scene")

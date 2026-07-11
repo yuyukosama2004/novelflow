@@ -43,6 +43,9 @@ class MemoryCandidate(UUIDMixin, TimestampMixin, Base):
     content_json: Mapped[dict] = mapped_column(JSON, default=dict)
     evidence: Mapped[str] = mapped_column(Text, default="")
     confidence: Mapped[float] = mapped_column(Float, default=0.8)
+    source_chunk_index: Mapped[int] = mapped_column(Integer, default=0)
+    source_start: Mapped[int] = mapped_column(Integer, default=0)
+    source_end: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(
         String(40), default="pending"
     )  # pending | approved | rejected | conflicted
