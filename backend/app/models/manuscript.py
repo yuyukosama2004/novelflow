@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -60,6 +60,7 @@ class Scene(UUIDMixin, TimestampMixin, Base):
     forbidden_actions_json: Mapped[list[str]] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(40), default="unplanned")
     approved_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    is_stale: Mapped[bool] = mapped_column(Boolean, default=False)
 
     chapter = relationship("Chapter", back_populates="scenes")
     workflow_runs = relationship(
@@ -144,6 +145,8 @@ class SceneVersion(UUIDMixin, TimestampMixin, Base):
     created_by: Mapped[str] = mapped_column(String(80), default="user")
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     approval_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    superseded_by_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
     scene = relationship("Scene", back_populates="versions", foreign_keys=[scene_id])
     review_runs = relationship(
@@ -172,3 +175,15 @@ class SceneVersion(UUIDMixin, TimestampMixin, Base):
         foreign_keys="MemoryExtractionRun.scene_version_id",
         order_by="MemoryExtractionRun.created_at",
     )
+
+
+class ImpactReport(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "impact_reports"
+
+    project_id: Mapped[str] = mapped_column(ForeignKey("novel_projects.id"), index=True)
+    source_scene_id: Mapped[str] = mapped_column(ForeignKey("scenes.id"), index=True)
+    old_version_id: Mapped[str] = mapped_column(String(36))
+    new_version_id: Mapped[str] = mapped_column(String(36))
+    affected_scene_ids_json: Mapped[list[str]] = mapped_column(JSON, default=list)
+    reason_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(40), default="open")

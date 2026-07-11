@@ -4,6 +4,7 @@ from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.interview import InterviewSession, StoryCandidate
 from app.models.manuscript import (
     Chapter,
+    ImpactReport,
     Scene,
     SceneCharacter,
     SceneVersion,
@@ -21,6 +22,7 @@ from app.models.world import WorldEntry
 __all__ = [
     "Base",
     "Chapter",
+    "ImpactReport",
     "Character",
     "CharacterKnowledge",
     "CharacterRelationship",

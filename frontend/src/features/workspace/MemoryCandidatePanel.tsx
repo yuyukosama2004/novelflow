@@ -22,6 +22,7 @@ const STATUS_TONE: Record<MemoryCandidateStatus, 'neutral' | 'ok' | 'warn'> = {
   approved: 'ok',
   rejected: 'neutral',
   conflicted: 'warn',
+  invalidated: 'neutral',
 };
 
 function formatPayload(payload: Record<string, unknown>): string {

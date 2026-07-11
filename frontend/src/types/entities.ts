@@ -89,6 +89,7 @@ export interface Scene extends EntityBase {
   forbidden_actions_json: string[];
   status: string;
   approved_version_id: string | null;
+  is_stale: boolean;
 }
 
 export interface SceneVersion extends EntityBase {
@@ -107,6 +108,18 @@ export interface SceneVersion extends EntityBase {
   created_by: string;
   approved_at: string | null;
   approval_override_reason: string | null;
+  superseded_at: string | null;
+  superseded_by_version_id: string | null;
+}
+
+export interface ImpactReport extends EntityBase {
+  project_id: string;
+  source_scene_id: string;
+  old_version_id: string;
+  new_version_id: string;
+  affected_scene_ids_json: string[];
+  reason_json: Record<string, unknown>;
+  status: string;
 }
 
 export interface SceneWorkingDraft {
@@ -177,7 +190,12 @@ export interface ReviewResult {
   issues: ReviewIssue[];
 }
 
-export type MemoryCandidateStatus = 'pending' | 'approved' | 'rejected' | 'conflicted';
+export type MemoryCandidateStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'conflicted'
+  | 'invalidated';
 
 export interface MemoryCandidate extends EntityBase {
   extraction_run_id: string | null;

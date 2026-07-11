@@ -61,6 +61,7 @@ class CharacterState(UUIDMixin, TimestampMixin, Base):
     active_secrets_json: Mapped[list[str]] = mapped_column(JSON, default=list)
     notes: Mapped[str] = mapped_column(Text, default="")
     source_scene_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    source_candidate_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="confirmed")
 
     character = relationship("Character", back_populates="states")
@@ -76,5 +77,6 @@ class CharacterKnowledge(UUIDMixin, TimestampMixin, Base):
     learned_at_scene_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
     record_status: Mapped[str] = mapped_column(String(40), default="active")
+    source_candidate_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
     character = relationship("Character", back_populates="knowledge")

@@ -62,5 +62,7 @@ class TimelineEvent(UUIDMixin, TimestampMixin, Base):
     event_text: Mapped[str] = mapped_column(Text, default="")
     timeline_order: Mapped[int] = mapped_column(Integer, default=0)
     affected_character_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    source_candidate_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), default="active")
 
     project = relationship("NovelProject", back_populates="timeline_events")

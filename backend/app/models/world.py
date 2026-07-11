@@ -17,5 +17,7 @@ class WorldEntry(UUIDMixin, TimestampMixin, Base):
     tags_json: Mapped[list[str]] = mapped_column(JSON, default=list)
     canon_status: Mapped[str] = mapped_column(String(40), default="draft")
     version: Mapped[int] = mapped_column(Integer, default=1)
+    source_scene_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    source_candidate_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
     project = relationship("NovelProject", back_populates="world_entries")

@@ -280,6 +280,7 @@ export function SceneEditor({
         queryKey: ['scene-versions', scene?.id],
       });
       queryClient.invalidateQueries({ queryKey: ['scenes'] });
+      queryClient.invalidateQueries({ queryKey: ['impact-reports'] });
     },
   });
 
@@ -300,6 +301,14 @@ export function SceneEditor({
     },
     onError: () => {
       setApprovalMessage('审查失败，请稍后重试。');
+    },
+  });
+
+  const clearStale = useMutation({
+    mutationFn: () => apiClient.clearSceneStale(scene?.id ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scene', scene?.id] });
+      queryClient.invalidateQueries({ queryKey: ['scenes'] });
     },
   });
 
@@ -328,6 +337,16 @@ export function SceneEditor({
         return;
       }
       await reviewForApproval.mutateAsync(version.id).catch(() => undefined);
+      return;
+    }
+
+    if (
+      scene?.approved_version_id &&
+      scene.approved_version_id !== version.id &&
+      !window.confirm(
+        '替换正式稿会使后续场景标记为“需复查”，并使旧版本产生的记忆失效。确认继续吗？',
+      )
+    ) {
       return;
     }
 
@@ -410,6 +429,14 @@ export function SceneEditor({
           >
             {saveStateLabel(saveState, dirty, scene.status)}
           </StatusPill>
+          {scene.is_stale ? (
+            <IconButton
+              icon={<Check size={16} />}
+              label="已检查，清除需复查标记"
+              disabled={clearStale.isPending}
+              onClick={() => clearStale.mutate()}
+            />
+          ) : null}
           <IconButton
             icon={<Save size={16} />}
             label="保存版本"

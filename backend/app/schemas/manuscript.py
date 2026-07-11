@@ -131,6 +131,7 @@ class SceneRead(EntityBase):
     forbidden_actions_json: list[str]
     status: str
     approved_version_id: str | None
+    is_stale: bool
 
 
 class SceneReorderItem(BaseModel):
@@ -194,6 +195,24 @@ class SceneVersionRead(EntityBase):
     created_by: str
     approved_at: datetime | None
     approval_override_reason: str | None
+    superseded_at: datetime | None
+    superseded_by_version_id: str | None
+
+
+class ImpactReportRead(EntityBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    project_id: str
+    source_scene_id: str
+    old_version_id: str
+    new_version_id: str
+    affected_scene_ids_json: list[str]
+    reason_json: dict[str, Any]
+    status: str
+
+
+class ImpactReportUpdate(BaseModel):
+    status: Literal["acknowledged", "resolved"]
 
 
 class SceneWorkingDraftUpdate(BaseModel):

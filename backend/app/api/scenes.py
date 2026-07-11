@@ -10,6 +10,8 @@ from app.schemas.manuscript import (
     ChapterCreate,
     ChapterRead,
     ChapterUpdate,
+    ImpactReportRead,
+    ImpactReportUpdate,
     SceneCreate,
     SceneRead,
     SceneReorderRequest,
@@ -132,6 +134,40 @@ async def update_scene(
 ) -> dict:
     scene = await ManuscriptService(session).update_scene(scene_id, payload)
     return success(SceneRead.model_validate(scene), request)
+
+
+@router.post("/scenes/{scene_id}/clear-stale")
+async def clear_scene_stale(
+    scene_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    scene = await ManuscriptService(session).clear_scene_stale(scene_id)
+    return success(SceneRead.model_validate(scene), request)
+
+
+@router.get("/projects/{project_id}/impact-reports")
+async def list_impact_reports(
+    project_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    reports = await ManuscriptService(session).list_impact_reports(project_id)
+    return success([ImpactReportRead.model_validate(item) for item in reports], request)
+
+
+@router.patch("/impact-reports/{report_id}")
+async def update_impact_report(
+    report_id: str,
+    payload: ImpactReportUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    report = await ManuscriptService(session).update_impact_report(
+        report_id,
+        payload.status,
+    )
+    return success(ImpactReportRead.model_validate(report), request)
 
 
 @router.delete("/scenes/{scene_id}")

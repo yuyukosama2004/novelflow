@@ -5,6 +5,7 @@ import type {
   Character,
   CharacterRelationship,
   HealthStatus,
+  ImpactReport,
   InterviewSession,
   MemoryCandidate,
   MemoryExtractionResult,
@@ -183,6 +184,12 @@ export const apiClient = {
     unwrap<SceneContextLinks>(api.put(`/scenes/${sceneId}/context-links`, payload)),
   completeScene: (sceneId: string) =>
     unwrap<Scene>(api.post(`/scenes/${sceneId}/complete`)),
+  clearSceneStale: (sceneId: string) =>
+    unwrap<Scene>(api.post(`/scenes/${sceneId}/clear-stale`)),
+  listImpactReports: (projectId: string) =>
+    unwrap<ImpactReport[]>(api.get(`/projects/${projectId}/impact-reports`)),
+  updateImpactReport: (reportId: string, status: 'acknowledged' | 'resolved') =>
+    unwrap<ImpactReport>(api.patch(`/impact-reports/${reportId}`, { status })),
 
   listVersions: (sceneId: string) =>
     unwrap<SceneVersion[]>(

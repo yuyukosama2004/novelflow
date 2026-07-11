@@ -13,25 +13,19 @@ class CharacterRelationship(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "character_relationships"
     __table_args__ = (
-        UniqueConstraint("project_id", "character_a_id", "character_b_id", "relation_type", name="uq_character_relation"),
+        UniqueConstraint(
+            "project_id", "character_a_id", "character_b_id", "relation_type", name="uq_character_relation"
+        ),
     )
 
-    project_id: Mapped[str] = mapped_column(
-        ForeignKey("novel_projects.id"), index=True
-    )
-    character_a_id: Mapped[str] = mapped_column(
-        ForeignKey("characters.id"), index=True
-    )
-    character_b_id: Mapped[str] = mapped_column(
-        ForeignKey("characters.id"), index=True
-    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("novel_projects.id"), index=True)
+    character_a_id: Mapped[str] = mapped_column(ForeignKey("characters.id"), index=True)
+    character_b_id: Mapped[str] = mapped_column(ForeignKey("characters.id"), index=True)
     relation_type: Mapped[str] = mapped_column(
         String(40), default="other"
     )  # ally/rival/lover/family/mentor/conflict/secret/other
     description: Mapped[str] = mapped_column(Text, default="")
-    timeline_info: Mapped[str] = mapped_column(
-        Text, default=""
-    )  # 关系的时间线背景
-    status: Mapped[str] = mapped_column(
-        String(40), default="active"
-    )  # active | draft
+    timeline_info: Mapped[str] = mapped_column(Text, default="")  # 关系的时间线背景
+    status: Mapped[str] = mapped_column(String(40), default="active")  # active | draft
+    source_scene_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    source_candidate_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

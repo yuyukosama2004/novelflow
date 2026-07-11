@@ -24,6 +24,8 @@ function makeVersion(
     created_by: 'author',
     approved_at: null,
     approval_override_reason: null,
+    superseded_at: null,
+    superseded_by_version_id: null,
     created_at: now,
     updated_at: now,
     ...overrides,

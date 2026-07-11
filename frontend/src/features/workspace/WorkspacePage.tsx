@@ -84,6 +84,17 @@ export function WorkspacePage() {
     queryFn: () => apiClient.listWorldEntries(projectId),
     enabled: Boolean(projectId),
   });
+  const impactReports = useQuery({
+    queryKey: ['impact-reports', projectId],
+    queryFn: () => apiClient.listImpactReports(projectId),
+    enabled: Boolean(projectId),
+  });
+  const acknowledgeImpact = useMutation({
+    mutationFn: (reportId: string) =>
+      apiClient.updateImpactReport(reportId, 'acknowledged'),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['impact-reports', projectId] }),
+  });
   const volumes = useQuery({
     queryKey: ['volumes', projectId],
     queryFn: () => apiClient.listVolumes(projectId),
@@ -624,6 +635,11 @@ export function WorkspacePage() {
                                       }`}
                                     >
                                       {item.sequence_no}. {item.title}
+                                      {item.is_stale ? (
+                                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                                          需复查
+                                        </span>
+                                      ) : null}
                                     </button>
                                   )}
                                   {selectedSceneId !== item.id && (
@@ -934,6 +950,24 @@ export function WorkspacePage() {
             characters={characters.data}
             worldEntries={worldEntries.data}
           />
+          {impactReports.data?.filter((report) => report.status === 'open').map((report) => (
+            <section
+              key={report.id}
+              className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+            >
+              <p className="font-semibold">正式稿替换影响</p>
+              <p className="mt-1">
+                以下 {report.affected_scene_ids_json.length} 个后续场景需要复查：
+                {report.affected_scene_ids_json.join('、') || '无'}
+              </p>
+              <button
+                className="mt-2 rounded border border-amber-300 bg-white px-2 py-1"
+                onClick={() => acknowledgeImpact.mutate(report.id)}
+              >
+                已查看影响
+              </button>
+            </section>
+          ))}
           <ContextChecker sceneId={selectedSceneId} />
           <ReviewIssuePanel
             sceneVersionId={selectedSceneVersionId}

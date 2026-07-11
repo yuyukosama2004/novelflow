@@ -29,6 +29,7 @@ export const CANON_STATUS_LABELS: Record<string, string> = {
   approved: "已确认",
   deprecated: "已废弃",
   conflicted: "冲突",
+  invalidated: "已失效",
 };
 
 // ── 版本来源类型 ──
@@ -62,6 +63,7 @@ export const MEMORY_CANDIDATE_STATUS_LABELS: Record<string, string> = {
   approved: "已批准",
   rejected: "已拒绝",
   conflicted: "冲突",
+  invalidated: "已失效",
 };
 
 // ── 审查问题类型 ──

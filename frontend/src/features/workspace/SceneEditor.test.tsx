@@ -70,6 +70,7 @@ const scene: Scene = {
   forbidden_actions_json: [],
   status: 'reviewing',
   approved_version_id: null,
+  is_stale: false,
   created_at: now,
   updated_at: now,
 };
@@ -92,6 +93,8 @@ function version(reviewStatus: string): SceneVersion {
     created_by: 'user',
     approved_at: null,
     approval_override_reason: null,
+    superseded_at: null,
+    superseded_by_version_id: null,
     created_at: now,
     updated_at: now,
   };

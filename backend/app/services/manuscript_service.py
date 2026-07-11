@@ -12,9 +12,11 @@ from app.core.exceptions import (
     ValidationAppError,
 )
 from app.models.base import utc_now
-from app.models.character import Character
+from app.models.bible import CharacterRelationship
+from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.manuscript import (
     Chapter,
+    ImpactReport,
     Scene,
     SceneCharacter,
     SceneVersion,
@@ -22,7 +24,7 @@ from app.models.manuscript import (
     SceneWorldEntry,
     Volume,
 )
-from app.models.memory import MemoryCandidate, MemoryExtractionRun
+from app.models.memory import MemoryCandidate, MemoryExtractionRun, TimelineEvent
 from app.models.review import ReviewIssue, ReviewRun
 from app.models.world import WorldEntry
 from app.repositories.base import apply_updates
@@ -396,11 +398,11 @@ class ManuscriptService:
             )
         if scene.approved_version_id == version.id:
             return scene
-        if scene.approved_version_id is not None:
-            raise ConflictError(
-                "historical replacement is not ready",
-                {"reason": "HISTORICAL_REPLACEMENT_NOT_READY"},
-            )
+        old_version = (
+            await self.get_version(scene.approved_version_id)
+            if scene.approved_version_id is not None
+            else None
+        )
 
         review_result = await self.session.execute(
             select(ReviewRun)
@@ -446,7 +448,125 @@ class ManuscriptService:
         version.approved_at = utc_now()
         version.approval_override_reason = override_reason if blocking_issues else None
         chapter = await self.get_chapter(scene.chapter_id)
-        chapter.approved_word_count += count_plaintext_characters(version.content_json)
+        if old_version is None:
+            chapter.approved_word_count += count_plaintext_characters(version.content_json)
+        else:
+            chapter.approved_word_count = max(
+                0,
+                chapter.approved_word_count
+                - count_plaintext_characters(old_version.content_json)
+                + count_plaintext_characters(version.content_json),
+            )
+            old_version.superseded_at = utc_now()
+            old_version.superseded_by_version_id = version.id
+            await self._invalidate_version_memory(old_version.id)
+            affected_scenes, project_id = await self._mark_later_scenes_stale(scene)
+            self.session.add(
+                ImpactReport(
+                    project_id=project_id,
+                    source_scene_id=scene.id,
+                    old_version_id=old_version.id,
+                    new_version_id=version.id,
+                    affected_scene_ids_json=[item.id for item in affected_scenes],
+                    reason_json={"reason": "CANONICAL_VERSION_REPLACED"},
+                    status="open",
+                )
+            )
+        await self.session.commit()
+        await self.session.refresh(scene)
+        return scene
+
+    async def _invalidate_version_memory(self, version_id: str) -> None:
+        await self.session.execute(
+            update(MemoryCandidate)
+            .where(
+                MemoryCandidate.scene_version_id == version_id,
+                MemoryCandidate.status == "pending",
+            )
+            .values(status="invalidated")
+        )
+        await self.session.execute(
+            update(CharacterState)
+            .where(CharacterState.source_scene_version_id == version_id)
+            .values(status="invalidated")
+        )
+        await self.session.execute(
+            update(CharacterKnowledge)
+            .where(CharacterKnowledge.learned_at_scene_version_id == version_id)
+            .values(record_status="invalidated")
+        )
+        await self.session.execute(
+            update(TimelineEvent)
+            .where(TimelineEvent.scene_version_id == version_id)
+            .values(status="invalidated")
+        )
+        await self.session.execute(
+            update(CharacterRelationship)
+            .where(CharacterRelationship.source_scene_version_id == version_id)
+            .values(status="invalidated")
+        )
+        await self.session.execute(
+            update(WorldEntry)
+            .where(WorldEntry.source_scene_version_id == version_id)
+            .values(canon_status="invalidated")
+        )
+
+    async def _mark_later_scenes_stale(
+        self,
+        scene: Scene,
+    ) -> tuple[list[Scene], str]:
+        position_result = await self.session.execute(
+            select(Chapter, Volume)
+            .join(Volume, Chapter.volume_id == Volume.id)
+            .where(Chapter.id == scene.chapter_id)
+        )
+        chapter, volume = position_result.one()
+        later_result = await self.session.execute(
+            select(Scene)
+            .join(Chapter, Scene.chapter_id == Chapter.id)
+            .join(Volume, Chapter.volume_id == Volume.id)
+            .where(
+                Volume.project_id == volume.project_id,
+                or_(
+                    Volume.sequence_no > volume.sequence_no,
+                    and_(
+                        Volume.sequence_no == volume.sequence_no,
+                        Chapter.sequence_no > chapter.sequence_no,
+                    ),
+                    and_(
+                        Volume.sequence_no == volume.sequence_no,
+                        Chapter.sequence_no == chapter.sequence_no,
+                        Scene.sequence_no > scene.sequence_no,
+                    ),
+                ),
+            )
+        )
+        later_scenes = list(later_result.scalars().all())
+        for later_scene in later_scenes:
+            later_scene.is_stale = True
+        return later_scenes, volume.project_id
+
+    async def list_impact_reports(self, project_id: str) -> list[ImpactReport]:
+        await ProjectService(self.session).get(project_id)
+        result = await self.session.execute(
+            select(ImpactReport)
+            .where(ImpactReport.project_id == project_id)
+            .order_by(ImpactReport.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def update_impact_report(self, report_id: str, status: str) -> ImpactReport:
+        report = await self.session.get(ImpactReport, report_id)
+        if report is None:
+            raise NotFoundError("impact report not found", {"report_id": report_id})
+        report.status = status
+        await self.session.commit()
+        await self.session.refresh(report)
+        return report
+
+    async def clear_scene_stale(self, scene_id: str) -> Scene:
+        scene = await self.get_scene(scene_id)
+        scene.is_stale = False
         await self.session.commit()
         await self.session.refresh(scene)
         return scene

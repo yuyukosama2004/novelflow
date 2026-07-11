@@ -244,11 +244,23 @@ def test_non_blocking_issue_does_not_require_override(
     assert approved.status_code == 200
 
 
-def test_replacing_an_existing_approved_version_is_not_ready(
+def test_replacing_an_existing_approved_version_marks_later_scenes_stale(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _, scene = create_story(client)
+    chapter, prior_scene = create_story(client)
+    scene = response_data(
+        client.post(
+            f"/api/chapters/{chapter['id']}/scenes",
+            json={"sequence_no": 2, "title": "Source scene"},
+        )
+    )
+    later_scene = response_data(
+        client.post(
+            f"/api/chapters/{chapter['id']}/scenes",
+            json={"sequence_no": 3, "title": "Later scene"},
+        )
+    )
     first = create_version(client, scene["id"], "First.")
     review_version(client, monkeypatch, first["id"], NoIssueReviewer)
     response_data(
@@ -260,10 +272,24 @@ def test_replacing_an_existing_approved_version_is_not_ready(
 
     second = create_version(client, scene["id"], "Second.")
     review_version(client, monkeypatch, second["id"], NoIssueReviewer)
-    replacement = client.post(
-        f"/api/scenes/{scene['id']}/approve-version",
-        json={"version_id": second["id"]},
+    replacement = response_data(
+        client.post(
+            f"/api/scenes/{scene['id']}/approve-version",
+            json={"version_id": second["id"]},
+        )
     )
+    refreshed_first = response_data(client.get(f"/api/scene-versions/{first['id']}"))
+    refreshed_later = response_data(client.get(f"/api/scenes/{later_scene['id']}"))
+    refreshed_prior = response_data(client.get(f"/api/scenes/{prior_scene['id']}"))
+    project = response_data(client.get("/api/projects"))[0]
+    reports = response_data(client.get(f"/api/projects/{project['id']}/impact-reports"))
 
-    assert replacement.status_code == 409
-    assert approval_reason(replacement) == "HISTORICAL_REPLACEMENT_NOT_READY"
+    assert replacement["approved_version_id"] == second["id"]
+    assert refreshed_first["superseded_by_version_id"] == second["id"]
+    assert refreshed_first["superseded_at"] is not None
+    assert refreshed_later["is_stale"] is True
+    assert refreshed_prior["is_stale"] is False
+    assert reports[0]["affected_scene_ids_json"] == [later_scene["id"]]
+
+    cleared = response_data(client.post(f"/api/scenes/{later_scene['id']}/clear-stale"))
+    assert cleared["is_stale"] is False

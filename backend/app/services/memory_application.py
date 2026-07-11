@@ -102,6 +102,7 @@ class CharacterStateHandler:
                 CharacterState(
                     character_id=character_id,
                     source_scene_version_id=candidate.scene_version_id,
+                    source_candidate_id=candidate.id,
                     **values,
                 )
             )
@@ -144,6 +145,7 @@ class CharacterKnowledgeHandler:
                     character_id=character_id,
                     fact_key=content.fact_key,
                     learned_at_scene_version_id=candidate.scene_version_id,
+                    source_candidate_id=candidate.id,
                     **values,
                 )
             )
@@ -186,6 +188,7 @@ class TimelineEventHandler:
                     event_text=content.event_text,
                     timeline_order=metadata.timeline_order,
                     affected_character_ids=content.affected_character_ids,
+                    source_candidate_id=candidate.id,
                 )
             )
             return
@@ -230,6 +233,8 @@ class RelationshipChangeHandler:
                     description=content.description,
                     timeline_info=content.timeline_info,
                     status="active",
+                    source_scene_version_id=candidate.scene_version_id,
+                    source_candidate_id=candidate.id,
                 )
             )
             return
@@ -262,6 +267,8 @@ class WorldFactUpdateHandler:
                 changed = True
         if changed:
             entry.version += 1
+        entry.source_scene_version_id = candidate.scene_version_id
+        entry.source_candidate_id = candidate.id
 
 
 HANDLERS: dict[str, MemoryHandler] = {
