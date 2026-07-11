@@ -157,7 +157,13 @@ export const apiClient = {
     ),
   createScene: (
     chapterId: string,
-    payload: { sequence_no: number; title: string },
+    payload: {
+      sequence_no: number;
+      title: string;
+      pov_character_id?: string | null;
+      goal?: string;
+      ending_hook?: string;
+    },
   ) =>
     unwrap<Scene>(
       api.post(`/chapters/${chapterId}/scenes`, payload),

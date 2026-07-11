@@ -13,7 +13,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { API_BASE_URL, apiClient } from '../../api/client';
 import { IconButton } from '../../components/IconButton';
@@ -44,6 +44,8 @@ function nextSequence<T extends { sequence_no: number }>(items: T[] | undefined)
 
 export function WorkspacePage() {
   const { projectId = '' } = useParams();
+  const [searchParams] = useSearchParams();
+  const isQuickEntry = searchParams.get('entry') === 'quick';
   const queryClient = useQueryClient();
   const [selectedVolumeId, setSelectedVolumeId] = useState<string>('');
   const [selectedChapterId, setSelectedChapterId] = useState<string>('');
@@ -216,8 +218,21 @@ export function WorkspacePage() {
         setPendingSceneVersionId(version.id);
       }
       queryClient.invalidateQueries({ queryKey: ['scene-versions', selectedSceneId] });
+      if (version?.id && isQuickEntry) {
+        void apiClient
+          .runReview(version.id, modelProfileId || undefined)
+          .then(() => {
+            queryClient.invalidateQueries({
+              queryKey: ['scene-versions', selectedSceneId],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ['review-runs', version.id],
+            });
+          })
+          .catch(() => undefined);
+      }
     },
-    [queryClient, selectedSceneId],
+    [isQuickEntry, modelProfileId, queryClient, selectedSceneId],
   );
 
   const invalidateAll = () => {

@@ -47,6 +47,12 @@ export function ProjectListView({
           <StatusPill tone={health?.database === 'ok' ? 'ok' : 'warn'}>
             {health?.database === 'ok' ? `API ${health.version}` : 'API 未连接'}
           </StatusPill>
+          <Link
+            to="/quick"
+            className="ml-3 rounded-md bg-emerald-700 px-3 py-2 text-sm text-white"
+          >
+            快速创作
+          </Link>
         </div>
       </header>
 
