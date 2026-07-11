@@ -125,6 +125,45 @@ describe('SceneEditor approval gate', () => {
     });
   });
 
+  it('normalizes legacy HTML before loading and saving a version', async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([
+      {
+        ...version('not_reviewed'),
+        content_markdown: '<p><strong>重点</strong><br>下一行</p>',
+      },
+    ]);
+    renderWithQuery(<SceneEditor scene={scene} />);
+
+    await waitFor(() => {
+      expect(editorMock.commands.setContent).toHaveBeenCalledWith(
+        {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: '重点', marks: [{ type: 'bold' }] },
+                { type: 'hardBreak' },
+                { type: 'text', text: '下一行', marks: [] },
+              ],
+            },
+          ],
+        },
+        false,
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '保存版本' }));
+
+    await waitFor(() => {
+      expect(apiClient.createVersion).toHaveBeenCalledWith(scene.id, {
+        content_markdown: '**重点**  \n下一行',
+        summary: scene.title,
+        source_type: 'human_revised',
+      });
+    });
+  });
+
   it('guides an unreviewed version through review before approval', async () => {
     vi.mocked(apiClient.listVersions).mockResolvedValue([
       version('not_reviewed'),

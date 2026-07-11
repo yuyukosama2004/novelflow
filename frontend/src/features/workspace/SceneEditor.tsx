@@ -10,6 +10,7 @@ import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
 import type { Scene, SceneVersion } from '../../types/entities';
 import { label, SOURCE_TYPE_LABELS } from '../../utils/enumLabels';
+import { RichTextCodec, RichTextCodecError } from '../../utils/richTextCodec';
 
 interface SceneEditorProps {
   scene: Scene | null;
@@ -65,6 +66,20 @@ function approvalFailureMessage(reason: string | undefined): string {
   return '批准失败，请刷新后重试。';
 }
 
+function codecFailureMessage(error: unknown): string {
+  return error instanceof RichTextCodecError
+    ? error.message
+    : '正文格式转换失败，请检查内容后重试。';
+}
+
+function contentPreview(value: string): string {
+  try {
+    return RichTextCodec.toPlaintext(RichTextCodec.toTiptapJson(value)).slice(0, 80);
+  } catch {
+    return value.replace(/<[^>]+>/g, '').slice(0, 80);
+  }
+}
+
 export function SceneEditor({
   scene,
   onVersionCreated,
@@ -77,6 +92,7 @@ export function SceneEditor({
     'idle' | 'saving' | 'saved' | 'error'
   >('idle');
   const [approvalMessage, setApprovalMessage] = useState('');
+  const [codecMessage, setCodecMessage] = useState('');
 
   const versions = useQuery({
     queryKey: ['scene-versions', scene?.id],
@@ -94,9 +110,15 @@ export function SceneEditor({
       },
     },
     onUpdate: ({ editor: activeEditor }) => {
-      setContent(activeEditor.getHTML());
-      setDirty(true);
-      setSaveState('idle');
+      try {
+        setContent(RichTextCodec.toMarkdown(activeEditor.getJSON()));
+        setCodecMessage('');
+        setDirty(true);
+        setSaveState('idle');
+      } catch (error) {
+        setCodecMessage(codecFailureMessage(error));
+        setSaveState('error');
+      }
     },
   });
 
@@ -106,10 +128,19 @@ export function SceneEditor({
   );
 
   useEffect(() => {
-    setContent(selectedContent);
-    setDirty(false);
-    setSaveState('idle');
-    editor?.commands.setContent(selectedContent, false);
+    try {
+      const document = RichTextCodec.toTiptapJson(selectedContent);
+      setContent(RichTextCodec.toMarkdown(document));
+      setCodecMessage('');
+      setDirty(false);
+      setSaveState('idle');
+      editor?.commands.setContent(document, false);
+    } catch (error) {
+      setContent('');
+      setCodecMessage(codecFailureMessage(error));
+      setDirty(false);
+      setSaveState('error');
+    }
   }, [editor, selectedContent]);
 
   const createVersion = useMutation({
@@ -271,6 +302,12 @@ export function SceneEditor({
 
       <EditorContent editor={editor} />
 
+      {codecMessage ? (
+        <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {codecMessage}
+        </p>
+      ) : null}
+
       <div className="mt-4 rounded-md border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
           <h3 className="text-sm font-semibold text-slate-900">版本历史</h3>
@@ -308,9 +345,7 @@ export function SceneEditor({
                 </div>
                 <p className="mt-1 truncate text-xs text-slate-500">
                   {version.summary ||
-                    version.content_markdown
-                      .replace(/<[^>]+>/g, '')
-                      .slice(0, 80)}
+                    contentPreview(version.content_markdown)}
                 </p>
               </div>
               <IconButton
