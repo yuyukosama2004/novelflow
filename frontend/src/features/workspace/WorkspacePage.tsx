@@ -31,6 +31,10 @@ import {
 } from './sceneVersionSelection';
 import ContextChecker from './ContextChecker';
 import SceneGenerationPanel from '../workflows/SceneGenerationPanel';
+import {
+  WorkspacePanelTabs,
+  type WorkspacePanelTab,
+} from './WorkspacePanelTabs';
 
 function nextSequence<T extends { sequence_no: number }>(items: T[] | undefined): number {
   return (items?.reduce((max, item) => Math.max(max, item.sequence_no), 0) ?? 0) + 1;
@@ -65,8 +69,9 @@ export function WorkspacePage() {
   const [editingChapterTitle, setEditingChapterTitle] = useState('');
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [editingSceneTitle, setEditingSceneTitle] = useState('');
-  const [showSettings, setShowSettings] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const [modelProfileId, setModelProfileId] = useState('');
+  const [rightTab, setRightTab] = useState<WorkspacePanelTab>('ai');
 
   // ── 数据查询 ──
   const project = useQuery({
@@ -933,24 +938,24 @@ export function WorkspacePage() {
         </div>
 
         {/* ── 右侧栏：当前场景版本工具 ── */}
-        <aside className="space-y-4">
-          <SceneVersionSelector
-            versions={sceneVersions.data ?? []}
-            approvedVersionId={scene.data?.approved_version_id ?? null}
-            selectedVersionId={selectedSceneVersionId || null}
-            onSelect={handleVersionSelectionChange}
-          />
-          <SceneGenerationPanel
-            sceneId={selectedSceneId}
-            modelProfileId={modelProfileId}
-            onVersionCreated={handleVersionCreated}
-          />
-          <SceneCardEditor
-            scene={scene.data ?? null}
-            characters={characters.data}
-            worldEntries={worldEntries.data}
-          />
-          {impactReports.data?.filter((report) => report.status === 'open').map((report) => (
+        <aside className="min-w-0 space-y-3">
+          <WorkspacePanelTabs value={rightTab} onChange={setRightTab} />
+
+          {rightTab === 'ai' ? (
+            <SceneGenerationPanel
+              sceneId={selectedSceneId}
+              modelProfileId={modelProfileId}
+              onVersionCreated={handleVersionCreated}
+            />
+          ) : null}
+
+          {rightTab === 'review' ? (
+            <>
+              <ReviewIssuePanel
+                sceneVersionId={selectedSceneVersionId}
+                modelProfileId={modelProfileId}
+              />
+              {impactReports.data?.filter((report) => report.status === 'open').map((report) => (
             <section
               key={report.id}
               className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
@@ -967,18 +972,38 @@ export function WorkspacePage() {
                 已查看影响
               </button>
             </section>
-          ))}
-          <ContextChecker sceneId={selectedSceneId} />
-          <ReviewIssuePanel
-            sceneVersionId={selectedSceneVersionId}
-            modelProfileId={modelProfileId}
-          />
-          <MemoryCandidatePanel
-            sceneId={selectedSceneId}
-            sceneVersionId={selectedSceneVersionId}
-            approvedVersionId={scene.data?.approved_version_id ?? null}
-            modelProfileId={modelProfileId}
-          />
+              ))}
+            </>
+          ) : null}
+
+          {rightTab === 'memory' ? (
+            <MemoryCandidatePanel
+              sceneId={selectedSceneId}
+              sceneVersionId={selectedSceneVersionId}
+              approvedVersionId={scene.data?.approved_version_id ?? null}
+              modelProfileId={modelProfileId}
+            />
+          ) : null}
+
+          {rightTab === 'history' ? (
+            <SceneVersionSelector
+              versions={sceneVersions.data ?? []}
+              approvedVersionId={scene.data?.approved_version_id ?? null}
+              selectedVersionId={selectedSceneVersionId || null}
+              onSelect={handleVersionSelectionChange}
+            />
+          ) : null}
+
+          {rightTab === 'advanced' ? (
+            <div className="space-y-3">
+              <SceneCardEditor
+                scene={scene.data ?? null}
+                characters={characters.data}
+                worldEntries={worldEntries.data}
+              />
+              <ContextChecker sceneId={selectedSceneId} />
+            </div>
+          ) : null}
         </aside>
       </div>
     </main>
