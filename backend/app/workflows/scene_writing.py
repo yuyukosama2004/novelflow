@@ -79,8 +79,9 @@ class SceneWritingWorkflow:
 
         except Exception as exc:
             self.state.status = "error"
-            self.state.error = str(exc)
-            yield self._event("error", {"error": str(exc)})
+            logger.exception("scene writing workflow failed", exc_info=exc)
+            self.state.error = "生成任务执行失败"
+            yield self._event("error", {"error": "生成失败，请稍后重试"})
             return
 
         yield self._event("workflow_complete", {"status": self.state.status})
@@ -135,6 +136,7 @@ class SceneWritingWorkflow:
 
     def _event(self, event_type: str, data: dict[str, Any]) -> dict:
         event = {
+            "event_id": len(self.state.events) + 1,
             "run_id": self.state.run_id,
             "event": event_type,
             "status": self.state.status,

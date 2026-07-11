@@ -130,6 +130,21 @@ export interface SceneWorkingDraft {
   updated_at: string | null;
 }
 
+export interface WorkflowRun extends EntityBase {
+  scene_id: string;
+  model_profile_id: string | null;
+  provider: string;
+  model: string;
+  run_type: string;
+  status: string;
+  plan: string;
+  draft: string;
+  final_content: string;
+  error: string;
+  version_created_id: string | null;
+  events_json: Record<string, unknown>[];
+}
+
 export interface SceneContextLinks {
   character_ids: string[];
   world_entry_ids: string[];

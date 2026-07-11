@@ -8,9 +8,11 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ConflictError
+from app.core.exceptions import ConflictError, NotFoundError
+from app.core.responses import success
 from app.database.session import get_session
 from app.llm.router import LLMRouter
 from app.models.workflow import WorkflowRun
@@ -105,6 +107,7 @@ class WorkflowRunOut(BaseModel):
     final_content: str
     error: str
     version_created_id: str | None
+    events_json: list[dict]
 
     model_config = {"from_attributes": True}
 
@@ -120,13 +123,43 @@ async def get_workflow_run(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Query a workflow run by ID."""
-    from app.core.responses import success
-
     run = await session.get(WorkflowRun, run_id)
     if run is None:
         from app.core.exceptions import NotFoundError
 
         raise NotFoundError("workflow run not found", {"run_id": run_id})
+    return success(WorkflowRunOut.model_validate(run), request)
+
+
+@router.get("/scenes/{scene_id}/workflow-runs")
+async def list_scene_workflow_runs(
+    scene_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    await ManuscriptService(session).get_scene(scene_id)
+    result = await session.execute(
+        select(WorkflowRun).where(WorkflowRun.scene_id == scene_id).order_by(WorkflowRun.created_at.desc())
+    )
+    return success(
+        [WorkflowRunOut.model_validate(run) for run in result.scalars().all()],
+        request,
+    )
+
+
+@router.post("/workflows/runs/{run_id}/cancel")
+async def cancel_workflow_run(
+    run_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    run = await session.get(WorkflowRun, run_id)
+    if run is None:
+        raise NotFoundError("workflow run not found", {"run_id": run_id})
+    if run.status in {"pending", "planning", "drafting"}:
+        run.status = "cancelled"
+        run.error = "用户已取消生成"
+        await session.commit()
     return success(WorkflowRunOut.model_validate(run), request)
 
 
@@ -184,7 +217,14 @@ async def generate_scene_stream(
         context_manifest_json=ctx.manifest,
     )
     session.add(wf_run)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise ConflictError(
+            "此场景已有正在进行的生成任务，请等待完成或取消后再试",
+            {"reason": "ACTIVE_WORKFLOW_EXISTS", "scene_id": scene_id},
+        ) from None
 
     state = WorkflowState(
         scene_id=scene_id,
@@ -201,6 +241,10 @@ async def generate_scene_stream(
     async def stream():  # type: ignore[no-untyped-def]
         try:
             async for event in workflow.run():
+                await session.refresh(wf_run)
+                if wf_run.status == "cancelled":
+                    state.status = "cancelled"
+                    break
                 # Update persisted run
                 wf_run.status = state.status
                 wf_run.plan = state.plan
@@ -210,7 +254,7 @@ async def generate_scene_stream(
                 wf_run.error = state.error
                 await session.commit()
 
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                yield (f"id: {event['event_id']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n")
 
             # A successful generation remains a draft awaiting explicit approval.
             if state.status == "waiting_review" and state.draft.strip():
@@ -238,22 +282,34 @@ async def generate_scene_stream(
                 await session.commit()
 
                 done_data = {
+                    "event_id": len(state.events) + 1,
                     "run_id": run_id,
                     "event": "version_created",
                     "status": "waiting_review",
                     "version": SceneVersionRead.model_validate(version).model_dump(mode="json"),
                 }
-                yield ("data: " + json.dumps(done_data, ensure_ascii=False) + "\n\n")
+                state.events.append(done_data)
+                wf_run.events_json = state.events
+                await session.commit()
+                yield (
+                    f"id: {done_data['event_id']}\n"
+                    "data: " + json.dumps(done_data, ensure_ascii=False) + "\n\n"
+                )
         except asyncio.CancelledError:
             wf_run.status = "cancelled"
             wf_run.error = "client cancelled generation"
             await session.commit()
             raise
-        except Exception as exc:
+        except Exception:
             wf_run.status = "error"
-            wf_run.error = str(exc)
+            wf_run.error = "生成任务执行失败"
             await session.commit()
-            error_data = {"run_id": run_id, "event": "error", "error": str(exc)}
+            error_data = {
+                "event_id": len(state.events) + 1,
+                "run_id": run_id,
+                "event": "error",
+                "error": "生成失败，请稍后重试",
+            }
             yield ("data: " + json.dumps(error_data, ensure_ascii=False) + "\n\n")
         finally:
             yield "data: [DONE]\n\n"

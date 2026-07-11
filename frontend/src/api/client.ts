@@ -26,6 +26,7 @@ import type {
   StoryCandidateEntity,
   Volume,
   WorldEntry,
+  WorkflowRun,
 } from "../types/entities";
 
 interface ApiEnvelope<T> {
@@ -196,6 +197,10 @@ export const apiClient = {
     unwrap<ImpactReport[]>(api.get(`/projects/${projectId}/impact-reports`)),
   updateImpactReport: (reportId: string, status: 'acknowledged' | 'resolved') =>
     unwrap<ImpactReport>(api.patch(`/impact-reports/${reportId}`, { status })),
+  listWorkflowRuns: (sceneId: string) =>
+    unwrap<WorkflowRun[]>(api.get(`/scenes/${sceneId}/workflow-runs`)),
+  cancelWorkflowRun: (runId: string) =>
+    unwrap<WorkflowRun>(api.post(`/workflows/runs/${runId}/cancel`)),
 
   listVersions: (sceneId: string) =>
     unwrap<SceneVersion[]>(

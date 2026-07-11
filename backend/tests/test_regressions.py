@@ -10,6 +10,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api import workflows as workflow_api
@@ -21,6 +22,7 @@ from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
 from app.models.memory import MemoryCandidate
 from app.models.project import NovelProject
+from app.models.workflow import WorkflowRun
 from app.services.context_builder import ContextBuilder
 from app.services.structured_output import generate_json_array
 from app.workflows.scene_writing import SceneWritingWorkflow, WorkflowState
@@ -155,6 +157,7 @@ async def test_workflow_error_is_not_overwritten_as_done() -> None:
 
     assert state.status == "error"
     assert [event["event"] for event in events] == ["node_start", "error"]
+    assert [event["event_id"] for event in events] == [1, 2]
 
 
 def test_sse_success_creates_unapproved_waiting_review_version(
@@ -178,11 +181,15 @@ def test_sse_success_creates_unapproved_waiting_review_version(
     ]
     version_created = next(e for e in events if e.get("event") == "version_created")
     assert version_created["run_id"] == run_id
+    assert "id: 1" in response.text
 
     run_response = client.get(f"/api/workflows/runs/{run_id}")
     assert run_response.status_code == 200
     run_data = response_data(run_response)
     assert run_data["status"] == "waiting_review"
+    assert run_data["events_json"]
+    listed_runs = response_data(client.get(f"/api/scenes/{scene['id']}/workflow-runs"))
+    assert listed_runs[0]["id"] == run_id
 
     versions = response_data(client.get(f"/api/scenes/{scene['id']}/versions"))
     refreshed_scene = response_data(client.get(f"/api/scenes/{scene['id']}"))
@@ -206,6 +213,21 @@ def test_sse_partial_failure_does_not_create_version(
     assert '"event": "error"' in response.text
     versions = response_data(client.get(f"/api/scenes/{scene['id']}/versions"))
     assert versions == []
+    assert "planned failure" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_database_allows_only_one_active_workflow_per_scene(
+    session: AsyncSession,
+) -> None:
+    _, _, scene, _ = await create_story_graph(session)
+    session.add(WorkflowRun(scene_id=scene.id, status="drafting"))
+    await session.commit()
+    session.add(WorkflowRun(scene_id=scene.id, status="pending"))
+
+    with pytest.raises(IntegrityError):
+        await session.commit()
+    await session.rollback()
 
 
 @pytest.mark.asyncio

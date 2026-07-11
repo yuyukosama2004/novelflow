@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from '@tanstack/react-query';
 
-import { createSSEStream } from "../../api/client";
+import { apiClient, createSSEStream } from "../../api/client";
 import type { SceneVersion } from "../../types/entities";
 
 interface Props {
@@ -19,8 +20,26 @@ export default function SceneGenerationPanel({
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [version, setVersion] = useState<SceneVersion | null>(null);
+  const [runId, setRunId] = useState('');
   const controllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLPreElement>(null);
+  const runs = useQuery({
+    queryKey: ['workflow-runs', sceneId],
+    queryFn: () => apiClient.listWorkflowRuns(sceneId),
+    enabled: Boolean(sceneId),
+  });
+
+  useEffect(() => {
+    const latest = runs.data?.[0];
+    if (!latest) return;
+    setRunId(latest.id);
+    setContent(latest.draft || latest.final_content);
+    setGenerating(['pending', 'planning', 'drafting'].includes(latest.status));
+    setDone(['waiting_review', 'done'].includes(latest.status));
+    if (latest.status === 'error' || latest.status === 'cancelled') {
+      setError(latest.error || '生成任务未完成');
+    }
+  }, [runs.data]);
 
   useEffect(() => {
     if (contentRef.current) {
@@ -39,6 +58,7 @@ export default function SceneGenerationPanel({
       sceneId,
       modelProfileId,
       (data) => {
+        if (data.run_id) setRunId(data.run_id);
         if (data.error) {
           setError(data.error);
           setGenerating(false);
@@ -65,7 +85,9 @@ export default function SceneGenerationPanel({
 
   function handleCancel() {
     controllerRef.current?.abort();
+    if (runId) void apiClient.cancelWorkflowRun(runId);
     setGenerating(false);
+    setError('用户已取消生成');
   }
 
   return (

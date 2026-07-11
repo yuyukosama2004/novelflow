@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, String, Text
+from sqlalchemy import JSON, ForeignKey, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -10,6 +10,14 @@ from app.models.base import Base, TimestampMixin, UUIDMixin
 
 class WorkflowRun(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "workflow_runs"
+    __table_args__ = (
+        Index(
+            "uq_workflow_active_scene",
+            "scene_id",
+            unique=True,
+            sqlite_where=text("status IN ('pending', 'planning', 'drafting')"),
+        ),
+    )
 
     scene_id: Mapped[str] = mapped_column(ForeignKey("scenes.id"), index=True)
     model_profile_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
