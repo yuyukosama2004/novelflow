@@ -22,6 +22,8 @@ interface SceneEditorProps {
   scene: Scene | null;
   onVersionCreated?: (version: SceneVersion) => void;
   modelProfileId?: string;
+  targetWordCount?: number;
+  onContentChange?: (content: string) => void;
 }
 
 function selectInitialContent(
@@ -110,6 +112,8 @@ export function SceneEditor({
   scene,
   onVersionCreated,
   modelProfileId = "",
+  targetWordCount = 1000,
+  onContentChange,
 }: SceneEditorProps) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState("");
@@ -153,6 +157,7 @@ export function SceneEditor({
         const document = activeEditor.getJSON() as RichTextNode;
         const markdown = RichTextCodec.toMarkdown(document);
         setContent(markdown);
+        onContentChange?.(markdown);
         contentRef.current = markdown;
         setContentJson(document);
         setCodecMessage("");
@@ -195,6 +200,7 @@ export function SceneEditor({
           : RichTextCodec.toTiptapJson(selectedContent);
       const markdown = RichTextCodec.toMarkdown(document);
       setContent(markdown);
+      onContentChange?.(markdown);
       contentRef.current = markdown;
       setContentJson(document);
       draftRevisionRef.current = draft?.revision ?? 0;
@@ -206,6 +212,7 @@ export function SceneEditor({
       initializedSceneRef.current = scene.id;
     } catch (error) {
       setContent("");
+      onContentChange?.("");
       contentRef.current = "";
       setCodecMessage(codecFailureMessage(error));
       setDirty(false);
@@ -214,6 +221,7 @@ export function SceneEditor({
     }
   }, [
     editor,
+    onContentChange,
     scene?.id,
     selectedContent,
     versions.isLoading,
@@ -429,6 +437,12 @@ export function SceneEditor({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">{wordCount} 字</span>
+          <span className="text-xs text-slate-400">
+            目标 {targetWordCount} 字
+            {wordCount < targetWordCount
+              ? `（还差 ${targetWordCount - wordCount}）`
+              : "（已达目标）"}
+          </span>
           <StatusPill
             tone={
               saveState === "error"

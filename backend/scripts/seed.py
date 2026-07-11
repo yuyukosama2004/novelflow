@@ -44,7 +44,7 @@ async def main() -> None:
             summary="一名调查记者与刑警在旧案阴影中追查真相。",
             genre="悬疑",
             theme_json={"themes": ["真相", "信任", "隐瞒"]},
-            pov_type="第三人称限知",
+            pov_type="third_person_limited",
             tone="克制、现实",
             status="active",
         )

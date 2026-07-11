@@ -25,6 +25,7 @@ class WorkflowState:
     error: str = ""
     provider: str = "deepseek"
     model: str = ""
+    max_output_tokens: int = 4096
     prompt_snapshot: dict = field(default_factory=dict)
     context_manifest: dict = field(default_factory=dict)
     run_id: str = ""
@@ -120,7 +121,7 @@ class SceneWritingWorkflow:
                 LLMMessage(role="user", content=full_prompt),
             ],
             model=self.state.model,
-            max_tokens=4096,
+            max_tokens=self.state.max_output_tokens,
             temperature=0.8,
         )
         async for chunk in self.llm.stream_generate(draft_request, self.state.provider):

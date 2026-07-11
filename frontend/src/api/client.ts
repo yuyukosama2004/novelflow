@@ -66,6 +66,10 @@ export const apiClient = {
       summary?: string;
       genre?: string;
       tone?: string;
+      pov_type?: string;
+      writing_style_preset?: string;
+      writing_style_custom?: string;
+      default_scene_word_count?: number;
       default_model_profile_id?: string | null;
     },
   ) => unwrap<NovelProject>(api.patch(`/projects/${projectId}`, payload)),
@@ -416,7 +420,13 @@ export const apiClient = {
 
 export function createSSEStream(
   sceneId: string,
-  modelProfileId: string,
+  payload: {
+    modelProfileId?: string;
+    generationMode: "new" | "rewrite" | "polish";
+    instruction: string;
+    baseContent: string;
+    targetWordCount: number;
+  },
   onChunk: (data: {
     run_id: string;
     content_delta: string;
@@ -431,7 +441,13 @@ export function createSSEStream(
   fetch(`${API_BASE_URL}/scenes/${sceneId}/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model_profile_id: modelProfileId || null }),
+    body: JSON.stringify({
+      model_profile_id: payload.modelProfileId || null,
+      generation_mode: payload.generationMode,
+      instruction: payload.instruction,
+      base_content: payload.baseContent,
+      target_word_count: payload.targetWordCount,
+    }),
     signal: controller.signal,
   })
     .then(async (response) => {

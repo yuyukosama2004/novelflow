@@ -12,6 +12,9 @@ export interface NovelProject extends EntityBase {
   target_word_count: number | null;
   pov_type: string;
   tone: string;
+  writing_style_preset: string;
+  writing_style_custom: string;
+  default_scene_word_count: number;
   status: string;
   language: string;
   current_timeline_position: number;

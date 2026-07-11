@@ -34,7 +34,7 @@ def test_project_to_scene_version_export_flow(
             json={
                 "title": "雨夜档案",
                 "genre": "悬疑",
-                "pov_type": "第三人称限知",
+                "pov_type": "third_person_limited",
                 "tone": "克制",
             },
         )

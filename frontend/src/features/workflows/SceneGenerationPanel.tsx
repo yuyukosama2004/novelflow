@@ -7,12 +7,16 @@ import type { SceneVersion } from "../../types/entities";
 interface Props {
   sceneId: string;
   modelProfileId?: string;
+  defaultTargetWordCount?: number;
+  baseContent?: string;
   onVersionCreated?: (version: SceneVersion) => void;
 }
 
 export default function SceneGenerationPanel({
   sceneId,
   modelProfileId = "",
+  defaultTargetWordCount = 1000,
+  baseContent = "",
   onVersionCreated,
 }: Props) {
   const [generating, setGenerating] = useState(false);
@@ -21,6 +25,13 @@ export default function SceneGenerationPanel({
   const [done, setDone] = useState(false);
   const [version, setVersion] = useState<SceneVersion | null>(null);
   const [runId, setRunId] = useState("");
+  const [generationMode, setGenerationMode] = useState<
+    "new" | "rewrite" | "polish"
+  >("new");
+  const [instruction, setInstruction] = useState("");
+  const [targetWordCount, setTargetWordCount] = useState(
+    defaultTargetWordCount,
+  );
   const controllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLPreElement>(null);
   const runs = useQuery({
@@ -42,6 +53,10 @@ export default function SceneGenerationPanel({
   }, [runs.data]);
 
   useEffect(() => {
+    setTargetWordCount(defaultTargetWordCount);
+  }, [defaultTargetWordCount, sceneId]);
+
+  useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
@@ -56,7 +71,13 @@ export default function SceneGenerationPanel({
 
     controllerRef.current = createSSEStream(
       sceneId,
-      modelProfileId,
+      {
+        modelProfileId,
+        generationMode,
+        instruction,
+        baseContent,
+        targetWordCount,
+      },
       (data) => {
         if (data.run_id) setRunId(data.run_id);
         if (data.error) {
@@ -94,12 +115,13 @@ export default function SceneGenerationPanel({
     <div className="flex flex-col gap-3 h-full">
       <div className="flex items-center gap-2">
         <h3 className="text-sm font-semibold text-gray-700">AI 场景生成</h3>
-        {!generating && !done && (
+        {!generating && (
           <button
             onClick={handleGenerate}
+            disabled={generationMode !== "new" && !baseContent.trim()}
             className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
           >
-            生成
+            {done ? "重新生成" : "生成"}
           </button>
         )}
         {generating && (
@@ -118,6 +140,58 @@ export default function SceneGenerationPanel({
       {error && (
         <div className="p-2 bg-red-50 text-red-700 text-xs rounded border border-red-200">
           {error}
+        </div>
+      )}
+
+      {!generating && (
+        <div className="space-y-2 rounded border border-slate-200 bg-white p-2 text-xs">
+          <label className="block">
+            <span className="font-medium text-slate-600">生成方式</span>
+            <select
+              value={generationMode}
+              onChange={(event) =>
+                setGenerationMode(
+                  event.target.value as "new" | "rewrite" | "polish",
+                )
+              }
+              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+            >
+              <option value="new">按场景卡全新生成</option>
+              <option value="rewrite">根据当前正文全文重写</option>
+              <option value="polish">润色当前正文，不改剧情</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="font-medium text-slate-600">本次目标字数</span>
+            <input
+              type="number"
+              min="300"
+              max="10000"
+              step="100"
+              value={targetWordCount}
+              onChange={(event) =>
+                setTargetWordCount(Number(event.target.value))
+              }
+              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+            />
+          </label>
+          <label className="block">
+            <span className="font-medium text-slate-600">
+              本次修改要求（可选）
+            </span>
+            <textarea
+              value={instruction}
+              onChange={(event) => setInstruction(event.target.value)}
+              rows={3}
+              placeholder="例如：减少血腥描写，加强两人初次见面的戒备感。"
+              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+            />
+          </label>
+          {generationMode !== "new" && !baseContent.trim() ? (
+            <p className="text-amber-700">
+              请先在正文编辑器中保留需要处理的内容。
+            </p>
+          ) : null}
         </div>
       )}
 

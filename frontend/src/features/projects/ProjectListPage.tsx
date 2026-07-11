@@ -179,7 +179,7 @@ export function ProjectListPage() {
         genre,
         status: "active",
         language: "zh-CN",
-        pov_type: "第三人称限知",
+        pov_type: "third_person_limited",
         tone: "克制、现实",
       }),
     onSuccess: (data) => {

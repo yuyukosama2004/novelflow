@@ -31,6 +31,7 @@ import { ReviewIssuePanel } from "./ReviewIssuePanel";
 import { SceneCardEditor } from "./SceneCardEditor";
 import { SceneEditor } from "./SceneEditor";
 import { WritingAssistant } from "./WritingAssistant";
+import { WritingSettingsPanel } from "./WritingSettingsPanel";
 import { SceneVersionSelector } from "./SceneVersionSelector";
 import {
   getDefaultSceneVersionId,
@@ -99,6 +100,7 @@ export function WorkspacePage() {
     "relaxed",
   );
   const [writingWidth, setWritingWidth] = useState<"narrow" | "wide">("wide");
+  const [editorContent, setEditorContent] = useState("");
 
   // ── 数据查询 ──
   const project = useQuery({
@@ -1108,6 +1110,8 @@ export function WorkspacePage() {
             scene={scene.data ?? null}
             onVersionCreated={handleVersionCreated}
             modelProfileId={modelProfileId}
+            targetWordCount={project.data?.default_scene_word_count ?? 1000}
+            onContentChange={setEditorContent}
           />
         </div>
 
@@ -1119,6 +1123,10 @@ export function WorkspacePage() {
             <SceneGenerationPanel
               sceneId={selectedSceneId}
               modelProfileId={modelProfileId}
+              defaultTargetWordCount={
+                project.data?.default_scene_word_count ?? 1000
+              }
+              baseContent={editorContent}
               onVersionCreated={handleVersionCreated}
             />
           ) : null}
@@ -1173,6 +1181,7 @@ export function WorkspacePage() {
 
           {rightTab === "advanced" ? (
             <div className="space-y-3">
+              <WritingSettingsPanel project={project.data ?? null} />
               <SceneCardEditor
                 scene={scene.data ?? null}
                 characters={characters.data}

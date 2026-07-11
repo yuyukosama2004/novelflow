@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from math import ceil
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,11 +17,14 @@ from app.core.exceptions import ConflictError, NotFoundError
 from app.core.responses import success
 from app.database.session import get_session
 from app.llm.router import LLMRouter
+from app.models.manuscript import Chapter, Scene, Volume
+from app.models.project import NovelProject
 from app.models.workflow import WorkflowRun
 from app.schemas.manuscript import SceneVersionCreate, SceneVersionRead
-from app.services.context_builder import ContextBuilder
+from app.services.context_builder import ContextBuilder, SceneContext
 from app.services.manuscript_service import ManuscriptService
 from app.services.model_runtime import ModelRuntimeResolver
+from app.services.writing_style import perspective_instruction, writing_style_instruction
 from app.workflows.scene_writing import SceneWritingWorkflow, WorkflowState
 
 router = APIRouter()
@@ -30,16 +35,38 @@ def _summary(content: str, max_len: int = 200) -> str:
     return content[:max_len] + "..." if len(content) > max_len else content
 
 
-def _build_system_prompt() -> str:
-    return (
-        "You are a fiction writer. Write in Chinese. "
-        "Write the scene content based on the scene card and context "
-        "provided below. Follow all constraints. "
-        "Output only the scene narrative text, no meta-commentary."
-    )
+def _build_system_prompt(
+    project: NovelProject,
+    target_word_count: int,
+    generation_mode: str,
+    instruction: str,
+) -> str:
+    mode_instruction = {
+        "new": "从场景卡和上下文创作一篇全新正文。",
+        "rewrite": "根据原稿和作者要求重写完整场景；保留未被作者要求改变的既有事实。",
+        "polish": "润色原稿的语言、节奏和表达；除非作者明确要求，否则不得改变事件、人物关系或信息量。",
+    }[generation_mode]
+    parts = [
+        "你是中文小说作者。只输出完整场景正文，不输出标题、说明、写作计划或元评论。",
+        perspective_instruction(project.pov_type),
+        writing_style_instruction(
+            project.writing_style_preset,
+            project.writing_style_custom,
+        ),
+        f"目标长度：约 {target_word_count} 个汉字，允许上下浮动约 15%。",
+        mode_instruction,
+    ]
+    if instruction.strip():
+        parts.append(f"本次作者要求（优先于文风细节，但不得违反故事硬约束）：{instruction.strip()}")
+    return "\n\n".join(parts)
 
 
-def _build_user_prompt(ctx, scene) -> str:  # type: ignore[no-untyped-def]
+def _build_user_prompt(
+    ctx: SceneContext,
+    scene: Scene,
+    generation_mode: str,
+    base_content: str,
+) -> str:
     parts: list[str] = []
 
     parts.append("## Scene Card")
@@ -90,6 +117,11 @@ def _build_user_prompt(ctx, scene) -> str:  # type: ignore[no-untyped-def]
             if wf.content:
                 parts.append(f"  {wf.content[:200]}")
 
+    if generation_mode in {"rewrite", "polish"}:
+        parts.append("")
+        parts.append("## 原稿")
+        parts.append(base_content.strip() or "（原稿为空，请按场景卡创作完整正文）")
+
     parts.append("")
     parts.append("Write the scene narrative now.")
     return "\n".join(parts)
@@ -114,6 +146,24 @@ class WorkflowRunOut(BaseModel):
 
 class GenerateSceneRequest(BaseModel):
     model_profile_id: str | None = None
+    generation_mode: Literal["new", "rewrite", "polish"] = "new"
+    instruction: str = Field(default="", max_length=2000)
+    base_content: str = Field(default="", max_length=50000)
+    target_word_count: int | None = Field(default=None, ge=300, le=10000)
+
+
+async def _project_for_scene(session: AsyncSession, scene_id: str) -> NovelProject:
+    result = await session.execute(
+        select(NovelProject)
+        .join(Volume, Volume.project_id == NovelProject.id)
+        .join(Chapter, Chapter.volume_id == Volume.id)
+        .join(Scene, Scene.chapter_id == Chapter.id)
+        .where(Scene.id == scene_id)
+    )
+    project = result.scalar_one_or_none()
+    if project is None:
+        raise NotFoundError("project not found for scene", {"scene_id": scene_id})
+    return project
 
 
 @router.get("/workflows/runs/{run_id}")
@@ -173,9 +223,11 @@ async def generate_scene_stream(
     """Stream-generate scene content via the persisted workflow state machine."""
     manuscript = ManuscriptService(session)
     scene = await manuscript.get_scene(scene_id)
+    project = await _project_for_scene(session, scene_id)
+    generation = payload or GenerateSceneRequest()
     runtime = await ModelRuntimeResolver(session).resolve_for_scene(
         scene_id,
-        payload.model_profile_id if payload else None,
+        generation.model_profile_id,
     )
 
     # 并发锁：检查是否有正在运行中的生成任务
@@ -197,8 +249,20 @@ async def generate_scene_stream(
     ctx = await builder.build_for_scene(scene_id)
 
     run_id = getattr(request.state, "request_id", f"run_{scene_id[:8]}")
-    system_prompt = _build_system_prompt()
-    user_prompt = _build_user_prompt(ctx, scene)
+    target_word_count = generation.target_word_count or project.default_scene_word_count
+    system_prompt = _build_system_prompt(
+        project,
+        target_word_count,
+        generation.generation_mode,
+        generation.instruction,
+    )
+    user_prompt = _build_user_prompt(
+        ctx,
+        scene,
+        generation.generation_mode,
+        generation.base_content,
+    )
+    max_output_tokens = min(8192, max(1024, ceil(target_word_count * 1.4)))
     provider = runtime.provider
 
     # Persist workflow run
@@ -213,6 +277,8 @@ async def generate_scene_stream(
         prompt_snapshot_json={
             "system": system_prompt,
             "user": user_prompt,
+            "generation_mode": generation.generation_mode,
+            "target_word_count": target_word_count,
         },
         context_manifest_json=ctx.manifest,
     )
@@ -231,8 +297,14 @@ async def generate_scene_stream(
         scene_title=scene.title,
         provider=provider,
         model=runtime.model,
+        max_output_tokens=max_output_tokens,
         run_id=run_id,
-        prompt_snapshot={"system": system_prompt, "user": user_prompt},
+        prompt_snapshot={
+            "system": system_prompt,
+            "user": user_prompt,
+            "generation_mode": generation.generation_mode,
+            "target_word_count": target_word_count,
+        },
         context_manifest=ctx.manifest,
     )
     llm = runtime.router if runtime.profile_id else LLMRouter()
@@ -270,7 +342,7 @@ async def generate_scene_stream(
                     },
                     content_markdown=state.draft,
                     summary=_summary(state.draft),
-                    source_type="ai_generated",
+                    source_type=("ai_generated" if generation.generation_mode == "new" else "ai_revised"),
                     model_profile_id=runtime.profile_id,
                     prompt_snapshot_json=state.prompt_snapshot,
                     context_manifest_json=state.context_manifest,
