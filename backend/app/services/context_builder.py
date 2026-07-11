@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.character import Character, CharacterKnowledge, CharacterState
-from app.models.manuscript import Chapter, Scene, SceneVersion
+from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
 from app.models.world import WorldEntry
 
 
@@ -76,13 +76,13 @@ class ContextBuilder:
 
         project_id = scene.chapter.volume.project_id
 
-        # Previous scene: same chapter, lower sequence_no, has an approved version
-        prev = await self._prev_scene(scene.chapter_id, scene.sequence_no)
+        # Previous scene follows narrative order across chapters and volumes.
+        prev = await self._prev_scene(scene)
 
         # Characters in this project
         characters = await self._character_cards(
             project_id,
-            scene.timeline_order,
+            scene,
         )
 
         # Approved world entries
@@ -114,15 +114,34 @@ class ContextBuilder:
             manifest=manifest,
         )
 
-    async def _prev_scene(self, chapter_id: str, current_seq: int) -> PreviousScene | None:
+    async def _prev_scene(self, current_scene: Scene) -> PreviousScene | None:
+        current_chapter = current_scene.chapter
+        current_volume = current_chapter.volume
         result = await self.session.execute(
             select(Scene)
+            .join(Chapter, Scene.chapter_id == Chapter.id)
+            .join(Volume, Chapter.volume_id == Volume.id)
             .where(
-                Scene.chapter_id == chapter_id,
-                Scene.sequence_no < current_seq,
+                Volume.project_id == current_volume.project_id,
                 Scene.approved_version_id.isnot(None),
+                or_(
+                    Volume.sequence_no < current_volume.sequence_no,
+                    and_(
+                        Volume.sequence_no == current_volume.sequence_no,
+                        Chapter.sequence_no < current_chapter.sequence_no,
+                    ),
+                    and_(
+                        Volume.sequence_no == current_volume.sequence_no,
+                        Chapter.sequence_no == current_chapter.sequence_no,
+                        Scene.sequence_no < current_scene.sequence_no,
+                    ),
+                ),
             )
-            .order_by(Scene.sequence_no.desc())
+            .order_by(
+                Volume.sequence_no.desc(),
+                Chapter.sequence_no.desc(),
+                Scene.sequence_no.desc(),
+            )
             .limit(1)
         )
         prev_scene = result.scalar_one_or_none()
@@ -145,7 +164,7 @@ class ContextBuilder:
     async def _character_cards(
         self,
         project_id: str,
-        timeline_order: int,
+        current_scene: Scene,
     ) -> list[CharacterCard]:
         result = await self.session.execute(
             select(Character).where(
@@ -157,10 +176,10 @@ class ContextBuilder:
 
         cards: list[CharacterCard] = []
         for ch in characters:
-            state = await self._current_state(ch.id, timeline_order)
+            state = await self._current_state(ch.id, current_scene.story_time_order)
             known, unknown = await self._knowledge_boundaries(
                 ch.id,
-                timeline_order,
+                current_scene,
             )
             cards.append(
                 CharacterCard(
@@ -212,8 +231,10 @@ class ContextBuilder:
     async def _knowledge_boundaries(
         self,
         character_id: str,
-        timeline_order: int,
+        current_scene: Scene,
     ) -> tuple[list[str], list[str]]:
+        current_chapter = current_scene.chapter
+        current_volume = current_chapter.volume
         result = await self.session.execute(
             select(CharacterKnowledge)
             .outerjoin(
@@ -221,11 +242,28 @@ class ContextBuilder:
                 CharacterKnowledge.learned_at_scene_version_id == SceneVersion.id,
             )
             .outerjoin(Scene, SceneVersion.scene_id == Scene.id)
+            .outerjoin(Chapter, Scene.chapter_id == Chapter.id)
+            .outerjoin(Volume, Chapter.volume_id == Volume.id)
             .where(
                 CharacterKnowledge.character_id == character_id,
                 or_(
                     CharacterKnowledge.learned_at_scene_version_id.is_(None),
-                    Scene.timeline_order <= timeline_order,
+                    Scene.story_time_order < current_scene.story_time_order,
+                    and_(
+                        Scene.story_time_order == current_scene.story_time_order,
+                        or_(
+                            Volume.sequence_no < current_volume.sequence_no,
+                            and_(
+                                Volume.sequence_no == current_volume.sequence_no,
+                                Chapter.sequence_no < current_chapter.sequence_no,
+                            ),
+                            and_(
+                                Volume.sequence_no == current_volume.sequence_no,
+                                Chapter.sequence_no == current_chapter.sequence_no,
+                                Scene.sequence_no <= current_scene.sequence_no,
+                            ),
+                        ),
+                    ),
                 ),
             )
         )

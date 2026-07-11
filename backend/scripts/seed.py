@@ -132,7 +132,7 @@ async def main() -> None:
             title="试探",
             pov_character_id=su_lan.id,
             time_text="第三天晚上",
-            timeline_order=10,
+            story_time_order=10,
             goal="苏岚试探林默",
             conflict="林默隐瞒三年前行踪",
             must_not_reveal_json=["林默曾在案发现场"],
@@ -144,7 +144,7 @@ async def main() -> None:
             title="病房外的录音",
             pov_character_id=lin_mo.id,
             time_text="第三天深夜",
-            timeline_order=11,
+            story_time_order=11,
             goal="林默确认有人监听",
             status="unplanned",
         )

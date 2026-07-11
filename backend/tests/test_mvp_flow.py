@@ -89,7 +89,7 @@ def test_project_to_scene_version_export_flow(
                 "sequence_no": 1,
                 "title": "试探",
                 "pov_character_id": character["id"],
-                "timeline_order": 10,
+                "story_time_order": 10,
             },
         )
     )

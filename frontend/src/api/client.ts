@@ -164,7 +164,13 @@ export const apiClient = {
     unwrap<Scene>(api.get(`/scenes/${sceneId}`)),
   patchScene: (
     sceneId: string,
-    payload: { title?: string; goal?: string; conflict?: string; time_text?: string },
+    payload: {
+      title?: string;
+      goal?: string;
+      conflict?: string;
+      time_text?: string;
+      story_time_order?: number;
+    },
   ) => unwrap<Scene>(api.patch(`/scenes/${sceneId}`, payload)),
   deleteScene: (sceneId: string) =>
     unwrap<{ deleted: boolean }>(api.delete(`/scenes/${sceneId}`)),

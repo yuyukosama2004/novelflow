@@ -395,7 +395,7 @@ export function SceneEditor({
             {scene.title}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            {scene.time_text || '未设定时间'} · 时间线 {scene.timeline_order}
+            {scene.time_text || '未设定时间'}
           </p>
         </div>
         <div className="flex items-center gap-2">

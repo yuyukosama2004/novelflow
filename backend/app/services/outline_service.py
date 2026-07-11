@@ -213,7 +213,7 @@ class OutlineService:
                         turning_point=sc_data.get("turning_point", ""),
                         ending_hook=sc_data.get("ending_hook", ""),
                         status="planned",
-                        timeline_order=sc_data["sequence_no"],
+                        story_time_order=sc_data["sequence_no"],
                     )
                     self.session.add(scene)
                     created["scenes"] += 1

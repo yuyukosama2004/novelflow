@@ -24,8 +24,13 @@ export function SceneCardEditor({ scene }: Props) {
   const [form, setForm] = useState<Record<string, string>>({});
 
   const saveScene = useMutation({
-    mutationFn: (payload: Record<string, string>) =>
-      apiClient.patchScene(scene?.id ?? '', payload),
+    mutationFn: (payload: Record<string, string>) => {
+      const { story_time_order, ...textFields } = payload;
+      return apiClient.patchScene(scene?.id ?? '', {
+        ...textFields,
+        story_time_order: Number(story_time_order),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scene', scene?.id] });
       queryClient.invalidateQueries({ queryKey: ['scenes'] });
@@ -46,6 +51,7 @@ export function SceneCardEditor({ scene }: Props) {
     FIELD_LABELS.forEach((f) => {
       vals[f.key] = String((scene as unknown as Record<string, unknown>)[f.key] ?? '');
     });
+    vals.story_time_order = String(scene?.story_time_order ?? 1);
     setForm(vals);
     setEditing(true);
   }
@@ -78,6 +84,22 @@ export function SceneCardEditor({ scene }: Props) {
             )}
           </label>
         ))}
+        <details className="rounded border border-slate-200 px-2 py-1.5">
+          <summary className="cursor-pointer font-medium text-slate-600">
+            高级设置
+          </summary>
+          <label className="mt-2 block">
+            <span className="font-medium text-slate-600">故事时间序号</span>
+            <input
+              type="number"
+              value={form.story_time_order ?? ''}
+              onChange={(event) =>
+                setForm({ ...form, story_time_order: event.target.value })
+              }
+              className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-emerald-600"
+            />
+          </label>
+        </details>
       </section>
     );
   }
@@ -102,7 +124,15 @@ export function SceneCardEditor({ scene }: Props) {
           );
         })}
         <div><span className="font-medium text-slate-600">POV 人物：</span><span className="text-slate-500">{scene.pov_character_id || '未设定'}</span></div>
-        <div><span className="font-medium text-slate-600">时间线序号：</span><span className="text-slate-500">{scene.timeline_order}</span></div>
+        <details className="rounded border border-slate-200 px-2 py-1.5">
+          <summary className="cursor-pointer font-medium text-slate-600">
+            高级设置
+          </summary>
+          <div className="mt-2">
+            <span className="font-medium text-slate-600">故事时间序号：</span>
+            <span className="text-slate-500">{scene.story_time_order}</span>
+          </div>
+        </details>
       </div>
     </section>
   );

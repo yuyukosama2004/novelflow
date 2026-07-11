@@ -78,7 +78,7 @@ export interface Scene extends EntityBase {
   title: string;
   pov_character_id: string | null;
   time_text: string;
-  timeline_order: number;
+  story_time_order: number;
   location_id: string | null;
   goal: string;
   conflict: string;

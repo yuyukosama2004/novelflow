@@ -83,7 +83,7 @@ class SceneCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     pov_character_id: str | None = None
     time_text: str = ""
-    timeline_order: int = 0
+    story_time_order: int | None = None
     location_id: str | None = None
     goal: str = ""
     conflict: str = ""
@@ -100,7 +100,7 @@ class SceneUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     pov_character_id: str | None = None
     time_text: str | None = None
-    timeline_order: int | None = None
+    story_time_order: int | None = None
     location_id: str | None = None
     goal: str | None = None
     conflict: str | None = None
@@ -120,7 +120,7 @@ class SceneRead(EntityBase):
     title: str
     pov_character_id: str | None
     time_text: str
-    timeline_order: int
+    story_time_order: int
     location_id: str | None
     goal: str
     conflict: str

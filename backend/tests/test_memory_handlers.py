@@ -64,7 +64,7 @@ async def create_graph(session: AsyncSession) -> dict[str, object]:
         chapter_id=chapter.id,
         sequence_no=1,
         title="Scene",
-        timeline_order=7,
+        story_time_order=7,
     )
     session.add(scene)
     await session.flush()

@@ -59,7 +59,7 @@ const scene: Scene = {
   title: '测试场景',
   pov_character_id: null,
   time_text: '',
-  timeline_order: 0,
+  story_time_order: 1,
   location_id: null,
   goal: '',
   conflict: '',

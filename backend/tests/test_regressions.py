@@ -43,7 +43,7 @@ async def session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
 async def create_story_graph(
     session: AsyncSession,
     *,
-    timeline_order: int = 5,
+    story_time_order: int = 5,
 ) -> tuple[NovelProject, Character, Scene, SceneVersion]:
     project = NovelProject(title="Regression story", status="active")
     session.add(project)
@@ -71,7 +71,7 @@ async def create_story_graph(
         chapter_id=chapter.id,
         sequence_no=1,
         title="Scene",
-        timeline_order=timeline_order,
+        story_time_order=story_time_order,
     )
     session.add(scene)
     await session.flush()
@@ -134,7 +134,7 @@ def create_api_scene(client: TestClient) -> dict[str, Any]:
     return response_data(
         client.post(
             f"/api/chapters/{chapter['id']}/scenes",
-            json={"sequence_no": 1, "title": "Scene", "timeline_order": 1},
+            json={"sequence_no": 1, "title": "Scene", "story_time_order": 1},
         )
     )
 
@@ -211,12 +211,12 @@ def test_sse_partial_failure_does_not_create_version(
 async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
     session: AsyncSession,
 ) -> None:
-    _, character, scene, _ = await create_story_graph(session, timeline_order=5)
+    _, character, scene, _ = await create_story_graph(session, story_time_order=5)
     future_scene = Scene(
         chapter_id=scene.chapter_id,
         sequence_no=2,
         title="Future scene",
-        timeline_order=8,
+        story_time_order=8,
     )
     session.add(future_scene)
     await session.flush()
@@ -226,6 +226,21 @@ async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
         content_markdown="Future draft",
     )
     session.add(future_version)
+    await session.flush()
+    same_time_future_scene = Scene(
+        chapter_id=scene.chapter_id,
+        sequence_no=3,
+        title="Same-time future scene",
+        story_time_order=5,
+    )
+    session.add(same_time_future_scene)
+    await session.flush()
+    same_time_future_version = SceneVersion(
+        scene_id=same_time_future_scene.id,
+        version_no=1,
+        content_markdown="Same-time future draft",
+    )
+    session.add(same_time_future_version)
     await session.flush()
     session.add_all(
         [
@@ -257,6 +272,12 @@ async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
                 knowledge_status="confirmed",
                 learned_at_scene_version_id=future_version.id,
             ),
+            CharacterKnowledge(
+                character_id=character.id,
+                fact_key="same_time_future_fact",
+                knowledge_status="confirmed",
+                learned_at_scene_version_id=same_time_future_version.id,
+            ),
         ]
     )
     await session.commit()
@@ -274,7 +295,7 @@ async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
 async def test_repeated_candidate_approval_is_idempotent(
     session: AsyncSession,
 ) -> None:
-    _, character, scene, version = await create_story_graph(session, timeline_order=7)
+    _, character, scene, version = await create_story_graph(session, story_time_order=7)
     scene.approved_version_id = version.id
     candidate = MemoryCandidate(
         scene_version_id=version.id,

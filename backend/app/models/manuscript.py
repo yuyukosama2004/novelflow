@@ -49,7 +49,7 @@ class Scene(UUIDMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(200))
     pov_character_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     time_text: Mapped[str] = mapped_column(String(160), default="")
-    timeline_order: Mapped[int] = mapped_column(Integer, default=0)
+    story_time_order: Mapped[int] = mapped_column(Integer, default=1)
     location_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     goal: Mapped[str] = mapped_column(Text, default="")
     conflict: Mapped[str] = mapped_column(Text, default="")

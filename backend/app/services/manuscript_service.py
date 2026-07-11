@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -111,10 +111,65 @@ class ManuscriptService:
 
     async def create_scene(self, chapter_id: str, payload: SceneCreate) -> Scene:
         await self.get_chapter(chapter_id)
-        scene = Scene(chapter_id=chapter_id, **payload.model_dump())
+        values = payload.model_dump()
+        story_time_order = values.pop("story_time_order")
+        if story_time_order is None:
+            story_time_order = await self._default_story_time_order(
+                chapter_id,
+                payload.sequence_no,
+            )
+        scene = Scene(
+            chapter_id=chapter_id,
+            story_time_order=story_time_order,
+            **values,
+        )
         await self.scenes.add(scene)
         await self.session.commit()
         return scene
+
+    async def _default_story_time_order(
+        self,
+        chapter_id: str,
+        scene_sequence_no: int,
+    ) -> int:
+        position_result = await self.session.execute(
+            select(
+                Chapter.sequence_no.label("chapter_sequence_no"),
+                Volume.sequence_no.label("volume_sequence_no"),
+                Volume.project_id.label("project_id"),
+            )
+            .join(Volume, Chapter.volume_id == Volume.id)
+            .where(Chapter.id == chapter_id)
+        )
+        position = position_result.one()
+        previous_result = await self.session.execute(
+            select(Scene.story_time_order)
+            .join(Chapter, Scene.chapter_id == Chapter.id)
+            .join(Volume, Chapter.volume_id == Volume.id)
+            .where(
+                Volume.project_id == position.project_id,
+                or_(
+                    Volume.sequence_no < position.volume_sequence_no,
+                    and_(
+                        Volume.sequence_no == position.volume_sequence_no,
+                        Chapter.sequence_no < position.chapter_sequence_no,
+                    ),
+                    and_(
+                        Volume.sequence_no == position.volume_sequence_no,
+                        Chapter.sequence_no == position.chapter_sequence_no,
+                        Scene.sequence_no < scene_sequence_no,
+                    ),
+                ),
+            )
+            .order_by(
+                Volume.sequence_no.desc(),
+                Chapter.sequence_no.desc(),
+                Scene.sequence_no.desc(),
+            )
+            .limit(1)
+        )
+        previous_order = previous_result.scalar_one_or_none()
+        return (previous_order + 1) if previous_order is not None else 1
 
     async def list_scenes(self, chapter_id: str) -> list[Scene]:
         await self.get_chapter(chapter_id)

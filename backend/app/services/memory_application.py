@@ -318,7 +318,7 @@ class MemoryApplicationService:
         result = await self.session.execute(
             select(
                 Volume.project_id,
-                Scene.timeline_order,
+                Scene.story_time_order,
                 Scene.approved_version_id,
             )
             .select_from(SceneVersion)
@@ -335,6 +335,6 @@ class MemoryApplicationService:
             )
         return SceneMetadata(
             project_id=row.project_id,
-            timeline_order=row.timeline_order,
+            timeline_order=row.story_time_order,
             approved_version_id=row.approved_version_id,
         )
