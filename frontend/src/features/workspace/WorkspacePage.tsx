@@ -929,7 +929,11 @@ export function WorkspacePage() {
             modelProfileId={modelProfileId}
             onVersionCreated={handleVersionCreated}
           />
-          <SceneCardEditor scene={scene.data ?? null} />
+          <SceneCardEditor
+            scene={scene.data ?? null}
+            characters={characters.data}
+            worldEntries={worldEntries.data}
+          />
           <ContextChecker sceneId={selectedSceneId} />
           <ReviewIssuePanel
             sceneVersionId={selectedSceneVersionId}

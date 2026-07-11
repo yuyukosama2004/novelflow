@@ -13,8 +13,17 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.models import Base
-from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
+from app.models.character import Character
+from app.models.manuscript import (
+    Chapter,
+    Scene,
+    SceneCharacter,
+    SceneVersion,
+    SceneWorldEntry,
+    Volume,
+)
 from app.models.project import NovelProject
+from app.models.world import WorldEntry
 from app.services.context_builder import ContextBuilder
 
 
@@ -90,6 +99,15 @@ async def test_previous_scene_uses_narrative_order_across_chapters_and_volumes(
     project = NovelProject(title="Cross-volume story")
     session.add(project)
     await session.flush()
+    linked_character = Character(project_id=project.id, name="Previous character")
+    linked_world = WorldEntry(
+        project_id=project.id,
+        entry_type="location",
+        name="Previous location",
+        canon_status="approved",
+    )
+    session.add_all([linked_character, linked_world])
+    await session.flush()
     first_volume = Volume(project_id=project.id, sequence_no=1, title="Volume 1")
     second_volume = Volume(project_id=project.id, sequence_no=2, title="Volume 2")
     session.add_all([first_volume, second_volume])
@@ -145,6 +163,18 @@ async def test_previous_scene_uses_narrative_order_across_chapters_and_volumes(
     await session.flush()
     earlier.approved_version_id = earlier_version.id
     previous.approved_version_id = previous_version.id
+    session.add_all(
+        [
+            SceneCharacter(
+                scene_id=previous.id,
+                character_id=linked_character.id,
+            ),
+            SceneWorldEntry(
+                scene_id=previous.id,
+                world_entry_id=linked_world.id,
+            ),
+        ]
+    )
     await session.commit()
 
     context = await ContextBuilder(session).build_for_scene(current.id)
@@ -152,3 +182,5 @@ async def test_previous_scene_uses_narrative_order_across_chapters_and_volumes(
     assert context.previous_scene is not None
     assert context.previous_scene.scene_id == previous.id
     assert context.previous_scene.content_preview == "Previous content"
+    assert [character.id for character in context.characters] == [linked_character.id]
+    assert [fact.id for fact in context.world_facts] == [linked_world.id]

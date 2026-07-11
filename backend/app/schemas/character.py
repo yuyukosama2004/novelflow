@@ -136,3 +136,4 @@ class CharacterKnowledgeRead(EntityBase):
     knowledge_status: str
     learned_at_scene_version_id: str | None
     confidence: float
+    record_status: str

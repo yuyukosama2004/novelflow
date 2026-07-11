@@ -73,6 +73,10 @@ def _build_user_prompt(ctx, scene) -> str:  # type: ignore[no-untyped-def]
             parts.append("  Forbidden: " + json.dumps(ch.forbidden_behaviors or [], ensure_ascii=False))
             parts.append("  Known facts: " + json.dumps(ch.knowledge_known or [], ensure_ascii=False))
             parts.append("  Must NOT know: " + json.dumps(ch.knowledge_unknown or [], ensure_ascii=False))
+            parts.append(
+                "  Future locked (do not reveal): "
+                + json.dumps(ch.knowledge_future_locked or [], ensure_ascii=False)
+            )
             if ch.current_state:
                 parts.append("  Current state: " + json.dumps(ch.current_state, ensure_ascii=False))
 

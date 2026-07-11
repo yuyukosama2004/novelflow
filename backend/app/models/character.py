@@ -75,5 +75,6 @@ class CharacterKnowledge(UUIDMixin, TimestampMixin, Base):
     knowledge_status: Mapped[str] = mapped_column(String(40), default="unknown")
     learned_at_scene_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    record_status: Mapped[str] = mapped_column(String(40), default="active")
 
     character = relationship("Character", back_populates="knowledge")

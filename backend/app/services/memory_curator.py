@@ -87,6 +87,7 @@ class MemoryCurator:
                 parts.append(f"  Previous state: {json.dumps(ch.current_state)}")
             parts.append(f"  Known: {json.dumps(ch.knowledge_known)}")
             parts.append(f"  Unknown: {json.dumps(ch.knowledge_unknown)}")
+            parts.append(f"  Future locked: {json.dumps(ch.knowledge_future_locked)}")
 
         parts.append("")
         parts.append("## Approved World Facts")

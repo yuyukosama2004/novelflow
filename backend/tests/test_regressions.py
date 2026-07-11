@@ -71,6 +71,7 @@ async def create_story_graph(
         chapter_id=chapter.id,
         sequence_no=1,
         title="Scene",
+        pov_character_id=character.id,
         story_time_order=story_time_order,
     )
     session.add(scene)
@@ -256,6 +257,12 @@ async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
                 emotional_state="future",
                 status="confirmed",
             ),
+            CharacterState(
+                character_id=character.id,
+                timeline_order=4,
+                emotional_state="invalidated",
+                status="invalidated",
+            ),
             CharacterKnowledge(
                 character_id=character.id,
                 fact_key="confirmed_fact",
@@ -278,6 +285,12 @@ async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
                 knowledge_status="confirmed",
                 learned_at_scene_version_id=same_time_future_version.id,
             ),
+            CharacterKnowledge(
+                character_id=character.id,
+                fact_key="invalidated_fact",
+                knowledge_status="confirmed",
+                record_status="invalidated",
+            ),
         ]
     )
     await session.commit()
@@ -289,6 +302,17 @@ async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
     assert card.current_state["emotional_state"] == "past"
     assert card.knowledge_known == ["confirmed_fact"]
     assert card.knowledge_unknown == ["unknown_fact"]
+    assert card.knowledge_future_locked == [
+        "future_fact",
+        "same_time_future_fact",
+    ]
+
+    review_context = await ContextBuilder(session).build_for_scene(
+        scene.id,
+        purpose="review",
+    )
+    review_locked = review_context.characters[0].knowledge_future_locked
+    assert '"fact_key": "future_fact"' in review_locked[0]
 
 
 @pytest.mark.asyncio

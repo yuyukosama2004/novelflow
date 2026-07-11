@@ -18,7 +18,8 @@ import type {
   ReviewIssueStatus,
   ReviewResult,
   ReviewRun,
-  Scene,
+    Scene,
+    SceneContextLinks,
   SceneVersion,
   SceneWorkingDraft,
   StoryCandidateEntity,
@@ -176,6 +177,10 @@ export const apiClient = {
     unwrap<{ deleted: boolean }>(api.delete(`/scenes/${sceneId}`)),
   getSceneContext: (sceneId: string) =>
     unwrap<Record<string, unknown>>(api.get(`/scenes/${sceneId}/context`)),
+  getSceneContextLinks: (sceneId: string) =>
+    unwrap<SceneContextLinks>(api.get(`/scenes/${sceneId}/context-links`)),
+  replaceSceneContextLinks: (sceneId: string, payload: SceneContextLinks) =>
+    unwrap<SceneContextLinks>(api.put(`/scenes/${sceneId}/context-links`, payload)),
   completeScene: (sceneId: string) =>
     unwrap<Scene>(api.post(`/scenes/${sceneId}/complete`)),
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,9 +12,19 @@ from app.core.exceptions import (
     ValidationAppError,
 )
 from app.models.base import utc_now
-from app.models.manuscript import Chapter, Scene, SceneVersion, SceneWorkingDraft, Volume
+from app.models.character import Character
+from app.models.manuscript import (
+    Chapter,
+    Scene,
+    SceneCharacter,
+    SceneVersion,
+    SceneWorkingDraft,
+    SceneWorldEntry,
+    Volume,
+)
 from app.models.memory import MemoryCandidate, MemoryExtractionRun
 from app.models.review import ReviewIssue, ReviewRun
+from app.models.world import WorldEntry
 from app.repositories.base import apply_updates
 from app.repositories.manuscript_repository import (
     ChapterRepository,
@@ -187,6 +197,82 @@ class ManuscriptService:
         await self.session.commit()
         await self.session.refresh(scene)
         return scene
+
+    async def get_context_links(self, scene_id: str) -> tuple[list[str], list[str]]:
+        await self.get_scene(scene_id)
+        character_result = await self.session.execute(
+            select(SceneCharacter.character_id).where(SceneCharacter.scene_id == scene_id)
+        )
+        world_result = await self.session.execute(
+            select(SceneWorldEntry.world_entry_id).where(SceneWorldEntry.scene_id == scene_id)
+        )
+        return (
+            list(character_result.scalars().all()),
+            list(world_result.scalars().all()),
+        )
+
+    async def replace_context_links(
+        self,
+        scene_id: str,
+        character_ids: list[str],
+        world_entry_ids: list[str],
+    ) -> tuple[list[str], list[str]]:
+        scene = await self.get_scene(scene_id)
+        project_result = await self.session.execute(
+            select(Volume.project_id)
+            .join(Chapter, Chapter.volume_id == Volume.id)
+            .where(Chapter.id == scene.chapter_id)
+        )
+        project_id = project_result.scalar_one()
+        requested_characters = set(character_ids)
+        requested_world = set(world_entry_ids)
+        valid_characters = set(
+            (
+                await self.session.execute(
+                    select(Character.id).where(
+                        Character.project_id == project_id,
+                        Character.id.in_(requested_characters),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        valid_world = set(
+            (
+                await self.session.execute(
+                    select(WorldEntry.id).where(
+                        WorldEntry.project_id == project_id,
+                        WorldEntry.id.in_(requested_world),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if valid_characters != requested_characters or valid_world != requested_world:
+            raise ValidationAppError(
+                "context links must belong to the scene project",
+                {
+                    "reason": "CONTEXT_LINK_PROJECT_MISMATCH",
+                    "invalid_character_ids": sorted(requested_characters - valid_characters),
+                    "invalid_world_entry_ids": sorted(requested_world - valid_world),
+                },
+            )
+        await self.session.execute(delete(SceneCharacter).where(SceneCharacter.scene_id == scene_id))
+        await self.session.execute(delete(SceneWorldEntry).where(SceneWorldEntry.scene_id == scene_id))
+        self.session.add_all(
+            [
+                SceneCharacter(scene_id=scene_id, character_id=character_id)
+                for character_id in sorted(requested_characters)
+            ]
+            + [
+                SceneWorldEntry(scene_id=scene_id, world_entry_id=world_entry_id)
+                for world_entry_id in sorted(requested_world)
+            ]
+        )
+        await self.session.commit()
+        return sorted(requested_characters), sorted(requested_world)
 
     async def delete_scene(self, scene_id: str) -> None:
         scene = await self.get_scene(scene_id)

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.responses import success
 from app.database.session import get_session
 from app.services.context_builder import ContextBuilder
+from app.services.manuscript_service import ManuscriptService
 
 router = APIRouter()
 
@@ -33,6 +34,7 @@ class CharacterCardOut(BaseModel):
     current_state: dict | None
     knowledge_known: list[str]
     knowledge_unknown: list[str]
+    knowledge_future_locked: list[str]
 
     model_config = {"from_attributes": True}
 
@@ -54,6 +56,11 @@ class SceneContextOut(BaseModel):
     manifest: dict
 
     model_config = {"from_attributes": True}
+
+
+class SceneContextLinks(BaseModel):
+    character_ids: list[str] = Field(default_factory=list)
+    world_entry_ids: list[str] = Field(default_factory=list)
 
 
 @router.get("/scenes/{scene_id}/context")
@@ -90,6 +97,7 @@ async def get_scene_context(
                     current_state=c.current_state,
                     knowledge_known=c.knowledge_known,
                     knowledge_unknown=c.knowledge_unknown,
+                    knowledge_future_locked=c.knowledge_future_locked,
                 )
                 for c in ctx.characters
             ],
@@ -104,6 +112,43 @@ async def get_scene_context(
                 for w in ctx.world_facts
             ],
             manifest=ctx.manifest,
+        ),
+        request,
+    )
+
+
+@router.get("/scenes/{scene_id}/context-links")
+async def get_scene_context_links(
+    scene_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    character_ids, world_entry_ids = await ManuscriptService(session).get_context_links(scene_id)
+    return success(
+        SceneContextLinks(
+            character_ids=character_ids,
+            world_entry_ids=world_entry_ids,
+        ),
+        request,
+    )
+
+
+@router.put("/scenes/{scene_id}/context-links")
+async def replace_scene_context_links(
+    scene_id: str,
+    payload: SceneContextLinks,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    character_ids, world_entry_ids = await ManuscriptService(session).replace_context_links(
+        scene_id,
+        payload.character_ids,
+        payload.world_entry_ids,
+    )
+    return success(
+        SceneContextLinks(
+            character_ids=character_ids,
+            world_entry_ids=world_entry_ids,
         ),
         request,
     )

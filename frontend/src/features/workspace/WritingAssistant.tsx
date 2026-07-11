@@ -15,6 +15,7 @@ interface ContextData {
     forbidden_behaviors: string[];
     knowledge_known: string[];
     knowledge_unknown: string[];
+    knowledge_future_locked: string[];
   }[];
   world_facts: { name: string; entry_type: string; summary: string }[];
   manifest: Record<string, unknown>;
@@ -54,6 +55,11 @@ export function WritingAssistant({ sceneId }: Props) {
     }
     if (ch.knowledge_unknown.length > 0) {
       constraints.push(`${ch.name} 不应知道：${ch.knowledge_unknown.join('、')}`);
+    }
+    if (ch.knowledge_future_locked.length > 0) {
+      constraints.push(
+        `${ch.name} 不得提前获知：${ch.knowledge_future_locked.join('、')}`,
+      );
     }
   });
 

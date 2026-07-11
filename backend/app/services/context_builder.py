@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from typing import Literal
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.character import Character, CharacterKnowledge, CharacterState
-from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
+from app.models.manuscript import (
+    Chapter,
+    Scene,
+    SceneCharacter,
+    SceneVersion,
+    SceneWorldEntry,
+    Volume,
+)
 from app.models.world import WorldEntry
 
 
@@ -25,6 +34,7 @@ class CharacterCard:
     current_state: dict | None
     knowledge_known: list[str]
     knowledge_unknown: list[str]
+    knowledge_future_locked: list[str]
 
 
 @dataclass
@@ -63,7 +73,11 @@ class ContextBuilder:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def build_for_scene(self, scene_id: str) -> SceneContext:
+    async def build_for_scene(
+        self,
+        scene_id: str,
+        purpose: Literal["writing", "review"] = "writing",
+    ) -> SceneContext:
         # Eager-load scene with chapter -> volume to avoid async lazy-load
         result = await self.session.execute(
             select(Scene)
@@ -79,14 +93,25 @@ class ContextBuilder:
         # Previous scene follows narrative order across chapters and volumes.
         prev = await self._prev_scene(scene)
 
-        # Characters in this project
+        character_ids = await self._relevant_character_ids(
+            scene,
+            prev.scene_id if prev else None,
+        )
+        world_entry_ids = await self._relevant_world_entry_ids(
+            scene.id,
+            prev.scene_id if prev else None,
+        )
+
+        # Only explicitly relevant characters enter writing context.
         characters = await self._character_cards(
             project_id,
             scene,
+            character_ids,
+            purpose,
         )
 
-        # Approved world entries
-        world_facts = await self._approved_world(project_id)
+        # Explicitly linked entries plus project-level hard rules.
+        world_facts = await self._approved_world(project_id, world_entry_ids)
 
         manifest = {
             "scene_id": scene_id,
@@ -101,6 +126,7 @@ class ContextBuilder:
             "character_count": len(characters),
             "world_fact_count": len(world_facts),
             "has_previous_scene": prev is not None,
+            "context_purpose": purpose,
         }
 
         token_estimate = await self._estimate_tokens(scene, prev, characters, world_facts)
@@ -165,11 +191,14 @@ class ContextBuilder:
         self,
         project_id: str,
         current_scene: Scene,
+        character_ids: set[str],
+        purpose: Literal["writing", "review"],
     ) -> list[CharacterCard]:
         result = await self.session.execute(
             select(Character).where(
                 Character.project_id == project_id,
                 Character.status == "active",
+                Character.id.in_(character_ids),
             )
         )
         characters = result.scalars().all()
@@ -177,9 +206,10 @@ class ContextBuilder:
         cards: list[CharacterCard] = []
         for ch in characters:
             state = await self._current_state(ch.id, current_scene.story_time_order)
-            known, unknown = await self._knowledge_boundaries(
+            known, unknown, future_locked = await self._knowledge_boundaries(
                 ch.id,
                 current_scene,
+                purpose,
             )
             cards.append(
                 CharacterCard(
@@ -195,6 +225,7 @@ class ContextBuilder:
                     current_state=state,
                     knowledge_known=known,
                     knowledge_unknown=unknown,
+                    knowledge_future_locked=future_locked,
                 )
             )
         return cards
@@ -232,11 +263,18 @@ class ContextBuilder:
         self,
         character_id: str,
         current_scene: Scene,
-    ) -> tuple[list[str], list[str]]:
+        purpose: Literal["writing", "review"],
+    ) -> tuple[list[str], list[str], list[str]]:
         current_chapter = current_scene.chapter
         current_volume = current_chapter.volume
         result = await self.session.execute(
-            select(CharacterKnowledge)
+            select(
+                CharacterKnowledge,
+                Scene.story_time_order,
+                Scene.sequence_no,
+                Chapter.sequence_no,
+                Volume.sequence_no,
+            )
             .outerjoin(
                 SceneVersion,
                 CharacterKnowledge.learned_at_scene_version_id == SceneVersion.id,
@@ -246,31 +284,44 @@ class ContextBuilder:
             .outerjoin(Volume, Chapter.volume_id == Volume.id)
             .where(
                 CharacterKnowledge.character_id == character_id,
-                or_(
-                    CharacterKnowledge.learned_at_scene_version_id.is_(None),
-                    Scene.story_time_order < current_scene.story_time_order,
-                    and_(
-                        Scene.story_time_order == current_scene.story_time_order,
-                        or_(
-                            Volume.sequence_no < current_volume.sequence_no,
-                            and_(
-                                Volume.sequence_no == current_volume.sequence_no,
-                                Chapter.sequence_no < current_chapter.sequence_no,
-                            ),
-                            and_(
-                                Volume.sequence_no == current_volume.sequence_no,
-                                Chapter.sequence_no == current_chapter.sequence_no,
-                                Scene.sequence_no <= current_scene.sequence_no,
-                            ),
-                        ),
-                    ),
-                ),
+                CharacterKnowledge.record_status == "active",
             )
+            .order_by(CharacterKnowledge.fact_key)
         )
-        items = result.scalars().all()
         known: list[str] = []
         unknown: list[str] = []
-        for item in items:
+        future_locked: list[str] = []
+        current_position = (
+            current_volume.sequence_no,
+            current_chapter.sequence_no,
+            current_scene.sequence_no,
+        )
+        for item, story_order, scene_sequence, chapter_sequence, volume_sequence in result.all():
+            learned = item.learned_at_scene_version_id is not None
+            available = not learned
+            if learned and story_order is not None:
+                learned_position = (
+                    volume_sequence,
+                    chapter_sequence,
+                    scene_sequence,
+                )
+                available = story_order < current_scene.story_time_order or (
+                    story_order == current_scene.story_time_order and learned_position <= current_position
+                )
+            if not available:
+                future_locked.append(
+                    json.dumps(
+                        {
+                            "fact_key": item.fact_key,
+                            "fact_value": item.fact_value_json,
+                            "knowledge_status": item.knowledge_status,
+                        },
+                        ensure_ascii=False,
+                    )
+                    if purpose == "review"
+                    else item.fact_key
+                )
+                continue
             if item.knowledge_status in (
                 "suspected",
                 "believed",
@@ -280,13 +331,21 @@ class ContextBuilder:
                 known.append(item.fact_key)
             else:
                 unknown.append(item.fact_key)
-        return known, unknown
+        return known, unknown, future_locked
 
-    async def _approved_world(self, project_id: str) -> list[WorldFact]:
+    async def _approved_world(
+        self,
+        project_id: str,
+        world_entry_ids: set[str],
+    ) -> list[WorldFact]:
         result = await self.session.execute(
             select(WorldEntry).where(
                 WorldEntry.project_id == project_id,
                 WorldEntry.canon_status == "approved",
+                or_(
+                    WorldEntry.entry_type == "rule",
+                    WorldEntry.id.in_(world_entry_ids),
+                ),
             )
         )
         entries = result.scalars().all()
@@ -300,6 +359,35 @@ class ContextBuilder:
             )
             for e in entries
         ]
+
+    async def _relevant_character_ids(
+        self,
+        scene: Scene,
+        previous_scene_id: str | None,
+    ) -> set[str]:
+        scene_ids = [scene.id]
+        if previous_scene_id:
+            scene_ids.append(previous_scene_id)
+        result = await self.session.execute(
+            select(SceneCharacter.character_id).where(SceneCharacter.scene_id.in_(scene_ids))
+        )
+        character_ids = set(result.scalars().all())
+        if scene.pov_character_id:
+            character_ids.add(scene.pov_character_id)
+        return character_ids
+
+    async def _relevant_world_entry_ids(
+        self,
+        scene_id: str,
+        previous_scene_id: str | None,
+    ) -> set[str]:
+        scene_ids = [scene_id]
+        if previous_scene_id:
+            scene_ids.append(previous_scene_id)
+        result = await self.session.execute(
+            select(SceneWorldEntry.world_entry_id).where(SceneWorldEntry.scene_id.in_(scene_ids))
+        )
+        return set(result.scalars().all())
 
     async def _estimate_tokens(
         self,

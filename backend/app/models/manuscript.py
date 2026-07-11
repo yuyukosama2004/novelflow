@@ -82,6 +82,36 @@ class Scene(UUIDMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    character_links = relationship(
+        "SceneCharacter",
+        back_populates="scene",
+        cascade="all, delete-orphan",
+    )
+    world_entry_links = relationship(
+        "SceneWorldEntry",
+        back_populates="scene",
+        cascade="all, delete-orphan",
+    )
+
+
+class SceneCharacter(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "scene_characters"
+    __table_args__ = (UniqueConstraint("scene_id", "character_id", name="uq_scene_character"),)
+
+    scene_id: Mapped[str] = mapped_column(ForeignKey("scenes.id"), index=True)
+    character_id: Mapped[str] = mapped_column(ForeignKey("characters.id"), index=True)
+
+    scene = relationship("Scene", back_populates="character_links")
+
+
+class SceneWorldEntry(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "scene_world_entries"
+    __table_args__ = (UniqueConstraint("scene_id", "world_entry_id", name="uq_scene_world_entry"),)
+
+    scene_id: Mapped[str] = mapped_column(ForeignKey("scenes.id"), index=True)
+    world_entry_id: Mapped[str] = mapped_column(ForeignKey("world_entries.id"), index=True)
+
+    scene = relationship("Scene", back_populates="world_entry_links")
 
 
 class SceneWorkingDraft(UUIDMixin, TimestampMixin, Base):

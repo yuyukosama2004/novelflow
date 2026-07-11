@@ -67,7 +67,7 @@ async def review_version(
         await session.commit()
 
         builder = ContextBuilder(session)
-        ctx = await builder.build_for_scene(version.scene_id)
+        ctx = await builder.build_for_scene(version.scene_id, purpose="review")
         reviewer = ContinuityReviewer(runtime.router, runtime.provider)
         run.prompt_snapshot_json = {
             "provider": runtime.provider,

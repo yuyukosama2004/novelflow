@@ -98,6 +98,7 @@ class ContinuityReviewer:
             parts.append(f"\n- {ch.name}:")
             parts.append(f"  Forbidden: {json.dumps(ch.forbidden_behaviors)}")
             parts.append(f"  Must NOT know: {json.dumps(ch.knowledge_unknown)}")
+            parts.append(f"  Future locked facts: {json.dumps(ch.knowledge_future_locked)}")
             parts.append(f"  Known: {json.dumps(ch.knowledge_known)}")
             if ch.current_state:
                 parts.append(f"  State: {json.dumps(ch.current_state)}")

@@ -117,6 +117,11 @@ export interface SceneWorkingDraft {
   updated_at: string | null;
 }
 
+export interface SceneContextLinks {
+  character_ids: string[];
+  world_entry_ids: string[];
+}
+
 export interface HealthStatus {
   status: string;
   database: string;

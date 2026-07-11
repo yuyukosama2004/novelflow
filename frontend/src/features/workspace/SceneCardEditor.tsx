@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Pencil, X } from 'lucide-react';
 
 import { apiClient } from '../../api/client';
-import type { Scene } from '../../types/entities';
+import type { Character, Scene, SceneContextLinks, WorldEntry } from '../../types/entities';
 
 interface Props {
   scene: Scene | null;
+  characters?: Character[];
+  worldEntries?: WorldEntry[];
 }
 
 const FIELD_LABELS: { key: string; label: string; textarea?: boolean }[] = [
@@ -18,10 +20,46 @@ const FIELD_LABELS: { key: string; label: string; textarea?: boolean }[] = [
   { key: 'ending_hook', label: '结尾钩子', textarea: true },
 ];
 
-export function SceneCardEditor({ scene }: Props) {
+export function SceneCardEditor({
+  scene,
+  characters = [],
+  worldEntries = [],
+}: Props) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
+
+  const contextLinks = useQuery({
+    queryKey: ['scene-context-links', scene?.id],
+    queryFn: () => apiClient.getSceneContextLinks(scene?.id ?? ''),
+    enabled: Boolean(scene?.id),
+  });
+
+  const saveContextLinks = useMutation({
+    mutationFn: (payload: SceneContextLinks) =>
+      apiClient.replaceSceneContextLinks(scene?.id ?? '', payload),
+    onSuccess: (links) => {
+      queryClient.setQueryData(['scene-context-links', scene?.id], links);
+      queryClient.invalidateQueries({ queryKey: ['context', scene?.id] });
+    },
+  });
+
+  function toggleContextLink(
+    kind: 'character_ids' | 'world_entry_ids',
+    id: string,
+  ) {
+    const current = contextLinks.data ?? {
+      character_ids: [],
+      world_entry_ids: [],
+    };
+    const selected = new Set(current[kind]);
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+    saveContextLinks.mutate({
+      ...current,
+      [kind]: [...selected],
+    });
+  }
 
   const saveScene = useMutation({
     mutationFn: (payload: Record<string, string>) => {
@@ -131,6 +169,30 @@ export function SceneCardEditor({ scene }: Props) {
           <div className="mt-2">
             <span className="font-medium text-slate-600">故事时间序号：</span>
             <span className="text-slate-500">{scene.story_time_order}</span>
+          </div>
+          <div className="mt-2 border-t border-slate-100 pt-2">
+            <p className="font-medium text-slate-600">相关人物</p>
+            {characters.map((character) => (
+              <label key={character.id} className="mt-1 flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={contextLinks.data?.character_ids.includes(character.id) ?? false}
+                  onChange={() => toggleContextLink('character_ids', character.id)}
+                />
+                {character.name}
+              </label>
+            ))}
+            <p className="mt-2 font-medium text-slate-600">相关世界观</p>
+            {worldEntries.map((entry) => (
+              <label key={entry.id} className="mt-1 flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={contextLinks.data?.world_entry_ids.includes(entry.id) ?? false}
+                  onChange={() => toggleContextLink('world_entry_ids', entry.id)}
+                />
+                {entry.name}
+              </label>
+            ))}
           </div>
         </details>
       </div>

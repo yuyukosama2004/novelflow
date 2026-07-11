@@ -28,6 +28,7 @@ interface ContextData {
     current_state: Record<string, unknown> | null;
     knowledge_known: string[];
     knowledge_unknown: string[];
+    knowledge_future_locked: string[];
   }[];
   world_facts: {
     id: string;
@@ -118,6 +119,11 @@ export default function ContextChecker({ sceneId }: Props) {
                 )}
                 {ch.knowledge_unknown.length > 0 && (
                   <p className="text-red-500">禁止获知：{ch.knowledge_unknown.join("、")}</p>
+                )}
+                {ch.knowledge_future_locked.length > 0 && (
+                  <p className="text-amber-600">
+                    后续场景信息（禁止提前泄露）：{ch.knowledge_future_locked.join("、")}
+                  </p>
                 )}
                 {ch.forbidden_behaviors.length > 0 && (
                   <p className="text-orange-600">禁止行为：{ch.forbidden_behaviors.join("、")}</p>
