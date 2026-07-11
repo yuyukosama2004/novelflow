@@ -166,6 +166,11 @@ export function SceneEditor({
     () => selectInitialContent(versions.data, scene),
     [scene, versions.data],
   );
+  const wordCount = useMemo(
+    () =>
+      RichTextCodec.toPlaintext(contentJson).replace(/\s+/g, '').length,
+    [contentJson],
+  );
 
   useEffect(() => {
     if (!scene?.id) {
@@ -418,6 +423,7 @@ export function SceneEditor({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">{wordCount} 字</span>
           <StatusPill
             tone={
               saveState === 'error'

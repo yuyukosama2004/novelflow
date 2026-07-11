@@ -6,6 +6,8 @@ import {
   Check,
   CirclePlus,
   Globe2,
+  Maximize2,
+  Minimize2,
   Pencil,
   Trash2,
   UserPlus,
@@ -72,6 +74,10 @@ export function WorkspacePage() {
   const [showSettings, setShowSettings] = useState(false);
   const [modelProfileId, setModelProfileId] = useState('');
   const [rightTab, setRightTab] = useState<WorkspacePanelTab>('ai');
+  const [focusMode, setFocusMode] = useState(false);
+  const [writingSize, setWritingSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [writingSpacing, setWritingSpacing] = useState<'compact' | 'relaxed'>('relaxed');
+  const [writingWidth, setWritingWidth] = useState<'narrow' | 'wide'>('wide');
 
   // ── 数据查询 ──
   const project = useQuery({
@@ -435,6 +441,13 @@ export function WorkspacePage() {
               {label(PROJECT_STATUS_LABELS, project.data?.status)}
             </StatusPill>
             <ModelSelector selectedId={modelProfileId} onChange={setModelProfileId} />
+            <button
+              onClick={() => setFocusMode((value) => !value)}
+              className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600"
+            >
+              {focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              {focusMode ? '退出专注' : '专注写作'}
+            </button>
             <Link
               to={`/projects/${projectId}/bible`}
               className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
@@ -467,9 +480,15 @@ export function WorkspacePage() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1600px] gap-4 px-5 py-4 xl:grid-cols-[300px_minmax(0,1fr)_340px]">
+      <div
+        className={`mx-auto grid gap-4 px-5 py-4 ${
+          focusMode
+            ? 'max-w-[1200px] grid-cols-1'
+            : 'max-w-[1600px] xl:grid-cols-[300px_minmax(0,1fr)_340px]'
+        }`}
+      >
         {/* ── 左侧栏：大纲 + 设定库 ── */}
-        <aside className="space-y-4">
+        <aside className={`space-y-4 ${focusMode ? 'hidden' : ''}`}>
           {/* 大纲 */}
           <section className="rounded-md border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
@@ -928,17 +947,72 @@ export function WorkspacePage() {
         </aside>
 
         {/* ── 中间：写作辅助 + 场景编辑器 ── */}
-        <div className="space-y-4">
-          <WritingAssistant sceneId={selectedSceneId} />
+        <div
+          className={`mx-auto w-full space-y-4 ${
+            writingWidth === 'narrow' ? 'max-w-3xl' : 'max-w-5xl'
+          } ${
+            writingSize === 'small'
+              ? '[&_.ProseMirror]:text-sm'
+              : writingSize === 'large'
+                ? '[&_.ProseMirror]:text-lg'
+                : '[&_.ProseMirror]:text-base'
+          } ${
+            writingSpacing === 'compact'
+              ? '[&_.ProseMirror]:leading-6'
+              : '[&_.ProseMirror]:leading-9'
+          }`}
+        >
+          {focusMode ? (
+            <div className="flex justify-end gap-2 text-xs text-slate-500">
+              <select
+                aria-label="正文字号"
+                value={writingSize}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === 'small' || value === 'medium' || value === 'large') {
+                    setWritingSize(value);
+                  }
+                }}
+                className="rounded border border-slate-300 bg-white px-2 py-1"
+              >
+                <option value="small">小字号</option>
+                <option value="medium">标准字号</option>
+                <option value="large">大字号</option>
+              </select>
+              <select
+                aria-label="正文行距"
+                value={writingSpacing}
+                onChange={(event) =>
+                  setWritingSpacing(
+                    event.target.value === 'compact' ? 'compact' : 'relaxed',
+                  )
+                }
+                className="rounded border border-slate-300 bg-white px-2 py-1"
+              >
+                <option value="compact">紧凑行距</option>
+                <option value="relaxed">舒展行距</option>
+              </select>
+              <button
+                onClick={() =>
+                  setWritingWidth((value) => (value === 'wide' ? 'narrow' : 'wide'))
+                }
+                className="rounded border border-slate-300 bg-white px-2 py-1"
+              >
+                {writingWidth === 'wide' ? '窄版正文' : '宽版正文'}
+              </button>
+            </div>
+          ) : (
+            <WritingAssistant sceneId={selectedSceneId} />
+          )}
           <SceneEditor
-            scene={scene.data ?? null}
-            onVersionCreated={handleVersionCreated}
-            modelProfileId={modelProfileId}
-          />
+              scene={scene.data ?? null}
+              onVersionCreated={handleVersionCreated}
+              modelProfileId={modelProfileId}
+            />
         </div>
 
         {/* ── 右侧栏：当前场景版本工具 ── */}
-        <aside className="min-w-0 space-y-3">
+        <aside className={`min-w-0 space-y-3 ${focusMode ? 'hidden' : ''}`}>
           <WorkspacePanelTabs value={rightTab} onChange={setRightTab} />
 
           {rightTab === 'ai' ? (

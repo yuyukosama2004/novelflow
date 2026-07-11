@@ -181,6 +181,7 @@ describe('SceneEditor approval gate', () => {
         false,
       );
     });
+    expect(screen.getByText('5 字')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '保存版本' }));
 
