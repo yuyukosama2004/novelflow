@@ -16,11 +16,17 @@ function stripHtml(html: string): string {
 }
 
 function versionPreview(version: SceneVersion): string {
-  if (version.summary?.trim()) {
+  const summary = version.summary?.trim();
+  const content = stripHtml(version.content_markdown).trim();
+  const looksLikeRawOpening =
+    Boolean(summary) &&
+    (summary!.length > 120 ||
+      content.startsWith(summary!.replace(/\.\.\.$/, "")));
+  if (summary && !looksLikeRawOpening) {
     return version.summary;
   }
-  const text = stripHtml(version.content_markdown).trim();
-  return text.slice(0, 100) || "（空）";
+  const count = content.replace(/\s+/g, "").length;
+  return `${label(SOURCE_TYPE_LABELS, version.source_type)}正文 · ${count} 字`;
 }
 
 function reviewStatusLabel(reviewStatus: string): string {

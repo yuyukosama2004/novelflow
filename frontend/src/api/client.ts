@@ -57,6 +57,26 @@ export const apiClient = {
   listProjects: () => unwrap<NovelProject[]>(api.get("/projects")),
   createProject: (payload: Partial<NovelProject> & { title: string }) =>
     unwrap<NovelProject>(api.post("/projects", payload)),
+  planQuickCreation: (payload: {
+    idea: string;
+    target_length: string;
+    draft_kind: "opening" | "short";
+    model_profile_id?: string;
+  }) =>
+    unwrap<{
+      title_candidates: string[];
+      summary: string;
+      protagonist: string;
+      genre: string;
+      tone: string;
+      scene: {
+        title: string;
+        goal: string;
+        conflict: string;
+        turning_point: string;
+        ending_hook: string;
+      };
+    }>(api.post("/quick-creation/plan", payload)),
   getProject: (projectId: string) =>
     unwrap<NovelProject>(api.get(`/projects/${projectId}`)),
   patchProject: (
@@ -144,7 +164,10 @@ export const apiClient = {
       sequence_no: number;
       title: string;
       pov_character_id?: string | null;
+      time_text?: string;
       goal?: string;
+      conflict?: string;
+      turning_point?: string;
       ending_hook?: string;
     },
   ) => unwrap<Scene>(api.post(`/chapters/${chapterId}/scenes`, payload)),
@@ -155,6 +178,8 @@ export const apiClient = {
       title?: string;
       goal?: string;
       conflict?: string;
+      turning_point?: string;
+      ending_hook?: string;
       time_text?: string;
       story_time_order?: number;
     },
@@ -322,6 +347,21 @@ export const apiClient = {
       api.post(`/story-candidates/${candidateId}/apply`),
     ),
 
+  // Persistent project / scene discussion. Suggestions remain candidates until applied.
+  listCreativeDiscussions: (projectId: string, sceneId?: string) =>
+    unwrap<InterviewSession[]>(
+      api.get(`/projects/${projectId}/creative-discussions`, {
+        params: sceneId ? { scene_id: sceneId } : {},
+      }),
+    ),
+  startCreativeDiscussion: (
+    projectId: string,
+    payload: { scene_id?: string; model_profile_id?: string },
+  ) =>
+    unwrap<InterviewSession>(
+      api.post(`/projects/${projectId}/creative-discussions/start`, payload),
+    ),
+
   // Bible / Relationship APIs
   createRelationship: (
     projectId: string,
@@ -433,6 +473,7 @@ export function createSSEStream(
     finish_reason: string | null;
     version?: SceneVersion;
     error?: string;
+    perspective_warning?: string;
   }) => void,
   onDone: () => void,
   onError: (error: string) => void,

@@ -13,6 +13,7 @@ from app.api import (
     model_profiles,
     outline,
     projects,
+    quick_creation,
     review,
     scenes,
     workflows,
@@ -22,6 +23,7 @@ from app.api import (
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(projects.router, tags=["projects"])
+api_router.include_router(quick_creation.router, tags=["quick-creation"])
 api_router.include_router(characters.router, tags=["characters"])
 api_router.include_router(world_entries.router, tags=["world"])
 api_router.include_router(scenes.router, tags=["manuscript"])

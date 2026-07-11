@@ -93,11 +93,10 @@ class SceneWritingWorkflow:
                 LLMMessage(
                     role="system",
                     content=(
-                        "You are a fiction writing planner. "
-                        "Based on the scene card below, write a brief "
-                        "scene plan (beats, key moments, emotional arc). "
-                        "Output only the plan, no meta-commentary. "
-                        "Keep it under 300 characters."
+                        "你是中文小说场景策划。基于场景卡，用中文输出两行简短计划："
+                        "第一行必须以“摘要：”开头，用 40—80 字概括本场发生了什么；"
+                        "第二行必须以“节拍：”开头，列出关键动作、转折与情绪变化。"
+                        "不要输出元评论，总长度不超过 300 字。"
                     ),
                 ),
                 LLMMessage(role="user", content=self.user_prompt),

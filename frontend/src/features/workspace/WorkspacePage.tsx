@@ -31,6 +31,7 @@ import { ReviewIssuePanel } from "./ReviewIssuePanel";
 import { SceneCardEditor } from "./SceneCardEditor";
 import { SceneEditor } from "./SceneEditor";
 import { WritingAssistant } from "./WritingAssistant";
+import { CreativeDiscussionPanel } from "./CreativeDiscussionPanel";
 import { WritingSettingsPanel } from "./WritingSettingsPanel";
 import { SceneVersionSelector } from "./SceneVersionSelector";
 import {
@@ -101,6 +102,7 @@ export function WorkspacePage() {
   );
   const [writingWidth, setWritingWidth] = useState<"narrow" | "wide">("wide");
   const [editorContent, setEditorContent] = useState("");
+  const [discussionInstruction, setDiscussionInstruction] = useState("");
 
   // ── 数据查询 ──
   const project = useQuery({
@@ -440,8 +442,8 @@ export function WorkspacePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white">
+    <main className="min-h-screen bg-slate-50 text-slate-800">
+      <header className="border-b border-slate-200 bg-white/95 shadow-sm">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-5 py-3">
           <div className="min-w-0">
             <Link
@@ -491,6 +493,39 @@ export function WorkspacePage() {
                 </>
               )}
             </div>
+            {project.data ? (
+              <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                <span className="rounded-full bg-indigo-50 px-2 py-1 text-indigo-700">
+                  {project.data.pov_type === "first_person"
+                    ? "第一人称"
+                    : project.data.pov_type === "third_person_omniscient"
+                      ? "第三人称全知"
+                      : "第三人称限知"}
+                </span>
+                <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                  {project.data.writing_style_preset === "light_novel"
+                    ? "轻小说"
+                    : project.data.writing_style_preset === "male_web"
+                      ? "男频成长冒险"
+                      : project.data.writing_style_preset === "female_web"
+                        ? "女频情感成长"
+                        : project.data.writing_style_preset === "suspense"
+                          ? "悬疑推理"
+                          : project.data.writing_style_preset === "literary"
+                            ? "文学现实主义"
+                            : project.data.writing_style_preset === "historical"
+                              ? "古风历史"
+                              : project.data.writing_style_preset === "scifi"
+                                ? "科幻幻想"
+                                : project.data.writing_style_preset === "custom"
+                                  ? "自定义文风"
+                                  : "通用网络小说"}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+                  单场目标 {project.data.default_scene_word_count} 字
+                </span>
+              </div>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             <StatusPill tone="ok">
@@ -545,7 +580,7 @@ export function WorkspacePage() {
         className={`mx-auto grid gap-4 px-5 py-4 ${
           focusMode
             ? "max-w-[1200px] grid-cols-1"
-            : "max-w-[1600px] xl:grid-cols-[300px_minmax(0,1fr)_340px]"
+            : "max-w-[1680px] xl:grid-cols-[280px_minmax(0,1fr)_370px]"
         }`}
       >
         {/* ── 左侧栏：大纲 + 设定库 ── */}
@@ -1042,7 +1077,7 @@ export function WorkspacePage() {
           </section>
         </aside>
 
-        {/* ── 中间：写作辅助 + 场景编辑器 ── */}
+        {/* ── 中间：正文优先 ── */}
         <div
           className={`mx-auto w-full space-y-4 ${
             writingWidth === "narrow" ? "max-w-3xl" : "max-w-5xl"
@@ -1103,11 +1138,11 @@ export function WorkspacePage() {
                 {writingWidth === "wide" ? "窄版正文" : "宽版正文"}
               </button>
             </div>
-          ) : (
-            <WritingAssistant sceneId={selectedSceneId} />
-          )}
+          ) : null}
           <SceneEditor
             scene={scene.data ?? null}
+            selectedVersionId={selectedSceneVersionId}
+            loadSelectedVersion={hasExplicitSceneVersionSelection}
             onVersionCreated={handleVersionCreated}
             modelProfileId={modelProfileId}
             targetWordCount={project.data?.default_scene_word_count ?? 1000}
@@ -1127,6 +1162,7 @@ export function WorkspacePage() {
                 project.data?.default_scene_word_count ?? 1000
               }
               baseContent={editorContent}
+              instructionFromDiscussion={discussionInstruction}
               onVersionCreated={handleVersionCreated}
             />
           ) : null}
@@ -1179,9 +1215,29 @@ export function WorkspacePage() {
             />
           ) : null}
 
+          {rightTab === "discussion" ? (
+            <CreativeDiscussionPanel
+              projectId={projectId}
+              sceneId={selectedSceneId}
+              modelProfileId={modelProfileId}
+              onApplyRewriteInstruction={(instruction) => {
+                setDiscussionInstruction(instruction);
+                setRightTab("ai");
+              }}
+            />
+          ) : null}
+
           {rightTab === "advanced" ? (
             <div className="space-y-3">
               <WritingSettingsPanel project={project.data ?? null} />
+              <details className="rounded-md border border-slate-200 bg-white p-3">
+                <summary className="cursor-pointer text-xs font-medium text-slate-700">
+                  写作上下文与约束
+                </summary>
+                <div className="mt-3">
+                  <WritingAssistant sceneId={selectedSceneId} />
+                </div>
+              </details>
               <SceneCardEditor
                 scene={scene.data ?? null}
                 characters={characters.data}

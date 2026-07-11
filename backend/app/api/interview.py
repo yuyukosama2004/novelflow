@@ -19,6 +19,11 @@ class StartSessionRequest(BaseModel):
     model_profile_id: str | None = None
 
 
+class StartWorkspaceDiscussionRequest(BaseModel):
+    scene_id: str | None = None
+    model_profile_id: str | None = None
+
+
 class SendMessageRequest(BaseModel):
     content: str
 
@@ -41,6 +46,32 @@ async def start_interview(
         payload.entry_type,
         payload.title,
         payload.model_profile_id,
+    )
+    return success(result, request)
+
+
+@router.get("/projects/{project_id}/creative-discussions")
+async def list_creative_discussions(
+    project_id: str,
+    request: Request,
+    scene_id: str | None = None,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    discussions = await InterviewService(session).list_workspace_discussions(
+        project_id, scene_id
+    )
+    return success(discussions, request)
+
+
+@router.post("/projects/{project_id}/creative-discussions/start")
+async def start_creative_discussion(
+    project_id: str,
+    payload: StartWorkspaceDiscussionRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    result = await InterviewService(session).start_workspace_discussion(
+        project_id, payload.scene_id, payload.model_profile_id
     )
     return success(result, request)
 

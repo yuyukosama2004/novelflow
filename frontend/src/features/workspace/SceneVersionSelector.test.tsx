@@ -154,7 +154,7 @@ describe("SceneVersionSelector", () => {
     expect(screen.getByText("AI generated draft")).toBeInTheDocument();
   });
 
-  it("shows content preview when version has no summary", () => {
+  it("uses a readable metadata label instead of raw manuscript when summary is absent", () => {
     const noSummary = makeVersion({
       id: "v4",
       version_no: 4,
@@ -171,9 +171,10 @@ describe("SceneVersionSelector", () => {
       />,
     );
 
+    expect(screen.getByText("人工修订正文 · 38 字")).toBeInTheDocument();
     expect(
-      screen.getByText("This is the full content of the scene version."),
-    ).toBeInTheDocument();
+      screen.queryByText("This is the full content of the scene version."),
+    ).not.toBeInTheDocument();
   });
 
   it("handles empty content gracefully", () => {
@@ -193,7 +194,7 @@ describe("SceneVersionSelector", () => {
       />,
     );
 
-    expect(screen.getByText("（空）")).toBeInTheDocument();
+    expect(screen.getByText("人工修订正文 · 0 字")).toBeInTheDocument();
   });
 
   it("falls back to the first rendered option when the selected id is missing", () => {

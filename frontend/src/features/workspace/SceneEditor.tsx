@@ -20,6 +20,8 @@ type SaveState = "idle" | "saving" | "draft_saved" | "version_saved" | "error";
 
 interface SceneEditorProps {
   scene: Scene | null;
+  selectedVersionId?: string;
+  loadSelectedVersion?: boolean;
   onVersionCreated?: (version: SceneVersion) => void;
   modelProfileId?: string;
   targetWordCount?: number;
@@ -97,19 +99,10 @@ function draftFailureMessage(error: unknown): string {
     : "草稿保存失败，请稍后重试。";
 }
 
-function contentPreview(value: string): string {
-  try {
-    return RichTextCodec.toPlaintext(RichTextCodec.toTiptapJson(value)).slice(
-      0,
-      80,
-    );
-  } catch {
-    return value.replace(/<[^>]+>/g, "").slice(0, 80);
-  }
-}
-
 export function SceneEditor({
   scene,
+  selectedVersionId = "",
+  loadSelectedVersion = false,
   onVersionCreated,
   modelProfileId = "",
   targetWordCount = 1000,
@@ -142,6 +135,8 @@ export function SceneEditor({
   const draftRevisionRef = useRef(0);
   const contentRef = useRef("");
   const initializedSceneRef = useRef<string | null>(null);
+  const loadedExplicitVersionRef = useRef("");
+  const [initializedSceneId, setInitializedSceneId] = useState("");
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -182,6 +177,7 @@ export function SceneEditor({
   useEffect(() => {
     if (!scene?.id) {
       initializedSceneRef.current = null;
+      setInitializedSceneId("");
       return;
     }
     if (
@@ -210,6 +206,8 @@ export function SceneEditor({
       setSaveState("idle");
       editor.commands.setContent(document, false);
       initializedSceneRef.current = scene.id;
+      loadedExplicitVersionRef.current = "";
+      setInitializedSceneId(scene.id);
     } catch (error) {
       setContent("");
       onContentChange?.("");
@@ -218,6 +216,7 @@ export function SceneEditor({
       setDirty(false);
       setSaveState("error");
       initializedSceneRef.current = scene.id;
+      setInitializedSceneId(scene.id);
     }
   }, [
     editor,
@@ -227,6 +226,52 @@ export function SceneEditor({
     versions.isLoading,
     workingDraft.data,
     workingDraft.isLoading,
+  ]);
+
+  useEffect(() => {
+    if (
+      !editor ||
+      !scene?.id ||
+      !loadSelectedVersion ||
+      !selectedVersionId ||
+      initializedSceneId !== scene.id
+    ) {
+      return;
+    }
+    const selectedVersion = versions.data?.find(
+      (version) => version.id === selectedVersionId,
+    );
+    const key = `${scene.id}:${selectedVersionId}`;
+    if (!selectedVersion || loadedExplicitVersionRef.current === key) {
+      return;
+    }
+    try {
+      const document = RichTextCodec.toTiptapJson(
+        selectedVersion.content_markdown,
+      );
+      const markdown = RichTextCodec.toMarkdown(document);
+      setContent(markdown);
+      onContentChange?.(markdown);
+      contentRef.current = markdown;
+      setContentJson(document);
+      setCodecMessage("");
+      setDraftMessage("");
+      setDirty(false);
+      setSaveState("idle");
+      editor.commands.setContent(document, false);
+      loadedExplicitVersionRef.current = key;
+    } catch (error) {
+      setCodecMessage(codecFailureMessage(error));
+      setSaveState("error");
+    }
+  }, [
+    editor,
+    initializedSceneId,
+    loadSelectedVersion,
+    onContentChange,
+    scene?.id,
+    selectedVersionId,
+    versions.data,
   ]);
 
   const updateDraft = useMutation({
@@ -490,44 +535,30 @@ export function SceneEditor({
         </p>
       ) : null}
 
-      <div className="mt-4 rounded-md border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-          <h3 className="text-sm font-semibold text-slate-900">版本历史</h3>
-          <span className="text-xs text-slate-500">
-            {versions.data?.length ?? 0} 个版本
-          </span>
-        </div>
-        {approvalMessage ? (
-          <p className="border-b border-slate-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            {approvalMessage}
-          </p>
-        ) : null}
-        <div className="max-h-72 divide-y divide-slate-100 overflow-auto">
+      {approvalMessage ? (
+        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {approvalMessage}
+        </p>
+      ) : null}
+
+      <details className="mt-3 rounded-md border border-slate-200 bg-white text-xs">
+        <summary className="cursor-pointer px-3 py-2 font-medium text-slate-700">
+          版本审批（{versions.data?.length ?? 0}）
+        </summary>
+        <div className="divide-y divide-slate-100 border-t border-slate-100">
           {versions.data?.map((version) => (
             <div
               key={version.id}
-              className="flex items-center justify-between gap-3 px-3 py-3"
+              className="flex items-center justify-between gap-3 px-3 py-2"
             >
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-slate-900">
-                    v{version.version_no}
-                  </span>
-                  <StatusPill
-                    tone={
-                      scene.approved_version_id === version.id
-                        ? "ok"
-                        : "neutral"
-                    }
-                  >
-                    {scene.approved_version_id === version.id
-                      ? "正式稿"
-                      : label(SOURCE_TYPE_LABELS, version.source_type)}
-                  </StatusPill>
-                </div>
-                <p className="mt-1 truncate text-xs text-slate-500">
-                  {version.summary || contentPreview(version.content_markdown)}
-                </p>
+                <span className="font-medium text-slate-800">
+                  v{version.version_no}
+                </span>
+                <span className="ml-2 text-slate-500">
+                  {version.summary ||
+                    `${label(SOURCE_TYPE_LABELS, version.source_type)}正文`}
+                </span>
               </div>
               <IconButton
                 icon={<Check size={15} />}
@@ -543,11 +574,8 @@ export function SceneEditor({
               />
             </div>
           ))}
-          {versions.data?.length === 0 ? (
-            <p className="px-3 py-6 text-sm text-slate-500">暂无版本</p>
-          ) : null}
         </div>
-      </div>
+      </details>
     </section>
   );
 }

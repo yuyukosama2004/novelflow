@@ -40,7 +40,15 @@ class ModelRuntimeResolver:
                 )
             profile_id = project.default_model_profile_id
 
-        profile = await self._profile(profile_id) if profile_id else None
+        return await self.resolve_default(profile_id)
+
+    async def resolve_default(self, requested_profile_id: str | None = None) -> ModelRuntime:
+        """Resolve an explicit or default profile without requiring a project.
+
+        This is used by pre-project flows such as quick creation.  It deliberately
+        follows the same default-profile fallback as project-bound generation.
+        """
+        profile = await self._profile(requested_profile_id) if requested_profile_id else None
         if profile is None:
             result = await self.session.execute(
                 select(ModelProfile)

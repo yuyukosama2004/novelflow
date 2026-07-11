@@ -281,7 +281,9 @@ export interface InterviewSession {
 export type StoryCandidateType =
   | "project_setting"
   | "character"
-  | "world_entry";
+  | "world_entry"
+  | "scene_card"
+  | "rewrite_instruction";
 export type StoryCandidateStatus = "pending" | "approved" | "rejected";
 
 export interface StoryCandidateEntity {

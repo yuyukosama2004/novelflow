@@ -16,10 +16,12 @@ from app.core.exceptions import ConflictError, NotFoundError, ValidationAppError
 from app.llm.base import LLMMessage, LLMRequest
 from app.models.character import Character
 from app.models.interview import InterviewSession, StoryCandidate
+from app.models.manuscript import Chapter, Scene, Volume
 from app.models.project import NovelProject
 from app.models.world import WorldEntry
 from app.services.model_runtime import ModelRuntime, ModelRuntimeResolver
 from app.services.project_service import ProjectService
+from app.services.structured_output import generate_json_array
 
 # ── 访谈入口 Prompt ──
 
@@ -86,6 +88,25 @@ ENTRY_TITLES: dict[str, str] = {
     "outline": "大纲创作访谈",
     "direct": "快速开始",
 }
+
+WORKSPACE_DISCUSSION_PROMPT = (
+    "你是小说创作讨论伙伴，不是自动写稿工具。你正在帮助作者打磨一本正在创作的中文小说。\n\n"
+    "规则：\n"
+    "1. 用中文讨论，先分析作者的问题，再给可选择的建议；不要擅自把建议写入项目。\n"
+    "2. 优先尊重全书既有的人称、文风、人物限制和场景卡；发现冲突时明确指出。\n"
+    "3. 可以提出书名、场景卡和重写方向，但须说明它们只是候选，等待作者确认。\n"
+    "4. 每次回复尽量包含可执行的下一步，避免空泛鼓励和长篇正文。\n"
+    "5. 不要宣称建议已成为正史；只有作者点击“应用”才会写入项目。"
+)
+
+WORKSPACE_EXTRACT_PROMPT = (
+    "从以下创作讨论中提取作者要求或明确认可的可应用候选。只输出 JSON 数组，不要 Markdown。\n"
+    "每项包含 candidate_type、title、content_json、proposal、confidence。candidate_type 只能是：\n"
+    "- project_setting：content_json 可含 title、summary、genre、tone；\n"
+    "- scene_card：content_json 必含 scene_id，可含 title、goal、conflict、turning_point、ending_hook；\n"
+    "- rewrite_instruction：content_json 必含 instruction，用于填入一次重写要求，绝不直接改正文。\n"
+    "只提取有依据的建议；不要把助手未经作者确认的猜测伪装成事实。"
+)
 
 EXTRACT_SYSTEM_PROMPT = (
     "你是一位小说编辑，现在需要从一段创作访谈对话中提取作者已确认的设定，"
@@ -180,6 +201,72 @@ class InterviewService:
             "messages": session.messages_json,
         }
 
+    async def start_workspace_discussion(
+        self,
+        project_id: str,
+        scene_id: str | None,
+        model_profile_id: str | None = None,
+    ) -> dict:
+        """Create a persisted, project/scene-aware discussion without canonical writes."""
+        project = await ProjectService(self.session).get(project_id)
+        scene: Scene | None = None
+        if scene_id:
+            scene = await self._scene_in_project(project_id, scene_id)
+        runtime = await ModelRuntimeResolver(self.session).resolve(
+            project_id,
+            model_profile_id,
+        )
+        scope = (
+            f"当前场景：{scene.title}\n场景目标：{scene.goal or '未填写'}\n"
+            f"场景冲突：{scene.conflict or '未填写'}\n场景转折：{scene.turning_point or '未填写'}\n"
+            if scene
+            else "当前范围：全书讨论。\n"
+        )
+        project_profile = (
+            f"项目：{project.title}\n人称：{project.pov_type}\n"
+            f"文风：{project.writing_style_preset}\n基调：{project.tone or '未填写'}\n"
+        )
+        system_prompt = f"{WORKSPACE_DISCUSSION_PROMPT}\n\n{project_profile}{scope}"
+        greeting = (
+            f"我会围绕{'当前场景' if scene else '全书'}和既有写作设置与你讨论。"
+            "我给出的内容都只是候选；你可以在下方提取建议，再明确决定是否应用。"
+        )
+        discussion = InterviewSession(
+            project_id=project_id,
+            model_profile_id=runtime.profile_id,
+            provider=runtime.provider,
+            model=runtime.model,
+            entry_type=self._workspace_entry_type(scene_id),
+            title=f"{'场景' if scene else '全书'}讨论：{scene.title if scene else project.title}",
+            status="active",
+            messages_json=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "assistant",
+                    "content": greeting,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            ],
+        )
+        self.session.add(discussion)
+        await self.session.commit()
+        await self.session.refresh(discussion)
+        return self._session_out(discussion)
+
+    async def list_workspace_discussions(
+        self, project_id: str, scene_id: str | None
+    ) -> list[dict]:
+        await ProjectService(self.session).get(project_id)
+        result = await self.session.execute(
+            select(InterviewSession)
+            .where(
+                InterviewSession.project_id == project_id,
+                InterviewSession.entry_type == self._workspace_entry_type(scene_id),
+            )
+            .order_by(InterviewSession.updated_at.desc())
+        )
+        return [self._session_out(item) for item in result.scalars().all()]
+
     async def send_message(self, session_id: str, content: str) -> dict:
         """发送用户消息，获取 LLM 回复。"""
         session_obj = await self._get_session(session_id)
@@ -260,6 +347,9 @@ class InterviewService:
             session_obj.model_profile_id,
         )
 
+        if session_obj.entry_type.startswith("workspace:"):
+            return await self._extract_workspace_candidates(session_obj, runtime)
+
         # 构建提取请求
         conversation_text = "\n".join(f"{m['role']}: {m['content']}" for m in session_obj.messages_json)
 
@@ -272,8 +362,6 @@ class InterviewService:
         ]
 
         from pydantic import BaseModel, Field
-
-        from app.services.structured_output import generate_json_array
 
         class CandidateItem(BaseModel):
             candidate_type: str
@@ -383,6 +471,88 @@ class InterviewService:
             raise NotFoundError("interview session not found", {"session_id": session_id})
         return session_obj
 
+    @staticmethod
+    def _workspace_entry_type(scene_id: str | None) -> str:
+        return f"workspace:{scene_id or 'project'}"
+
+    async def _scene_in_project(self, project_id: str, scene_id: str) -> Scene:
+        result = await self.session.execute(
+            select(Scene)
+            .join(Chapter, Scene.chapter_id == Chapter.id)
+            .join(Volume, Chapter.volume_id == Volume.id)
+            .where(Scene.id == scene_id, Volume.project_id == project_id)
+        )
+        scene = result.scalar_one_or_none()
+        if scene is None:
+            raise NotFoundError("scene not found in project", {"scene_id": scene_id})
+        return scene
+
+    async def _extract_workspace_candidates(
+        self, session_obj: InterviewSession, runtime: ModelRuntime
+    ) -> list[dict]:
+        from pydantic import BaseModel, Field
+
+        class WorkspaceCandidate(BaseModel):
+            candidate_type: str
+            title: str
+            content_json: dict
+            proposal: str = ""
+            confidence: float = Field(ge=0.0, le=1.0)
+
+        scene_id = session_obj.entry_type.removeprefix("workspace:")
+        if scene_id == "project":
+            scene_id = ""
+        conversation = "\n".join(
+            f"{message['role']}: {message['content']}"
+            for message in session_obj.messages_json
+            if message["role"] != "system"
+        )
+        items = await generate_json_array(
+            runtime.router,
+            runtime.provider,
+            LLMRequest(
+                messages=[
+                    LLMMessage(role="system", content=WORKSPACE_EXTRACT_PROMPT),
+                    LLMMessage(
+                        role="user",
+                        content=f"当前 scene_id：{scene_id or '无（全书讨论）'}\n\n讨论记录：\n{conversation}",
+                    ),
+                ],
+                model=runtime.model,
+                max_tokens=1600,
+                temperature=0.3,
+            ),
+            WorkspaceCandidate,
+        )
+        allowed_types = {"project_setting", "scene_card", "rewrite_instruction"}
+        candidates: list[StoryCandidate] = []
+        for item in items:
+            if item.candidate_type not in allowed_types:
+                continue
+            content = dict(item.content_json)
+            if item.candidate_type == "scene_card":
+                if not scene_id:
+                    continue
+                content["scene_id"] = scene_id
+            if item.candidate_type == "rewrite_instruction" and not content.get("instruction"):
+                continue
+            candidate = StoryCandidate(
+                project_id=session_obj.project_id,
+                session_id=session_obj.id,
+                candidate_type=item.candidate_type,
+                title=item.title,
+                content_json=content,
+                proposal=item.proposal,
+                confidence=item.confidence,
+                status="pending",
+            )
+            self.session.add(candidate)
+            candidates.append(candidate)
+        await self.session.commit()
+        for candidate in candidates:
+            await self.session.refresh(candidate)
+        return [self._candidate_out(candidate) for candidate in candidates]
+
     async def _get_candidate(self, candidate_id: str) -> StoryCandidate:
         candidate = await self.session.get(StoryCandidate, candidate_id)
         if candidate is None:
@@ -481,10 +651,35 @@ class InterviewService:
             await self.session.flush()
             return "world_entry", entry.id
 
+        if candidate.candidate_type == "scene_card":
+            scene_id = str(content.get("scene_id", ""))
+            scene = await self._scene_in_project(candidate.project_id, scene_id)
+            for field in ("title", "goal", "conflict", "turning_point", "ending_hook"):
+                value = content.get(field)
+                if isinstance(value, str) and value.strip():
+                    setattr(scene, field, value.strip())
+            self.session.add(scene)
+            await self.session.flush()
+            return "scene", scene.id
+
         raise ValidationAppError(
             "unsupported candidate type for apply",
             {"candidate_type": candidate.candidate_type},
         )
+
+    @staticmethod
+    def _session_out(session_obj: InterviewSession) -> dict:
+        return {
+            "id": session_obj.id,
+            "project_id": session_obj.project_id,
+            "model_profile_id": session_obj.model_profile_id,
+            "provider": session_obj.provider,
+            "model": session_obj.model,
+            "entry_type": session_obj.entry_type,
+            "title": session_obj.title,
+            "status": session_obj.status,
+            "messages": session_obj.messages_json,
+        }
 
     @staticmethod
     def _candidate_out(candidate: StoryCandidate) -> dict:

@@ -9,6 +9,7 @@ interface Props {
   modelProfileId?: string;
   defaultTargetWordCount?: number;
   baseContent?: string;
+  instructionFromDiscussion?: string;
   onVersionCreated?: (version: SceneVersion) => void;
 }
 
@@ -17,6 +18,7 @@ export default function SceneGenerationPanel({
   modelProfileId = "",
   defaultTargetWordCount = 1000,
   baseContent = "",
+  instructionFromDiscussion = "",
   onVersionCreated,
 }: Props) {
   const [generating, setGenerating] = useState(false);
@@ -25,6 +27,7 @@ export default function SceneGenerationPanel({
   const [done, setDone] = useState(false);
   const [version, setVersion] = useState<SceneVersion | null>(null);
   const [runId, setRunId] = useState("");
+  const [perspectiveWarning, setPerspectiveWarning] = useState("");
   const [generationMode, setGenerationMode] = useState<
     "new" | "rewrite" | "polish"
   >("new");
@@ -57,6 +60,12 @@ export default function SceneGenerationPanel({
   }, [defaultTargetWordCount, sceneId]);
 
   useEffect(() => {
+    if (!instructionFromDiscussion.trim()) return;
+    setInstruction(instructionFromDiscussion);
+    setGenerationMode("rewrite");
+  }, [instructionFromDiscussion]);
+
+  useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
@@ -68,6 +77,7 @@ export default function SceneGenerationPanel({
     setError("");
     setDone(false);
     setVersion(null);
+    setPerspectiveWarning("");
 
     controllerRef.current = createSSEStream(
       sceneId,
@@ -91,6 +101,9 @@ export default function SceneGenerationPanel({
         if (data.version) {
           setVersion(data.version);
           if (onVersionCreated) onVersionCreated(data.version);
+        }
+        if (data.perspective_warning) {
+          setPerspectiveWarning(data.perspective_warning);
         }
       },
       () => {
@@ -195,7 +208,7 @@ export default function SceneGenerationPanel({
         </div>
       )}
 
-      {(content || generating) && (
+      {generating && (
         <pre
           ref={contentRef}
           className="flex-1 p-3 bg-gray-50 border rounded text-sm text-gray-800 whitespace-pre-wrap overflow-auto max-h-80"
@@ -208,13 +221,29 @@ export default function SceneGenerationPanel({
       )}
 
       {done && !error && (
-        <div className="text-xs text-green-700">
-          生成完成。
+        <div className="rounded border border-emerald-100 bg-emerald-50 p-2 text-xs text-emerald-800">
+          已生成并载入编辑器。
           {version && (
-            <span className="ml-1">已保存为版本 #{version.version_no}。</span>
+            <span className="ml-1">
+              已保存为版本 #{version.version_no}，请审核后再批准为正式稿。
+            </span>
           )}
+          {content ? (
+            <details className="mt-2 text-slate-600">
+              <summary className="cursor-pointer">查看本次生成预览</summary>
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-xs">
+                {content}
+              </pre>
+            </details>
+          ) : null}
         </div>
       )}
+
+      {perspectiveWarning ? (
+        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+          {perspectiveWarning}
+        </p>
+      ) : null}
     </div>
   );
 }

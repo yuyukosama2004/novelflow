@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from math import ceil
 from typing import Literal
 
@@ -31,8 +32,30 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _summary(content: str, max_len: int = 200) -> str:
-    return content[:max_len] + "..." if len(content) > max_len else content
+def _summary_from_plan(plan: str, scene_title: str, generation_mode: str) -> str:
+    """Return a navigable version label without leaking raw manuscript text."""
+    match = re.search(r"(?:摘要|概述)\s*[：:]\s*([^\n]+)", plan)
+    if match:
+        summary = match.group(1).strip().strip("。")
+        if summary:
+            return summary[:120]
+    mode_label = {"new": "AI 初稿", "rewrite": "AI 重写", "polish": "AI 润色"}[
+        generation_mode
+    ]
+    return f"{scene_title} · {mode_label}，待作者审核"
+
+
+def _perspective_warning(content: str, pov_type: str) -> str:
+    """Detect only clear, high-signal perspective misses; dialogue is ignored."""
+    if len(content.strip()) < 300:
+        return ""
+    narrative = re.sub(r"“[^”]*”|「[^」]*」|\"[^\"]*\"", "", content)
+    first_person_markers = len(re.findall(r"我(?=[一-龥，。！？；：])", narrative))
+    if pov_type.startswith("third_person") and first_person_markers >= 5:
+        return "检测到较多第一人称叙述痕迹；请在审阅时确认重写是否已转换为全书设定的第三人称。"
+    if pov_type == "first_person" and first_person_markers == 0:
+        return "未检测到明确第一人称叙述；请在审阅时确认是否符合全书设定的第一人称。"
+    return ""
 
 
 def _build_system_prompt(
@@ -48,6 +71,8 @@ def _build_system_prompt(
     }[generation_mode]
     parts = [
         "你是中文小说作者。只输出完整场景正文，不输出标题、说明、写作计划或元评论。",
+        "约束优先级（从高到低）：既有正史、人物知识与禁止事项；全书写作设置；场景卡；本次作者要求；原稿措辞。"
+        "本次作者要求只能调整本场的节奏、侧重点和表达，不得覆盖全书设定的人称或文风。",
         perspective_instruction(project.pov_type),
         writing_style_instruction(
             project.writing_style_preset,
@@ -56,8 +81,18 @@ def _build_system_prompt(
         f"目标长度：约 {target_word_count} 个汉字，允许上下浮动约 15%。",
         mode_instruction,
     ]
+    if generation_mode == "rewrite":
+        if project.pov_type == "first_person":
+            parts.append(
+                "这是硬约束：重写时必须使用第一人称叙述。若原稿不是第一人称，应先转换叙述视角；对话内容可按人物自然保留。"
+            )
+        else:
+            parts.append(
+                "这是硬约束：重写时必须使用第三人称叙述。原稿若以“我”叙述，必须先转换为相应的第三人称叙述；"
+                "仅人物对话中允许出现第一人称。不要把原稿的人称原样沿用。"
+            )
     if instruction.strip():
-        parts.append(f"本次作者要求（优先于文风细节，但不得违反故事硬约束）：{instruction.strip()}")
+        parts.append(f"本次作者要求（不得覆盖全书人称、文风或故事硬约束）：{instruction.strip()}")
     return "\n\n".join(parts)
 
 
@@ -341,7 +376,11 @@ async def generate_scene_stream(
                         ],
                     },
                     content_markdown=state.draft,
-                    summary=_summary(state.draft),
+                    summary=_summary_from_plan(
+                        state.plan,
+                        scene.title,
+                        generation.generation_mode,
+                    ),
                     source_type=("ai_generated" if generation.generation_mode == "new" else "ai_revised"),
                     model_profile_id=runtime.profile_id,
                     prompt_snapshot_json=state.prompt_snapshot,
@@ -360,6 +399,9 @@ async def generate_scene_stream(
                     "status": "waiting_review",
                     "version": SceneVersionRead.model_validate(version).model_dump(mode="json"),
                 }
+                perspective_warning = _perspective_warning(state.draft, project.pov_type)
+                if perspective_warning:
+                    done_data["perspective_warning"] = perspective_warning
                 state.events.append(done_data)
                 wf_run.events_json = state.events
                 await session.commit()

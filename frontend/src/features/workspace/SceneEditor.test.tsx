@@ -49,13 +49,18 @@ vi.mock("../../api/client", () => ({
   },
 }));
 
-function renderWithQuery(ui: ReactElement) {
-  const queryClient = new QueryClient({
+function renderWithQuery(
+  ui: ReactElement,
+  queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
-  );
+  }),
+) {
+  return {
+    ...render(
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+    ),
+    queryClient,
+  };
 }
 
 const now = "2026-07-11T00:00:00.000Z";
@@ -246,6 +251,56 @@ describe("SceneEditor approval gate", () => {
       content_json: document,
     });
     expect(apiClient.createVersion).not.toHaveBeenCalled();
+  });
+
+  it("loads an explicitly selected newly generated version into the editor", async () => {
+    const first = {
+      ...version("not_reviewed"),
+      id: "version-1",
+      content_markdown: "旧版本",
+    };
+    const second = {
+      ...version("not_reviewed"),
+      id: "version-2",
+      version_no: 2,
+      content_markdown: "新生成版本",
+    };
+    vi.mocked(apiClient.listVersions).mockResolvedValue([first, second]);
+
+    const rendered = renderWithQuery(
+      <SceneEditor scene={scene} selectedVersionId="version-1" />,
+    );
+    await waitFor(() => {
+      expect(editorMock.commands.setContent).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.any(Array) }),
+        false,
+      );
+    });
+
+    rendered.rerender(
+      <QueryClientProvider client={rendered.queryClient}>
+        <SceneEditor
+          scene={scene}
+          selectedVersionId="version-2"
+          loadSelectedVersion
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(editorMock.commands.setContent).toHaveBeenLastCalledWith(
+        {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "新生成版本" }],
+            },
+          ],
+        },
+        false,
+      );
+    });
   });
 
   it("saves a pending draft before manually creating a version", async () => {

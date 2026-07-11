@@ -3,6 +3,7 @@ export type WorkspacePanelTab =
   | "review"
   | "memory"
   | "history"
+  | "discussion"
   | "advanced";
 
 const TABS: readonly [WorkspacePanelTab, string][] = [
@@ -10,6 +11,7 @@ const TABS: readonly [WorkspacePanelTab, string][] = [
   ["review", "审查"],
   ["memory", "记忆"],
   ["history", "历史"],
+  ["discussion", "讨论"],
   ["advanced", "高级"],
 ];
 
@@ -20,7 +22,7 @@ interface Props {
 
 export function WorkspacePanelTabs({ value, onChange }: Props) {
   return (
-    <nav className="grid grid-cols-5 rounded-md border border-slate-200 bg-white p-1 text-xs">
+    <nav className="grid grid-cols-6 rounded-md border border-slate-200 bg-white p-1 text-xs">
       {TABS.map(([key, text]) => (
         <button
           key={key}
