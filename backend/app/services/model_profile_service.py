@@ -11,7 +11,7 @@ from app.models.model_profile import ModelProfile
 from app.models.project import NovelProject
 
 # DeepSeek 已知模型列表
-DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner"]
+DEEPSEEK_MODELS = ["deepseek-v4-flash", "deepseek-reasoner"]
 
 
 class ModelProfileService:

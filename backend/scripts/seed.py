@@ -26,7 +26,7 @@ async def main() -> None:
                 provider="deepseek",
                 base_url=settings.deepseek_base_url,
                 api_key=settings.deepseek_api_key,
-                model_name="deepseek-chat",
+                model_name="deepseek-v4-flash",
                 is_default=True,
                 enabled=True,
             )

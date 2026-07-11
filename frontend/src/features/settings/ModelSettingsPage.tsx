@@ -295,7 +295,7 @@ function ProfileForm({
           <input
             value={String(form.model_name ?? "")}
             onChange={(e) => setForm({ ...form, model_name: e.target.value })}
-            placeholder="如：deepseek-chat"
+            placeholder="如：deepseek-v4-flash"
             className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600"
           />
         </label>

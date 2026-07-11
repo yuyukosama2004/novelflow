@@ -50,7 +50,7 @@ class LLMRouter:
             return DeepSeekClient(
                 api_key=profile.api_key,
                 base_url=profile.base_url or "https://api.deepseek.com",
-                default_model=profile.model_name or "deepseek-chat",
+                default_model=profile.model_name or "deepseek-v4-flash",
                 timeout_seconds=profile.timeout_seconds,
             )
         if profile.provider == "openai_compatible":

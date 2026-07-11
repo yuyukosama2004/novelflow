@@ -106,7 +106,6 @@ class SceneWritingWorkflow:
             temperature=0.7,
         )
         response = await self.llm.generate(plan_request, self.state.provider)
-        self.state.model = response.model
         return response.content
 
     async def _draft(self) -> AsyncIterator[dict]:

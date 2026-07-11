@@ -80,7 +80,7 @@ class OpenAICompatibleClient(LLMClient):
 
                 data = json.loads(data_str)
                 delta = data["choices"][0].get("delta", {})
-                content_delta = delta.get("content", "")
+                content_delta = delta.get("content") or ""
                 finish = data["choices"][0].get("finish_reason")
                 yield LLMStreamChunk(
                     content_delta=content_delta,

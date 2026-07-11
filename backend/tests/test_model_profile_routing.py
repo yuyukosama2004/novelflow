@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.api import memory as memory_api
 from app.api import review as review_api
+from app.llm.base import LLMRequest
 from app.llm.deepseek import DeepSeekClient
 from app.llm.fake import FakeLLMClient
 from app.llm.ollama import OllamaClient
@@ -42,7 +43,7 @@ async def session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
 @pytest.mark.parametrize(
     ("provider", "expected_type", "base_url", "model_name"),
     [
-        ("deepseek", DeepSeekClient, "https://deepseek.example", "deepseek-chat"),
+        ("deepseek", DeepSeekClient, "https://deepseek.example", "deepseek-v4-flash"),
         (
             "openai_compatible",
             OpenAICompatibleClient,
@@ -76,6 +77,40 @@ def test_router_builds_client_from_profile(
         assert client.base_url == base_url.rstrip("/")
         assert client.default_model == model_name
         assert client.timeout_seconds == 37
+
+
+@pytest.mark.asyncio
+async def test_openai_compatible_stream_accepts_null_content_delta() -> None:
+    class StreamResponse:
+        async def __aenter__(self) -> StreamResponse:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        def raise_for_status(self) -> None:
+            return None
+
+        async def aiter_lines(self) -> AsyncIterator[str]:
+            yield 'data: {"choices":[{"delta":{"role":"assistant","content":null},"finish_reason":null}]}'
+            yield 'data: {"choices":[{"delta":{"content":"正文"},"finish_reason":null}]}'
+            yield "data: [DONE]"
+
+    class StreamClient:
+        def stream(self, *args: object, **kwargs: object) -> StreamResponse:
+            return StreamResponse()
+
+    client = OpenAICompatibleClient(
+        api_key="placeholder",
+        base_url="https://deepseek.example",
+        default_model="deepseek-v4-flash",
+    )
+    client._client = StreamClient()  # type: ignore[assignment]
+    request = LLMRequest(messages=[])
+
+    chunks = [chunk async for chunk in client.stream_generate(request)]
+
+    assert [chunk.content_delta for chunk in chunks] == ["", "正文"]
 
 
 @pytest.mark.asyncio
@@ -165,7 +200,7 @@ async def test_profile_connection_failure_never_returns_api_key(
             "provider": "deepseek",
             "base_url": "https://invalid.example",
             "api_key": "do-not-leak-this-key",
-            "model_name": "deepseek-chat",
+            "model_name": "deepseek-v4-flash",
         }
     )
 

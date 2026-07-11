@@ -115,6 +115,23 @@ class PartialFailureRouter(SuccessfulRouter):
         raise RuntimeError("stream failed")
 
 
+class ModelAliasRouter:
+    def __init__(self) -> None:
+        self.request_models: list[str] = []
+
+    async def generate(self, request: LLMRequest, provider: str = "") -> LLMResponse:
+        self.request_models.append(request.model)
+        return LLMResponse(content="A short plan.", model="provider-internal-model")
+
+    async def stream_generate(
+        self,
+        request: LLMRequest,
+        provider: str = "",
+    ) -> AsyncIterator[LLMStreamChunk]:
+        self.request_models.append(request.model)
+        yield LLMStreamChunk(content_delta="Draft content", finish_reason="stop")
+
+
 def response_data(response: Any) -> Any:
     assert response.status_code < 400, response.text
     return response.json()["data"]
@@ -158,6 +175,29 @@ async def test_workflow_error_is_not_overwritten_as_done() -> None:
     assert state.status == "error"
     assert [event["event"] for event in events] == ["node_start", "error"]
     assert [event["event_id"] for event in events] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_workflow_keeps_configured_model_between_steps() -> None:
+    router = ModelAliasRouter()
+    state = WorkflowState(
+        run_id="run_model_alias",
+        provider="deepseek",
+        model="deepseek-v4-flash",
+    )
+    workflow = SceneWritingWorkflow(
+        state,
+        router,  # type: ignore[arg-type]
+        "system",
+        "user",
+        {},
+    )
+
+    events = [event async for event in workflow.run()]
+
+    assert events[-1]["event"] == "workflow_complete"
+    assert state.model == "deepseek-v4-flash"
+    assert router.request_models == ["deepseek-v4-flash", "deepseek-v4-flash"]
 
 
 def test_sse_success_creates_unapproved_waiting_review_version(
@@ -425,7 +465,7 @@ def test_model_profile_api_does_not_expose_api_key(client: TestClient) -> None:
             "provider": "deepseek",
             "base_url": "https://api.deepseek.com/v1",
             "api_key": placeholder_key,
-            "model_name": "deepseek-chat",
+            "model_name": "deepseek-v4-flash",
             "is_default": True,
         },
     )

@@ -10,7 +10,7 @@ class DeepSeekClient(OpenAICompatibleClient):
         self,
         api_key: str,
         base_url: str = "https://api.deepseek.com",
-        default_model: str = "deepseek-chat",
+        default_model: str = "deepseek-v4-flash",
         timeout_seconds: float = 120.0,
     ) -> None:
         super().__init__(
