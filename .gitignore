@@ -22,4 +22,4 @@ exports/
 !README.md
 docs/
 local-dev-docs/
-egg-info/
+*.egg-info/
