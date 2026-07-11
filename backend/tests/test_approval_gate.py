@@ -144,6 +144,44 @@ def test_completed_review_without_blocking_issue_can_be_approved(
     assert refreshed_version["approval_override_reason"] is None
 
 
+def test_approval_counts_plaintext_characters_from_rich_text_json(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chapter, scene = create_story(client)
+    version = response_data(
+        client.post(
+            f"/api/scenes/{scene['id']}/versions",
+            json={
+                "content_markdown": "**你好** world",
+                "content_json": {
+                    "type": "doc",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [
+                                {"type": "text", "text": "你好"},
+                                {"type": "text", "text": " world"},
+                            ],
+                        }
+                    ],
+                },
+            },
+        )
+    )
+    review_version(client, monkeypatch, version["id"], NoIssueReviewer)
+
+    response_data(
+        client.post(
+            f"/api/scenes/{scene['id']}/approve-version",
+            json={"version_id": version["id"]},
+        )
+    )
+    refreshed_chapter = response_data(client.get(f"/api/volumes/{chapter['volume_id']}/chapters"))[0]
+
+    assert refreshed_chapter["approved_word_count"] == 7
+
+
 def test_blocking_issue_requires_non_empty_override_reason(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,

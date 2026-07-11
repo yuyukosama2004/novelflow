@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.common import EntityBase
 
@@ -145,6 +146,12 @@ class SceneReorderRequest(BaseModel):
 class SceneVersionCreate(BaseModel):
     parent_version_id: str | None = None
     branch_name: str = "main"
+    content_json: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "type": "doc",
+            "content": [{"type": "paragraph"}],
+        }
+    )
     content_markdown: str = ""
     summary: str = ""
     source_type: SceneSourceType = "human"
@@ -154,6 +161,20 @@ class SceneVersionCreate(BaseModel):
     review_status: str = "not_reviewed"
     created_by: str = "user"
 
+    @field_validator("content_json")
+    @classmethod
+    def validate_content_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if value.get("type") != "doc":
+            raise ValueError("content_json root type must be doc")
+        return value
+
+    @field_validator("content_markdown")
+    @classmethod
+    def reject_html_markdown(cls, value: str) -> str:
+        if re.search(r"</?[A-Za-z][^>]*>", value):
+            raise ValueError("content_markdown must not contain HTML tags")
+        return value
+
 
 class SceneVersionRead(EntityBase):
     model_config = ConfigDict(from_attributes=True)
@@ -162,6 +183,7 @@ class SceneVersionRead(EntityBase):
     version_no: int
     parent_version_id: str | None
     branch_name: str
+    content_json: dict[str, Any]
     content_markdown: str
     summary: str
     source_type: str
@@ -172,6 +194,36 @@ class SceneVersionRead(EntityBase):
     created_by: str
     approved_at: datetime | None
     approval_override_reason: str | None
+
+
+class SceneWorkingDraftUpdate(BaseModel):
+    revision: int = Field(ge=0)
+    content_json: dict[str, Any]
+    content_markdown: str
+
+    @field_validator("content_json")
+    @classmethod
+    def validate_content_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if value.get("type") != "doc":
+            raise ValueError("content_json root type must be doc")
+        return value
+
+    @field_validator("content_markdown")
+    @classmethod
+    def reject_html_markdown(cls, value: str) -> str:
+        if re.search(r"</?[A-Za-z][^>]*>", value):
+            raise ValueError("content_markdown must not contain HTML tags")
+        return value
+
+
+class SceneWorkingDraftRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    scene_id: str
+    content_json: dict[str, Any]
+    content_markdown: str
+    revision: int
+    updated_at: datetime | None
 
 
 class ApproveVersionRequest(BaseModel):

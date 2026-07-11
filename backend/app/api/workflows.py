@@ -211,6 +211,15 @@ async def generate_scene_stream(
             # A successful generation remains a draft awaiting explicit approval.
             if state.status == "waiting_review" and state.draft.strip():
                 version_payload = SceneVersionCreate(
+                    content_json={
+                        "type": "doc",
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": state.draft}],
+                            }
+                        ],
+                    },
                     content_markdown=state.draft,
                     summary=_summary(state.draft),
                     source_type="ai_generated",

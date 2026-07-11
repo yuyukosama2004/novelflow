@@ -96,6 +96,7 @@ export interface SceneVersion extends EntityBase {
   version_no: number;
   parent_version_id: string | null;
   branch_name: string;
+  content_json: Record<string, unknown>;
   content_markdown: string;
   summary: string;
   source_type: string;
@@ -106,6 +107,14 @@ export interface SceneVersion extends EntityBase {
   created_by: string;
   approved_at: string | null;
   approval_override_reason: string | null;
+}
+
+export interface SceneWorkingDraft {
+  scene_id: string;
+  content_json: Record<string, unknown>;
+  content_markdown: string;
+  revision: number;
+  updated_at: string | null;
 }
 
 export interface HealthStatus {

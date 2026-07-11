@@ -13,6 +13,7 @@ function makeVersion(
     scene_id: 'scene-1',
     parent_version_id: null,
     branch_name: 'main',
+    content_json: { type: 'doc', content: [{ type: 'paragraph' }] },
     content_markdown: '<p>Sample content for version.</p>',
     summary: '',
     source_type: 'human_revised',

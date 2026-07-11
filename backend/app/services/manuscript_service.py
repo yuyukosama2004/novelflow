@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from typing import Any
+
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -9,7 +12,7 @@ from app.core.exceptions import (
     ValidationAppError,
 )
 from app.models.base import utc_now
-from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
+from app.models.manuscript import Chapter, Scene, SceneVersion, SceneWorkingDraft, Volume
 from app.models.memory import MemoryCandidate, MemoryExtractionRun
 from app.models.review import ReviewIssue, ReviewRun
 from app.repositories.base import apply_updates
@@ -27,10 +30,27 @@ from app.schemas.manuscript import (
     SceneReorderRequest,
     SceneUpdate,
     SceneVersionCreate,
+    SceneWorkingDraftUpdate,
     VolumeCreate,
     VolumeUpdate,
 )
 from app.services.project_service import ProjectService
+
+
+def count_plaintext_characters(document: dict[str, Any]) -> int:
+    """Count visible non-whitespace characters in a Tiptap document."""
+
+    def collect(node: object) -> str:
+        if not isinstance(node, dict):
+            return ""
+        text = node.get("text")
+        own_text = text if isinstance(text, str) else ""
+        children = node.get("content")
+        if not isinstance(children, list):
+            return own_text
+        return own_text + "".join(collect(child) for child in children)
+
+    return sum(not character.isspace() for character in collect(document))
 
 
 class ManuscriptService:
@@ -150,6 +170,76 @@ class ManuscriptService:
             raise NotFoundError("scene version not found", {"version_id": version_id})
         return version
 
+    async def get_working_draft(self, scene_id: str) -> SceneWorkingDraft | None:
+        await self.get_scene(scene_id)
+        result = await self.session.execute(
+            select(SceneWorkingDraft).where(SceneWorkingDraft.scene_id == scene_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def update_working_draft(
+        self,
+        scene_id: str,
+        payload: SceneWorkingDraftUpdate,
+    ) -> SceneWorkingDraft:
+        await self.get_scene(scene_id)
+        existing = await self.get_working_draft(scene_id)
+        if existing is None:
+            if payload.revision != 0:
+                raise ConflictError(
+                    "working draft revision conflict",
+                    {"reason": "DRAFT_REVISION_CONFLICT", "current_revision": 0},
+                )
+            draft = SceneWorkingDraft(
+                scene_id=scene_id,
+                content_json=payload.content_json,
+                content_markdown=payload.content_markdown,
+                revision=1,
+            )
+            self.session.add(draft)
+            try:
+                await self.session.commit()
+            except IntegrityError:
+                await self.session.rollback()
+                current = await self.get_working_draft(scene_id)
+                raise ConflictError(
+                    "working draft revision conflict",
+                    {
+                        "reason": "DRAFT_REVISION_CONFLICT",
+                        "current_revision": current.revision if current else 0,
+                    },
+                ) from None
+            await self.session.refresh(draft)
+            return draft
+
+        result = await self.session.execute(
+            update(SceneWorkingDraft)
+            .where(
+                SceneWorkingDraft.scene_id == scene_id,
+                SceneWorkingDraft.revision == payload.revision,
+            )
+            .values(
+                content_json=payload.content_json,
+                content_markdown=payload.content_markdown,
+                revision=payload.revision + 1,
+            )
+        )
+        if result.rowcount != 1:  # type: ignore[attr-defined]
+            await self.session.rollback()
+            current = await self.get_working_draft(scene_id)
+            raise ConflictError(
+                "working draft revision conflict",
+                {
+                    "reason": "DRAFT_REVISION_CONFLICT",
+                    "current_revision": current.revision if current else 0,
+                },
+            )
+        await self.session.commit()
+        updated = await self.get_working_draft(scene_id)
+        if updated is None:  # pragma: no cover - guarded by the update above
+            raise NotFoundError("working draft not found", {"scene_id": scene_id})
+        return updated
+
     async def approve_version(self, scene_id: str, payload: ApproveVersionRequest) -> Scene:
         scene = await self.get_scene(scene_id)
         version = await self.get_version(payload.version_id)
@@ -214,6 +304,8 @@ class ManuscriptService:
         scene.status = "canonicalizing"
         version.approved_at = utc_now()
         version.approval_override_reason = override_reason if blocking_issues else None
+        chapter = await self.get_chapter(scene.chapter_id)
+        chapter.approved_word_count += count_plaintext_characters(version.content_json)
         await self.session.commit()
         await self.session.refresh(scene)
         return scene

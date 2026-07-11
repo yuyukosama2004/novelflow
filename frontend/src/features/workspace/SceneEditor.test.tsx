@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { apiClient } from '../../api/client';
@@ -12,19 +12,30 @@ import type {
 } from '../../types/entities';
 import { SceneEditor } from './SceneEditor';
 
-const { editorMock } = vi.hoisted(() => ({
-  editorMock: { commands: { setContent: vi.fn() } },
+const { editorMock, editorOptions } = vi.hoisted(() => ({
+  editorMock: {
+    commands: { setContent: vi.fn() },
+    getJSON: vi.fn(),
+  },
+  editorOptions: { current: undefined as
+    | { onUpdate?: (event: { editor: unknown }) => void }
+    | undefined },
 }));
 
 vi.mock('@tiptap/react', () => ({
   EditorContent: () => <div data-testid="editor" />,
-  useEditor: () => editorMock,
+  useEditor: (options: { onUpdate?: (event: { editor: unknown }) => void }) => {
+    editorOptions.current = options;
+    return editorMock;
+  },
 }));
 
 vi.mock('../../api/client', () => ({
   apiClient: {
     listVersions: vi.fn(),
     createVersion: vi.fn(),
+    getWorkingDraft: vi.fn(),
+    updateWorkingDraft: vi.fn(),
     approveVersion: vi.fn(),
     runReview: vi.fn(),
   },
@@ -70,6 +81,7 @@ function version(reviewStatus: string): SceneVersion {
     version_no: 1,
     parent_version_id: null,
     branch_name: 'main',
+    content_json: { type: 'doc', content: [{ type: 'paragraph' }] },
     content_markdown: '正文',
     summary: '',
     source_type: 'human',
@@ -117,6 +129,20 @@ describe('SceneEditor approval gate', () => {
     vi.mocked(apiClient.createVersion).mockResolvedValue(
       version('not_reviewed'),
     );
+    vi.mocked(apiClient.getWorkingDraft).mockResolvedValue({
+      scene_id: scene.id,
+      content_json: { type: 'doc', content: [{ type: 'paragraph' }] },
+      content_markdown: '',
+      revision: 0,
+      updated_at: null,
+    });
+    vi.mocked(apiClient.updateWorkingDraft).mockResolvedValue({
+      scene_id: scene.id,
+      content_json: { type: 'doc', content: [{ type: 'paragraph' }] },
+      content_markdown: '新草稿',
+      revision: 1,
+      updated_at: now,
+    });
     vi.mocked(apiClient.runReview).mockResolvedValue(reviewResult);
     vi.mocked(apiClient.approveVersion).mockResolvedValue({
       ...scene,
@@ -158,10 +184,89 @@ describe('SceneEditor approval gate', () => {
     await waitFor(() => {
       expect(apiClient.createVersion).toHaveBeenCalledWith(scene.id, {
         content_markdown: '**重点**  \n下一行',
+        content_json: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: '重点', marks: [{ type: 'bold' }] },
+                { type: 'hardBreak' },
+                { type: 'text', text: '下一行', marks: [] },
+              ],
+            },
+          ],
+        },
         summary: scene.title,
         source_type: 'human_revised',
       });
     });
+  });
+
+  it('autosaves only the working draft without creating a version', async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([]);
+    renderWithQuery(<SceneEditor scene={scene} />);
+
+    await waitFor(() => {
+      expect(editorMock.commands.setContent).toHaveBeenCalled();
+    });
+
+    const document = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: '新草稿' }] },
+      ],
+    };
+    editorMock.getJSON.mockReturnValue(document);
+    vi.useFakeTimers();
+    act(() => {
+      editorOptions.current?.onUpdate?.({ editor: editorMock });
+    });
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
+    await act(async () => Promise.resolve());
+    vi.useRealTimers();
+
+    expect(apiClient.updateWorkingDraft).toHaveBeenCalledWith(scene.id, {
+      revision: 0,
+      content_markdown: '新草稿',
+      content_json: document,
+    });
+    expect(apiClient.createVersion).not.toHaveBeenCalled();
+  });
+
+  it('saves a pending draft before manually creating a version', async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([]);
+    renderWithQuery(<SceneEditor scene={scene} />);
+
+    await waitFor(() => {
+      expect(editorMock.commands.setContent).toHaveBeenCalled();
+    });
+    const document = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: '立即保存' }] },
+      ],
+    };
+    editorMock.getJSON.mockReturnValue(document);
+    act(() => {
+      editorOptions.current?.onUpdate?.({ editor: editorMock });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '保存版本' }));
+
+    await waitFor(() => {
+      expect(apiClient.createVersion).toHaveBeenCalled();
+    });
+    expect(apiClient.updateWorkingDraft).toHaveBeenCalledWith(scene.id, {
+      revision: 0,
+      content_markdown: '立即保存',
+      content_json: document,
+    });
+    expect(
+      vi.mocked(apiClient.updateWorkingDraft).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(apiClient.createVersion).mock.invocationCallOrder[0]);
   });
 
   it('guides an unreviewed version through review before approval', async () => {

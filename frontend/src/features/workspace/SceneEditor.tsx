@@ -10,7 +10,13 @@ import { IconButton } from '../../components/IconButton';
 import { StatusPill } from '../../components/StatusPill';
 import type { Scene, SceneVersion } from '../../types/entities';
 import { label, SOURCE_TYPE_LABELS } from '../../utils/enumLabels';
-import { RichTextCodec, RichTextCodecError } from '../../utils/richTextCodec';
+import {
+  RichTextCodec,
+  RichTextCodecError,
+  type RichTextNode,
+} from '../../utils/richTextCodec';
+
+type SaveState = 'idle' | 'saving' | 'draft_saved' | 'version_saved' | 'error';
 
 interface SceneEditorProps {
   scene: Scene | null;
@@ -32,12 +38,13 @@ function selectInitialContent(
 }
 
 function saveStateLabel(
-  saveState: 'idle' | 'saving' | 'saved' | 'error',
+  saveState: SaveState,
   dirty: boolean,
   sceneStatus: string,
 ): string {
   if (saveState === 'saving') return '保存中';
-  if (saveState === 'saved') return '已保存';
+  if (saveState === 'draft_saved') return '草稿已保存';
+  if (saveState === 'version_saved') return '版本已保存';
   if (saveState === 'error') return '保存失败';
   if (dirty) return '未保存';
   return sceneStatus;
@@ -72,6 +79,22 @@ function codecFailureMessage(error: unknown): string {
     : '正文格式转换失败，请检查内容后重试。';
 }
 
+function draftFailureReason(error: unknown): string | undefined {
+  if (!axios.isAxiosError(error)) {
+    return undefined;
+  }
+  const data = error.response?.data as
+    | { details?: { reason?: string } }
+    | undefined;
+  return data?.details?.reason;
+}
+
+function draftFailureMessage(error: unknown): string {
+  return draftFailureReason(error) === 'DRAFT_REVISION_CONFLICT'
+    ? '草稿已在别处更新，请刷新页面后继续编辑。'
+    : '草稿保存失败，请稍后重试。';
+}
+
 function contentPreview(value: string): string {
   try {
     return RichTextCodec.toPlaintext(RichTextCodec.toTiptapJson(value)).slice(0, 80);
@@ -87,18 +110,31 @@ export function SceneEditor({
 }: SceneEditorProps) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
+  const [contentJson, setContentJson] = useState<RichTextNode>({
+    type: 'doc',
+    content: [{ type: 'paragraph' }],
+  });
   const [dirty, setDirty] = useState(false);
-  const [saveState, setSaveState] = useState<
-    'idle' | 'saving' | 'saved' | 'error'
-  >('idle');
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const [approvalMessage, setApprovalMessage] = useState('');
   const [codecMessage, setCodecMessage] = useState('');
+  const [draftMessage, setDraftMessage] = useState('');
 
   const versions = useQuery({
     queryKey: ['scene-versions', scene?.id],
     queryFn: () => apiClient.listVersions(scene?.id ?? ''),
     enabled: Boolean(scene?.id),
   });
+
+  const workingDraft = useQuery({
+    queryKey: ['scene-working-draft', scene?.id],
+    queryFn: () => apiClient.getWorkingDraft(scene?.id ?? ''),
+    enabled: Boolean(scene?.id),
+  });
+
+  const draftRevisionRef = useRef(0);
+  const contentRef = useRef('');
+  const initializedSceneRef = useRef<string | null>(null);
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -111,7 +147,11 @@ export function SceneEditor({
     },
     onUpdate: ({ editor: activeEditor }) => {
       try {
-        setContent(RichTextCodec.toMarkdown(activeEditor.getJSON()));
+        const document = activeEditor.getJSON() as RichTextNode;
+        const markdown = RichTextCodec.toMarkdown(document);
+        setContent(markdown);
+        contentRef.current = markdown;
+        setContentJson(document);
         setCodecMessage('');
         setDirty(true);
         setSaveState('idle');
@@ -128,31 +168,95 @@ export function SceneEditor({
   );
 
   useEffect(() => {
+    if (!scene?.id) {
+      initializedSceneRef.current = null;
+      return;
+    }
+    if (
+      !editor ||
+      versions.isLoading ||
+      workingDraft.isLoading ||
+      initializedSceneRef.current === scene.id
+    ) {
+      return;
+    }
     try {
-      const document = RichTextCodec.toTiptapJson(selectedContent);
-      setContent(RichTextCodec.toMarkdown(document));
+      const draft = workingDraft.data;
+      const document =
+        draft && draft.revision > 0
+          ? (draft.content_json as unknown as RichTextNode)
+          : RichTextCodec.toTiptapJson(selectedContent);
+      const markdown = RichTextCodec.toMarkdown(document);
+      setContent(markdown);
+      contentRef.current = markdown;
+      setContentJson(document);
+      draftRevisionRef.current = draft?.revision ?? 0;
       setCodecMessage('');
+      setDraftMessage('');
       setDirty(false);
       setSaveState('idle');
-      editor?.commands.setContent(document, false);
+      editor.commands.setContent(document, false);
+      initializedSceneRef.current = scene.id;
     } catch (error) {
       setContent('');
+      contentRef.current = '';
       setCodecMessage(codecFailureMessage(error));
       setDirty(false);
       setSaveState('error');
+      initializedSceneRef.current = scene.id;
     }
-  }, [editor, selectedContent]);
+  }, [
+    editor,
+    scene?.id,
+    selectedContent,
+    versions.isLoading,
+    workingDraft.data,
+    workingDraft.isLoading,
+  ]);
+
+  const updateDraft = useMutation({
+    mutationFn: (payload: {
+      content_markdown: string;
+      content_json: RichTextNode;
+    }) =>
+      apiClient.updateWorkingDraft(scene?.id ?? '', {
+        revision: draftRevisionRef.current,
+        content_markdown: payload.content_markdown,
+        content_json: payload.content_json as unknown as Record<string, unknown>,
+      }),
+    onSuccess: (draft, payload) => {
+      draftRevisionRef.current = draft.revision;
+      setDraftMessage('');
+      if (contentRef.current === payload.content_markdown) {
+        setDirty(false);
+        setSaveState('draft_saved');
+      }
+      queryClient.setQueryData(
+        ['scene-working-draft', scene?.id],
+        draft,
+      );
+    },
+    onError: (error) => {
+      setDraftMessage(draftFailureMessage(error));
+      setSaveState('error');
+    },
+  });
 
   const createVersion = useMutation({
-    mutationFn: (payload: { content_markdown: string; summary?: string }) =>
+    mutationFn: (payload: {
+      content_markdown: string;
+      content_json: RichTextNode;
+      summary?: string;
+    }) =>
       apiClient.createVersion(scene?.id ?? '', {
         content_markdown: payload.content_markdown,
+        content_json: payload.content_json as unknown as Record<string, unknown>,
         summary: payload.summary ?? '',
         source_type: 'human_revised',
       }),
     onSuccess: (version) => {
       setDirty(false);
-      setSaveState('saved');
+      setSaveState('version_saved');
       queryClient.invalidateQueries({
         queryKey: ['scene-versions', scene?.id],
       });
@@ -199,6 +303,24 @@ export function SceneEditor({
     },
   });
 
+  async function saveVersion() {
+    if (dirty) {
+      try {
+        await updateDraft.mutateAsync({
+          content_markdown: content,
+          content_json: contentJson,
+        });
+      } catch {
+        return;
+      }
+    }
+    createVersion.mutate({
+      content_markdown: content,
+      content_json: contentJson,
+      summary: scene?.title ?? '',
+    });
+  }
+
   async function requestApproval(version: SceneVersion) {
     setApprovalMessage('');
     if (version.review_status !== 'completed') {
@@ -239,20 +361,23 @@ export function SceneEditor({
   }
 
   // 使用 ref 持有 mutate 引用，避免 useEffect 依赖不稳定
-  const mutateRef = useRef(createVersion.mutate);
-  mutateRef.current = createVersion.mutate;
+  const updateDraftRef = useRef(updateDraft.mutate);
+  updateDraftRef.current = updateDraft.mutate;
 
   // 自动保存 debounce
   useEffect(() => {
-    if (!scene?.id || !dirty || !content.trim()) {
+    if (!scene?.id || !dirty || !content.trim() || updateDraft.isPending) {
       return;
     }
     const timer = window.setTimeout(() => {
       setSaveState('saving');
-      mutateRef.current({ content_markdown: content, summary: scene.title });
+      updateDraftRef.current({
+        content_markdown: content,
+        content_json: contentJson,
+      });
     }, 1600);
     return () => window.clearTimeout(timer);
-  }, [content, dirty, scene?.id, scene?.title]);
+  }, [content, contentJson, dirty, scene?.id, updateDraft.isPending]);
 
   if (!scene) {
     return (
@@ -278,7 +403,7 @@ export function SceneEditor({
             tone={
               saveState === 'error'
                 ? 'warn'
-                : saveState === 'saved'
+                : saveState === 'draft_saved' || saveState === 'version_saved'
                   ? 'ok'
                   : 'neutral'
             }
@@ -289,13 +414,10 @@ export function SceneEditor({
             icon={<Save size={16} />}
             label="保存版本"
             tone="primary"
-            disabled={!content.trim() || createVersion.isPending}
-            onClick={() =>
-              createVersion.mutate({
-                content_markdown: content,
-                summary: scene.title,
-              })
+            disabled={
+              !content.trim() || createVersion.isPending || updateDraft.isPending
             }
+            onClick={() => void saveVersion()}
           />
         </div>
       </div>
@@ -305,6 +427,12 @@ export function SceneEditor({
       {codecMessage ? (
         <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
           {codecMessage}
+        </p>
+      ) : null}
+
+      {draftMessage ? (
+        <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {draftMessage}
         </p>
       ) : null}
 

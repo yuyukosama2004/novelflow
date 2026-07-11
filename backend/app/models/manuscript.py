@@ -76,6 +76,23 @@ class Scene(UUIDMixin, TimestampMixin, Base):
         foreign_keys="SceneVersion.scene_id",
         order_by="SceneVersion.version_no",
     )
+    working_draft = relationship(
+        "SceneWorkingDraft",
+        back_populates="scene",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class SceneWorkingDraft(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "scene_working_drafts"
+
+    scene_id: Mapped[str] = mapped_column(ForeignKey("scenes.id"), unique=True, index=True)
+    content_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    content_markdown: Mapped[str] = mapped_column(Text, default="")
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+
+    scene = relationship("Scene", back_populates="working_draft")
 
 
 class SceneVersion(UUIDMixin, TimestampMixin, Base):
@@ -86,6 +103,7 @@ class SceneVersion(UUIDMixin, TimestampMixin, Base):
     version_no: Mapped[int] = mapped_column(Integer)
     parent_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     branch_name: Mapped[str] = mapped_column(String(100), default="main")
+    content_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     content_markdown: Mapped[str] = mapped_column(Text, default="")
     summary: Mapped[str] = mapped_column(Text, default="")
     source_type: Mapped[str] = mapped_column(String(40), default="human")

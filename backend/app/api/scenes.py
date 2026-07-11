@@ -16,6 +16,8 @@ from app.schemas.manuscript import (
     SceneUpdate,
     SceneVersionCreate,
     SceneVersionRead,
+    SceneWorkingDraftRead,
+    SceneWorkingDraftUpdate,
     VersionCompareRead,
     VolumeCreate,
     VolumeRead,
@@ -160,6 +162,38 @@ async def list_scene_versions(
 ) -> dict:
     versions = await ManuscriptService(session).list_versions(scene_id)
     return success([SceneVersionRead.model_validate(item) for item in versions], request)
+
+
+@router.get("/scenes/{scene_id}/working-draft")
+async def get_scene_working_draft(
+    scene_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    draft = await ManuscriptService(session).get_working_draft(scene_id)
+    if draft is None:
+        return success(
+            SceneWorkingDraftRead(
+                scene_id=scene_id,
+                content_json={"type": "doc", "content": [{"type": "paragraph"}]},
+                content_markdown="",
+                revision=0,
+                updated_at=None,
+            ),
+            request,
+        )
+    return success(SceneWorkingDraftRead.model_validate(draft), request)
+
+
+@router.put("/scenes/{scene_id}/working-draft")
+async def update_scene_working_draft(
+    scene_id: str,
+    payload: SceneWorkingDraftUpdate,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    draft = await ManuscriptService(session).update_working_draft(scene_id, payload)
+    return success(SceneWorkingDraftRead.model_validate(draft), request)
 
 
 @router.post("/scenes/{scene_id}/versions")

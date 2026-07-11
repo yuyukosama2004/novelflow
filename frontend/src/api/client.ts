@@ -20,6 +20,7 @@ import type {
   ReviewRun,
   Scene,
   SceneVersion,
+  SceneWorkingDraft,
   StoryCandidateEntity,
   Volume,
   WorldEntry,
@@ -180,6 +181,7 @@ export const apiClient = {
     sceneId: string,
     payload: {
       content_markdown: string;
+      content_json?: Record<string, unknown>;
       summary?: string;
       source_type?: string;
       branch_name?: string;
@@ -188,6 +190,19 @@ export const apiClient = {
   ) =>
     unwrap<SceneVersion>(
       api.post(`/scenes/${sceneId}/versions`, payload),
+    ),
+  getWorkingDraft: (sceneId: string) =>
+    unwrap<SceneWorkingDraft>(api.get(`/scenes/${sceneId}/working-draft`)),
+  updateWorkingDraft: (
+    sceneId: string,
+    payload: {
+      revision: number;
+      content_json: Record<string, unknown>;
+      content_markdown: string;
+    },
+  ) =>
+    unwrap<SceneWorkingDraft>(
+      api.put(`/scenes/${sceneId}/working-draft`, payload),
     ),
   approveVersion: (
     sceneId: string,
