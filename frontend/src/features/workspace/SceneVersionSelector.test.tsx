@@ -97,7 +97,7 @@ describe("SceneVersionSelector", () => {
     expect(optionTexts[2]).toContain("v1");
   });
 
-  it("includes version metadata in option labels", () => {
+  it("uses the version, source, summary, and word-count format", () => {
     render(
       <SceneVersionSelector
         versions={[versionOne, versionTwo, versionThree]}
@@ -110,14 +110,12 @@ describe("SceneVersionSelector", () => {
     const select = screen.getByRole("combobox") as HTMLSelectElement;
     const options = Array.from(select.options);
 
-    // human_revised → "人工修订"
     expect(
       options.find((option) => option.value === "v3")?.textContent,
-    ).toContain("人工修订 / completed");
-    // ai_generated → "AI 生成", approved → "正式"
+    ).toContain("v3 / 人工 / Revised draft with fixes / 24 字");
     expect(
       options.find((option) => option.value === "v2")?.textContent,
-    ).toContain("AI 生成 / 正式 / pending");
+    ).toContain("v2 / 生成 / AI generated draft / 24 字");
     expect(
       options.find((option) => option.value === "v1")?.textContent,
     ).toContain("First draft");
@@ -148,10 +146,12 @@ describe("SceneVersionSelector", () => {
       />,
     );
 
-    // AI 生成（正式）
-    expect(screen.getByText(/AI 生成（正式）/)).toBeInTheDocument();
-    expect(screen.getByText("pending")).toBeInTheDocument();
-    expect(screen.getByText("AI generated draft")).toBeInTheDocument();
+    expect(screen.getByText("v2")).toBeInTheDocument();
+    expect(screen.getByText("生成")).toBeInTheDocument();
+    expect(screen.getByText("24 字")).toBeInTheDocument();
+    expect(
+      screen.getByText("内容梗概：AI generated draft"),
+    ).toBeInTheDocument();
   });
 
   it("uses a readable metadata label instead of raw manuscript when summary is absent", () => {
@@ -171,7 +171,7 @@ describe("SceneVersionSelector", () => {
       />,
     );
 
-    expect(screen.getByText("人工修订正文 · 38 字")).toBeInTheDocument();
+    expect(screen.getByText("内容梗概：未填写内容梗概")).toBeInTheDocument();
     expect(
       screen.queryByText("This is the full content of the scene version."),
     ).not.toBeInTheDocument();
@@ -194,7 +194,7 @@ describe("SceneVersionSelector", () => {
       />,
     );
 
-    expect(screen.getByText("人工修订正文 · 0 字")).toBeInTheDocument();
+    expect(screen.getByText("0 字")).toBeInTheDocument();
   });
 
   it("falls back to the first rendered option when the selected id is missing", () => {

@@ -1,8 +1,6 @@
 import { ChevronsUpDown, Layers } from "lucide-react";
 
-import { StatusPill } from "../../components/StatusPill";
 import type { SceneVersion } from "../../types/entities";
-import { label, SOURCE_TYPE_LABELS } from "../../utils/enumLabels";
 
 interface Props {
   versions: SceneVersion[];
@@ -25,20 +23,22 @@ function versionPreview(version: SceneVersion): string {
   if (summary && !looksLikeRawOpening) {
     return version.summary;
   }
-  const count = content.replace(/\s+/g, "").length;
-  return `${label(SOURCE_TYPE_LABELS, version.source_type)}正文 · ${count} 字`;
+  return "未填写内容梗概";
 }
 
-function reviewStatusLabel(reviewStatus: string): string {
-  if (!reviewStatus || reviewStatus === "none") {
-    return "";
-  }
-  return reviewStatus.replace(/_/g, " ");
+function versionSourceLabel(sourceType: string): string {
+  if (sourceType === "ai_generated") return "生成";
+  if (sourceType === "ai_revised") return "重写";
+  if (sourceType === "ai_polished") return "润色";
+  return "人工";
+}
+
+function versionWordCount(version: SceneVersion): number {
+  return stripHtml(version.content_markdown).replace(/\s+/g, "").length;
 }
 
 export function SceneVersionSelector({
   versions,
-  approvedVersionId,
   selectedVersionId,
   onSelect,
 }: Props) {
@@ -76,23 +76,12 @@ export function SceneVersionSelector({
           className="w-full appearance-none rounded-md border border-slate-300 bg-white py-2 pl-3 pr-8 text-sm text-slate-800 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
         >
           {sorted.map((version) => {
-            const isApproved = version.id === approvedVersionId;
-            const reviewLabel = reviewStatusLabel(version.review_status);
-            const labelParts = [
-              `v${version.version_no}`,
-              label(SOURCE_TYPE_LABELS, version.source_type),
-            ];
-            if (isApproved) {
-              labelParts.push("正式");
-            }
-            if (reviewLabel) {
-              labelParts.push(reviewLabel);
-            }
-
             return (
               <option key={version.id} value={version.id}>
-                {labelParts.join(" / ")} -{" "}
-                {versionPreview(version).slice(0, 60)}
+                v{version.version_no} /{" "}
+                {versionSourceLabel(version.source_type)} /{" "}
+                {versionPreview(version).slice(0, 60)} /{" "}
+                {versionWordCount(version)} 字
               </option>
             );
           })}
@@ -105,25 +94,17 @@ export function SceneVersionSelector({
 
       {selected ? (
         <div className="mt-2 rounded-md border border-slate-100 bg-slate-50 p-2">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 text-slate-700">
             <span className="font-medium text-slate-900">
               v{selected.version_no}
             </span>
-            <StatusPill
-              tone={selected.id === approvedVersionId ? "ok" : "neutral"}
-            >
-              {`${label(SOURCE_TYPE_LABELS, selected.source_type)}${
-                selected.id === approvedVersionId ? "（正式）" : ""
-              }`}
-            </StatusPill>
-            {reviewStatusLabel(selected.review_status) ? (
-              <StatusPill tone="neutral">
-                {reviewStatusLabel(selected.review_status)}
-              </StatusPill>
-            ) : null}
+            <span>/</span>
+            <span>{versionSourceLabel(selected.source_type)}</span>
+            <span>/</span>
+            <span>{versionWordCount(selected)} 字</span>
           </div>
           <p className="mt-1 line-clamp-2 text-slate-500">
-            {versionPreview(selected)}
+            内容梗概：{versionPreview(selected)}
           </p>
         </div>
       ) : null}
