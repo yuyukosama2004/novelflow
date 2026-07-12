@@ -1212,6 +1212,11 @@ export function WorkspacePage() {
               approvedVersionId={scene.data?.approved_version_id ?? null}
               selectedVersionId={selectedSceneVersionId || null}
               onSelect={handleVersionSelectionChange}
+              onSummaryGenerated={() =>
+                queryClient.invalidateQueries({
+                  queryKey: ["scene-versions", selectedSceneId],
+                })
+              }
             />
           ) : null}
 

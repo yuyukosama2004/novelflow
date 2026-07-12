@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { ChevronsUpDown, Layers } from "lucide-react";
 
+import { apiClient } from "../../api/client";
 import type { SceneVersion } from "../../types/entities";
 
 interface Props {
@@ -7,23 +9,25 @@ interface Props {
   approvedVersionId: string | null;
   selectedVersionId: string | null;
   onSelect: (versionId: string) => void;
+  onSummaryGenerated?: (version: SceneVersion) => void;
 }
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, "");
 }
 
-function versionPreview(version: SceneVersion): string {
+function versionPreview(version: SceneVersion, override = ""): string {
+  if (override) return override;
   const summary = version.summary?.trim();
   const content = stripHtml(version.content_markdown).trim();
   const looksLikeRawOpening =
     Boolean(summary) &&
     (summary!.length > 120 ||
       content.startsWith(summary!.replace(/\.\.\.$/, "")));
-  if (summary && !looksLikeRawOpening) {
+  if (summary && summary.length <= 16 && !looksLikeRawOpening) {
     return version.summary;
   }
-  return "未填写内容梗概";
+  return "待生成内容梗概";
 }
 
 function versionSourceLabel(sourceType: string): string {
@@ -41,7 +45,12 @@ export function SceneVersionSelector({
   versions,
   selectedVersionId,
   onSelect,
+  onSummaryGenerated,
 }: Props) {
+  const [summaryOverrides, setSummaryOverrides] = useState<
+    Record<string, string>
+  >({});
+  const [summarizingVersionId, setSummarizingVersionId] = useState("");
   if (versions.length === 0) {
     return (
       <section className="rounded-md border border-slate-200 bg-white p-3 text-xs">
@@ -60,6 +69,23 @@ export function SceneVersionSelector({
   const selected = selectedVersionId
     ? (versions.find((version) => version.id === selectedVersionId) ?? null)
     : null;
+  const selectedSummary = selected
+    ? versionPreview(selected, summaryOverrides[selected.id])
+    : "";
+
+  async function summarizeVersion(version: SceneVersion) {
+    setSummarizingVersionId(version.id);
+    try {
+      const updated = await apiClient.generateVersionSummary(version.id);
+      setSummaryOverrides((current) => ({
+        ...current,
+        [updated.id]: updated.summary || "待生成内容梗概",
+      }));
+      onSummaryGenerated?.(updated);
+    } finally {
+      setSummarizingVersionId("");
+    }
+  }
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-3 text-xs">
@@ -80,7 +106,7 @@ export function SceneVersionSelector({
               <option key={version.id} value={version.id}>
                 v{version.version_no} /{" "}
                 {versionSourceLabel(version.source_type)} /{" "}
-                {versionPreview(version).slice(0, 60)} /{" "}
+                {versionPreview(version, summaryOverrides[version.id])} /{" "}
                 {versionWordCount(version)} 字
               </option>
             );
@@ -104,8 +130,19 @@ export function SceneVersionSelector({
             <span>{versionWordCount(selected)} 字</span>
           </div>
           <p className="mt-1 line-clamp-2 text-slate-500">
-            内容梗概：{versionPreview(selected)}
+            内容梗概：{selectedSummary}
           </p>
+          {selectedSummary === "待生成内容梗概" ? (
+            <button
+              onClick={() => void summarizeVersion(selected)}
+              disabled={summarizingVersionId === selected.id}
+              className="mt-2 rounded border border-indigo-200 bg-white px-2 py-1 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+            >
+              {summarizingVersionId === selected.id
+                ? "AI 正在生成梗概…"
+                : "AI 生成梗概"}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </section>

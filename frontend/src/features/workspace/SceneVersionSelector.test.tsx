@@ -41,7 +41,7 @@ const versionTwo = makeVersion({
   id: "v2",
   version_no: 2,
   source_type: "ai_generated",
-  summary: "AI generated draft",
+  summary: "雨夜危机相遇",
   review_status: "pending",
 });
 const versionThree = makeVersion({
@@ -112,10 +112,10 @@ describe("SceneVersionSelector", () => {
 
     expect(
       options.find((option) => option.value === "v3")?.textContent,
-    ).toContain("v3 / 人工 / Revised draft with fixes / 24 字");
+    ).toContain("v3 / 人工 / 待生成内容梗概 / 24 字");
     expect(
       options.find((option) => option.value === "v2")?.textContent,
-    ).toContain("v2 / 生成 / AI generated draft / 24 字");
+    ).toContain("v2 / 生成 / 雨夜危机相遇 / 24 字");
     expect(
       options.find((option) => option.value === "v1")?.textContent,
     ).toContain("First draft");
@@ -149,9 +149,7 @@ describe("SceneVersionSelector", () => {
     expect(screen.getByText("v2")).toBeInTheDocument();
     expect(screen.getByText("生成")).toBeInTheDocument();
     expect(screen.getByText("24 字")).toBeInTheDocument();
-    expect(
-      screen.getByText("内容梗概：AI generated draft"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("内容梗概：雨夜危机相遇")).toBeInTheDocument();
   });
 
   it("uses a readable metadata label instead of raw manuscript when summary is absent", () => {
@@ -171,7 +169,7 @@ describe("SceneVersionSelector", () => {
       />,
     );
 
-    expect(screen.getByText("内容梗概：未填写内容梗概")).toBeInTheDocument();
+    expect(screen.getByText("内容梗概：待生成内容梗概")).toBeInTheDocument();
     expect(
       screen.queryByText("This is the full content of the scene version."),
     ).not.toBeInTheDocument();

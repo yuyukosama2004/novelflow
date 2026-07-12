@@ -25,24 +25,12 @@ from app.schemas.manuscript import SceneVersionCreate, SceneVersionRead
 from app.services.context_builder import ContextBuilder, SceneContext
 from app.services.manuscript_service import ManuscriptService
 from app.services.model_runtime import ModelRuntimeResolver
+from app.services.version_summary import generate_version_summary
 from app.services.writing_style import perspective_instruction, writing_style_instruction
 from app.workflows.scene_writing import SceneWritingWorkflow, WorkflowState
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def _summary_from_plan(plan: str, scene_title: str, generation_mode: str) -> str:
-    """Return a navigable version label without leaking raw manuscript text."""
-    match = re.search(r"(?:摘要|概述)\s*[：:]\s*([^\n]+)", plan)
-    if match:
-        summary = match.group(1).strip().strip("。")
-        if summary:
-            return summary[:120]
-    mode_label = {"new": "AI 初稿", "rewrite": "AI 重写", "polish": "AI 润色"}[
-        generation_mode
-    ]
-    return f"{scene_title} · {mode_label}，待作者审核"
 
 
 def _perspective_warning(content: str, pov_type: str) -> str:
@@ -365,6 +353,11 @@ async def generate_scene_stream(
 
             # A successful generation remains a draft awaiting explicit approval.
             if state.status == "waiting_review" and state.draft.strip():
+                try:
+                    summary = await generate_version_summary(runtime, state.draft)
+                except Exception:
+                    logger.warning("version summary generation failed", exc_info=True)
+                    summary = ""
                 version_payload = SceneVersionCreate(
                     content_json={
                         "type": "doc",
@@ -376,11 +369,7 @@ async def generate_scene_stream(
                         ],
                     },
                     content_markdown=state.draft,
-                    summary=_summary_from_plan(
-                        state.plan,
-                        scene.title,
-                        generation.generation_mode,
-                    ),
+                    summary=summary,
                     source_type=("ai_generated" if generation.generation_mode == "new" else "ai_revised"),
                     model_profile_id=runtime.profile_id,
                     prompt_snapshot_json=state.prompt_snapshot,

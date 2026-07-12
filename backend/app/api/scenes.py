@@ -26,6 +26,8 @@ from app.schemas.manuscript import (
     VolumeUpdate,
 )
 from app.services.manuscript_service import ManuscriptService
+from app.services.model_runtime import ModelRuntimeResolver
+from app.services.version_summary import generate_version_summary
 
 router = APIRouter()
 
@@ -250,6 +252,22 @@ async def get_scene_version(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     version = await ManuscriptService(session).get_version(version_id)
+    return success(SceneVersionRead.model_validate(version), request)
+
+
+@router.post("/scene-versions/{version_id}/generate-summary")
+async def generate_scene_version_summary(
+    version_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Create or refresh a short AI synopsis for one persisted version."""
+    manuscript = ManuscriptService(session)
+    version = await manuscript.get_version(version_id)
+    runtime = await ModelRuntimeResolver(session).resolve_for_version(version_id, None)
+    version.summary = await generate_version_summary(runtime, version.content_markdown)
+    await session.commit()
+    await session.refresh(version)
     return success(SceneVersionRead.model_validate(version), request)
 
 

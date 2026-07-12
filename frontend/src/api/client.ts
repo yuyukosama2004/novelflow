@@ -209,6 +209,10 @@ export const apiClient = {
 
   listVersions: (sceneId: string) =>
     unwrap<SceneVersion[]>(api.get(`/scenes/${sceneId}/versions`)),
+  generateVersionSummary: (versionId: string) =>
+    unwrap<SceneVersion>(
+      api.post(`/scene-versions/${versionId}/generate-summary`),
+    ),
   createVersion: (
     sceneId: string,
     payload: {
