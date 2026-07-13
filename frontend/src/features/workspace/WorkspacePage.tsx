@@ -443,13 +443,13 @@ export function WorkspacePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800">
-      <header className="border-b border-slate-200 bg-white/95 shadow-sm">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-5 py-3">
+    <main className="min-h-screen bg-stone-50 text-stone-800">
+      <header className="border-b border-stone-200 bg-white/95 shadow-sm">
+        <div className="mx-auto flex max-w-[1800px] flex-wrap items-start justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="min-w-0">
             <Link
               to="/"
-              className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900"
+              className="inline-flex items-center gap-2 text-sm text-stone-500 transition hover:text-brand-800"
             >
               <ArrowLeft size={15} />
               返回项目列表
@@ -478,7 +478,7 @@ export function WorkspacePage() {
                 </div>
               ) : (
                 <>
-                  <h1 className="truncate text-xl font-semibold text-slate-950">
+                  <h1 className="truncate text-xl font-semibold text-stone-950">
                     {project.data?.title ?? "加载中…"}
                   </h1>
                   <button
@@ -486,7 +486,7 @@ export function WorkspacePage() {
                       setProjectTitle(project.data?.title ?? "");
                       setEditingProject(true);
                     }}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    className="rounded p-1 text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"
                     title="编辑项目"
                   >
                     <Pencil size={14} />
@@ -496,14 +496,14 @@ export function WorkspacePage() {
             </div>
             {project.data ? (
               <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-                <span className="rounded-full bg-indigo-50 px-2 py-1 text-indigo-700">
+                <span className="rounded-full bg-brand-50 px-2 py-1 text-brand-700">
                   {project.data.pov_type === "first_person"
                     ? "第一人称"
                     : project.data.pov_type === "third_person_omniscient"
                       ? "第三人称全知"
                       : "第三人称限知"}
                 </span>
-                <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-800">
                   {project.data.writing_style_preset === "light_novel"
                     ? "轻小说"
                     : project.data.writing_style_preset === "male_web"
@@ -522,13 +522,13 @@ export function WorkspacePage() {
                                   ? "自定义文风"
                                   : "通用网络小说"}
                 </span>
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+                <span className="rounded-full bg-stone-100 px-2 py-1 text-stone-600">
                   单场目标 {project.data.default_scene_word_count} 字
                 </span>
               </div>
             ) : null}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
             <StatusPill tone="ok">
               {label(PROJECT_STATUS_LABELS, project.data?.status)}
             </StatusPill>
@@ -538,26 +538,26 @@ export function WorkspacePage() {
             />
             <button
               onClick={() => setFocusMode((value) => !value)}
-              className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600"
+              className="flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-600 shadow-sm transition hover:bg-stone-50"
             >
               {focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
               {focusMode ? "退出专注" : "专注写作"}
             </button>
             <Link
               to={`/projects/${projectId}/bible`}
-              className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
+              className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800 shadow-sm transition hover:bg-amber-50"
             >
               故事圣经
             </Link>
             <Link
               to={`/projects/${projectId}/wizard`}
-              className="rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+              className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-medium text-brand-700 shadow-sm transition hover:bg-brand-50"
             >
               创作向导
             </Link>
             <a
               href={`${API_BASE_URL}/projects/${projectId}/exports/markdown`}
-              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-emerald-400"
+              className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:border-brand-300 hover:bg-brand-50"
             >
               导出 Markdown
             </a>
@@ -569,7 +569,7 @@ export function WorkspacePage() {
                   archiveProject.mutate();
                 }
               }}
-              className="rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50"
+              className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-50"
             >
               归档
             </button>
