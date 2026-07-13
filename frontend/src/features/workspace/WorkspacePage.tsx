@@ -54,6 +54,50 @@ function nextSequence<T extends { sequence_no: number }>(
   );
 }
 
+type WritingFont = "sans" | "serif";
+type WritingSize = "small" | "medium" | "large" | "xlarge";
+type WritingSpacing = "compact" | "comfortable" | "relaxed";
+type WritingWidth = "narrow" | "standard" | "wide";
+
+interface WritingPreferences {
+  font: WritingFont;
+  size: WritingSize;
+  spacing: WritingSpacing;
+  width: WritingWidth;
+}
+
+const WRITING_PREFERENCES_KEY = "novelflow:writing-preferences";
+const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
+  font: "sans",
+  size: "medium",
+  spacing: "comfortable",
+  width: "standard",
+};
+
+function loadWritingPreferences(): WritingPreferences {
+  try {
+    const stored = JSON.parse(
+      window.localStorage.getItem(WRITING_PREFERENCES_KEY) ?? "{}",
+    ) as Partial<WritingPreferences>;
+    return {
+      font: stored.font === "serif" ? "serif" : "sans",
+      size: ["small", "medium", "large", "xlarge"].includes(stored.size ?? "")
+        ? (stored.size as WritingSize)
+        : DEFAULT_WRITING_PREFERENCES.size,
+      spacing: ["compact", "comfortable", "relaxed"].includes(
+        stored.spacing ?? "",
+      )
+        ? (stored.spacing as WritingSpacing)
+        : DEFAULT_WRITING_PREFERENCES.spacing,
+      width: ["narrow", "standard", "wide"].includes(stored.width ?? "")
+        ? (stored.width as WritingWidth)
+        : DEFAULT_WRITING_PREFERENCES.width,
+    };
+  } catch {
+    return DEFAULT_WRITING_PREFERENCES;
+  }
+}
+
 export function WorkspacePage() {
   const { projectId = "" } = useParams();
   const [searchParams] = useSearchParams();
@@ -95,15 +139,17 @@ export function WorkspacePage() {
   const [modelProfileId, setModelProfileId] = useState("");
   const [rightTab, setRightTab] = useState<WorkspacePanelTab>("ai");
   const [focusMode, setFocusMode] = useState(false);
-  const [writingSize, setWritingSize] = useState<"small" | "medium" | "large">(
-    "medium",
-  );
-  const [writingSpacing, setWritingSpacing] = useState<"compact" | "relaxed">(
-    "relaxed",
-  );
-  const [writingWidth, setWritingWidth] = useState<"narrow" | "wide">("wide");
+  const [writingPreferences, setWritingPreferences] =
+    useState<WritingPreferences>(loadWritingPreferences);
   const [editorContent, setEditorContent] = useState("");
   const [discussionInstruction, setDiscussionInstruction] = useState("");
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      WRITING_PREFERENCES_KEY,
+      JSON.stringify(writingPreferences),
+    );
+  }, [writingPreferences]);
 
   // ── 数据查询 ──
   const project = useQuery({
@@ -1097,67 +1143,99 @@ export function WorkspacePage() {
             {/* ── 中间：正文优先 ── */}
             <div
               className={`mx-auto w-full space-y-4 ${
-                writingWidth === "narrow" ? "max-w-3xl" : "max-w-5xl"
+                writingPreferences.width === "narrow"
+                  ? "max-w-2xl"
+                  : writingPreferences.width === "wide"
+                    ? "max-w-5xl"
+                    : "max-w-3xl"
               } ${
-                writingSize === "small"
+                writingPreferences.font === "serif"
+                  ? "novel-font-serif"
+                  : "novel-font-sans"
+              } ${
+                writingPreferences.size === "small"
                   ? "[&_.ProseMirror]:text-sm"
-                  : writingSize === "large"
+                  : writingPreferences.size === "large"
                     ? "[&_.ProseMirror]:text-lg"
-                    : "[&_.ProseMirror]:text-base"
+                    : writingPreferences.size === "xlarge"
+                      ? "[&_.ProseMirror]:text-xl"
+                      : "[&_.ProseMirror]:text-base"
               } ${
-                writingSpacing === "compact"
+                writingPreferences.spacing === "compact"
                   ? "[&_.ProseMirror]:leading-6"
-                  : "[&_.ProseMirror]:leading-9"
+                  : writingPreferences.spacing === "relaxed"
+                    ? "[&_.ProseMirror]:leading-8"
+                    : "[&_.ProseMirror]:leading-7"
               }`}
             >
-              {focusMode ? (
-                <div className="flex justify-end gap-2 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs shadow-panel">
+                <div className="flex items-center gap-2 text-stone-500">
+                  <span className="font-medium text-stone-700">阅读设置</span>
+                  <span className="hidden sm:inline">仅影响本机显示</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    aria-label="正文字体"
+                    value={writingPreferences.font}
+                    onChange={(event) =>
+                      setWritingPreferences((current) => ({
+                        ...current,
+                        font: event.target.value === "serif" ? "serif" : "sans",
+                      }))
+                    }
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-stone-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                  >
+                    <option value="sans">现代无衬线</option>
+                    <option value="serif">书籍衬线</option>
+                  </select>
                   <select
                     aria-label="正文字号"
-                    value={writingSize}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      if (
-                        value === "small" ||
-                        value === "medium" ||
-                        value === "large"
-                      ) {
-                        setWritingSize(value);
-                      }
-                    }}
-                    className="rounded border border-slate-300 bg-white px-2 py-1"
+                    value={writingPreferences.size}
+                    onChange={(event) =>
+                      setWritingPreferences((current) => ({
+                        ...current,
+                        size: event.target.value as WritingSize,
+                      }))
+                    }
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-stone-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                   >
-                    <option value="small">小字号</option>
-                    <option value="medium">标准字号</option>
-                    <option value="large">大字号</option>
+                    <option value="small">14px</option>
+                    <option value="medium">16px</option>
+                    <option value="large">18px</option>
+                    <option value="xlarge">20px</option>
                   </select>
                   <select
                     aria-label="正文行距"
-                    value={writingSpacing}
+                    value={writingPreferences.spacing}
                     onChange={(event) =>
-                      setWritingSpacing(
-                        event.target.value === "compact"
-                          ? "compact"
-                          : "relaxed",
-                      )
+                      setWritingPreferences((current) => ({
+                        ...current,
+                        spacing: event.target.value as WritingSpacing,
+                      }))
                     }
-                    className="rounded border border-slate-300 bg-white px-2 py-1"
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-stone-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                   >
-                    <option value="compact">紧凑行距</option>
-                    <option value="relaxed">舒展行距</option>
+                    <option value="compact">紧凑 1.6</option>
+                    <option value="comfortable">舒适 1.8</option>
+                    <option value="relaxed">宽松 2.0</option>
                   </select>
-                  <button
-                    onClick={() =>
-                      setWritingWidth((value) =>
-                        value === "wide" ? "narrow" : "wide",
-                      )
+                  <select
+                    aria-label="正文版心"
+                    value={writingPreferences.width}
+                    onChange={(event) =>
+                      setWritingPreferences((current) => ({
+                        ...current,
+                        width: event.target.value as WritingWidth,
+                      }))
                     }
-                    className="rounded border border-slate-300 bg-white px-2 py-1"
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-stone-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                   >
-                    {writingWidth === "wide" ? "窄版正文" : "宽版正文"}
-                  </button>
+                    <option value="narrow">窄版心</option>
+                    <option value="standard">标准版心</option>
+                    <option value="wide">宽版心</option>
+                  </select>
                 </div>
-              ) : null}
+              </div>
               <SceneEditor
                 scene={scene.data ?? null}
                 selectedVersionId={selectedSceneVersionId}

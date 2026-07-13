@@ -1,9 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import axios from "axios";
-import { Check, Save } from "lucide-react";
+import {
+  Bold,
+  Check,
+  Heading2,
+  Italic,
+  List,
+  ListOrdered,
+  Quote,
+  Redo2,
+  Save,
+  Undo2,
+} from "lucide-react";
 
 import { apiClient } from "../../api/client";
 import { IconButton } from "../../components/IconButton";
@@ -101,6 +112,29 @@ function draftFailureMessage(error: unknown): string {
   return draftFailureReason(error) === "DRAFT_REVISION_CONFLICT"
     ? "草稿已在别处更新，请刷新页面后继续编辑。"
     : "草稿保存失败，请稍后重试。";
+}
+
+function FormatButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-500 transition hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    >
+      {children}
+    </button>
+  );
 }
 
 export function SceneEditor({
@@ -554,6 +588,64 @@ export function SceneEditor({
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-panel">
+        {editor ? (
+          <div
+            aria-label="正文格式工具"
+            className="flex flex-wrap items-center gap-0.5 border-b border-stone-100 bg-stone-50 px-3 py-2"
+          >
+            <FormatButton
+              label="撤销"
+              onClick={() => editor.chain().focus().undo().run()}
+            >
+              <Undo2 size={16} />
+            </FormatButton>
+            <FormatButton
+              label="重做"
+              onClick={() => editor.chain().focus().redo().run()}
+            >
+              <Redo2 size={16} />
+            </FormatButton>
+            <span className="mx-1 h-5 w-px bg-stone-200" aria-hidden="true" />
+            <FormatButton
+              label="加粗"
+              onClick={() => editor.chain().focus().toggleBold().run()}
+            >
+              <Bold size={16} />
+            </FormatButton>
+            <FormatButton
+              label="斜体"
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+            >
+              <Italic size={16} />
+            </FormatButton>
+            <FormatButton
+              label="二级标题"
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 2 }).run()
+              }
+            >
+              <Heading2 size={16} />
+            </FormatButton>
+            <FormatButton
+              label="引用"
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            >
+              <Quote size={16} />
+            </FormatButton>
+            <FormatButton
+              label="无序列表"
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+            >
+              <List size={16} />
+            </FormatButton>
+            <FormatButton
+              label="有序列表"
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            >
+              <ListOrdered size={16} />
+            </FormatButton>
+          </div>
+        ) : null}
         <EditorContent editor={editor} />
       </div>
 

@@ -35,10 +35,20 @@ select {
   min-height: 420px;
   outline: none;
   font-family:
-    "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif;
+    "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
   font-size: 1.0625rem;
   line-height: 2;
   color: #292524;
+}
+
+.novel-font-sans .tiptap {
+  font-family:
+    "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+}
+
+.novel-font-serif .tiptap {
+  font-family:
+    "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif;
 }
 
 .tiptap p {
