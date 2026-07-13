@@ -17,6 +17,7 @@ import type {
   SceneVersion,
 } from "../../types/entities";
 import { SceneEditor } from "./SceneEditor";
+import { SceneApprovalPanel } from "./SceneApprovalPanel";
 
 const { editorMock, editorOptions } = vi.hoisted(() => ({
   editorMock: {
@@ -339,10 +340,9 @@ describe("SceneEditor approval gate", () => {
   });
 
   it("guides an unreviewed version through review before approval", async () => {
-    vi.mocked(apiClient.listVersions).mockResolvedValue([
-      version("not_reviewed"),
-    ]);
-    renderWithQuery(<SceneEditor scene={scene} />);
+    renderWithQuery(
+      <SceneApprovalPanel scene={scene} versions={[version("not_reviewed")]} />,
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: "先审查" }));
 
@@ -353,10 +353,13 @@ describe("SceneEditor approval gate", () => {
   });
 
   it("uses the selected model profile for approval review", async () => {
-    vi.mocked(apiClient.listVersions).mockResolvedValue([
-      version("not_reviewed"),
-    ]);
-    renderWithQuery(<SceneEditor scene={scene} modelProfileId="profile-1" />);
+    renderWithQuery(
+      <SceneApprovalPanel
+        scene={scene}
+        versions={[version("not_reviewed")]}
+        modelProfileId="profile-1"
+      />,
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: "先审查" }));
 
@@ -369,8 +372,9 @@ describe("SceneEditor approval gate", () => {
   });
 
   it("approves a completed review without an override", async () => {
-    vi.mocked(apiClient.listVersions).mockResolvedValue([version("completed")]);
-    renderWithQuery(<SceneEditor scene={scene} />);
+    renderWithQuery(
+      <SceneApprovalPanel scene={scene} versions={[version("completed")]} />,
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: "批准" }));
 
@@ -384,7 +388,6 @@ describe("SceneEditor approval gate", () => {
   });
 
   it("collects a reason before forcing approval with blocking issues", async () => {
-    vi.mocked(apiClient.listVersions).mockResolvedValue([version("completed")]);
     vi.mocked(apiClient.approveVersion)
       .mockRejectedValueOnce(apiError("BLOCKING_REVIEW_ISSUES"))
       .mockResolvedValueOnce({
@@ -392,7 +395,9 @@ describe("SceneEditor approval gate", () => {
         approved_version_id: "version-1",
         status: "canonicalizing",
       });
-    renderWithQuery(<SceneEditor scene={scene} />);
+    renderWithQuery(
+      <SceneApprovalPanel scene={scene} versions={[version("completed")]} />,
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: "批准" }));
 
@@ -406,11 +411,12 @@ describe("SceneEditor approval gate", () => {
   });
 
   it("shows a clear message when historical replacement is unavailable", async () => {
-    vi.mocked(apiClient.listVersions).mockResolvedValue([version("completed")]);
     vi.mocked(apiClient.approveVersion).mockRejectedValue(
       apiError("HISTORICAL_REPLACEMENT_NOT_READY"),
     );
-    renderWithQuery(<SceneEditor scene={scene} />);
+    renderWithQuery(
+      <SceneApprovalPanel scene={scene} versions={[version("completed")]} />,
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: "批准" }));
 

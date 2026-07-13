@@ -29,6 +29,7 @@ import { label, PROJECT_STATUS_LABELS } from "../../utils/enumLabels";
 import { MemoryCandidatePanel } from "./MemoryCandidatePanel";
 import { ReviewIssuePanel } from "./ReviewIssuePanel";
 import { SceneCardEditor } from "./SceneCardEditor";
+import { SceneApprovalPanel } from "./SceneApprovalPanel";
 import { SceneEditor } from "./SceneEditor";
 import { WritingAssistant } from "./WritingAssistant";
 import { CreativeDiscussionPanel } from "./CreativeDiscussionPanel";
@@ -1241,7 +1242,6 @@ export function WorkspacePage() {
                 selectedVersionId={selectedSceneVersionId}
                 loadSelectedVersion={hasExplicitSceneVersionSelection}
                 onVersionCreated={handleVersionCreated}
-                modelProfileId={modelProfileId}
                 targetWordCount={project.data?.default_scene_word_count ?? 1000}
                 onContentChange={setEditorContent}
               />
@@ -1307,17 +1307,24 @@ export function WorkspacePage() {
               ) : null}
 
               {rightTab === "history" ? (
-                <SceneVersionSelector
-                  versions={sceneVersions.data ?? []}
-                  approvedVersionId={scene.data?.approved_version_id ?? null}
-                  selectedVersionId={selectedSceneVersionId || null}
-                  onSelect={handleVersionSelectionChange}
-                  onSummaryGenerated={() =>
-                    queryClient.invalidateQueries({
-                      queryKey: ["scene-versions", selectedSceneId],
-                    })
-                  }
-                />
+                <div className="space-y-3">
+                  <SceneVersionSelector
+                    versions={sceneVersions.data ?? []}
+                    approvedVersionId={scene.data?.approved_version_id ?? null}
+                    selectedVersionId={selectedSceneVersionId || null}
+                    onSelect={handleVersionSelectionChange}
+                    onSummaryGenerated={() =>
+                      queryClient.invalidateQueries({
+                        queryKey: ["scene-versions", selectedSceneId],
+                      })
+                    }
+                  />
+                  <SceneApprovalPanel
+                    scene={scene.data ?? null}
+                    versions={sceneVersions.data ?? []}
+                    modelProfileId={modelProfileId}
+                  />
+                </div>
               ) : null}
 
               {rightTab === "discussion" ? (
