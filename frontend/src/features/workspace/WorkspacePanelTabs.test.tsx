@@ -8,10 +8,12 @@ describe("WorkspacePanelTabs", () => {
     const onChange = vi.fn();
     render(<WorkspacePanelTabs value="ai" onChange={onChange} />);
 
-    expect(screen.getByRole("button", { name: "AI 写作" })).toHaveClass(
-      "bg-slate-900",
+    expect(screen.getByLabelText("创作")).toBeInTheDocument();
+    expect(screen.getByLabelText("检查")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI 续写" })).toHaveClass(
+      "text-brand-700",
     );
-    fireEvent.click(screen.getByRole("button", { name: "审查" }));
+    fireEvent.click(screen.getByRole("button", { name: "一致性审查" }));
 
     expect(onChange).toHaveBeenCalledWith("review");
   });
