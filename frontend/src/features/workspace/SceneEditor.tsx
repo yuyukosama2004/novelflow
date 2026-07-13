@@ -9,7 +9,11 @@ import { apiClient } from "../../api/client";
 import { IconButton } from "../../components/IconButton";
 import { StatusPill } from "../../components/StatusPill";
 import type { Scene, SceneVersion } from "../../types/entities";
-import { label, SOURCE_TYPE_LABELS } from "../../utils/enumLabels";
+import {
+  label,
+  SCENE_STATUS_LABELS,
+  SOURCE_TYPE_LABELS,
+} from "../../utils/enumLabels";
 import {
   RichTextCodec,
   RichTextCodecError,
@@ -143,8 +147,7 @@ export function SceneEditor({
     content: "",
     editorProps: {
       attributes: {
-        class:
-          "prose prose-slate max-w-none rounded-md border border-slate-200 bg-white p-4 text-[15px] leading-7",
+        class: "tiptap max-w-none px-5 py-6 sm:px-8 sm:py-8",
       },
     },
     onUpdate: ({ editor: activeEditor }) => {
@@ -463,31 +466,56 @@ export function SceneEditor({
 
   if (!scene) {
     return (
-      <section className="flex min-h-[520px] items-center justify-center rounded-md border border-dashed border-slate-300 bg-white text-sm text-slate-500">
-        选择或创建一个场景
+      <section className="flex min-h-[520px] flex-col items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-white px-6 text-center shadow-panel">
+        <p className="text-sm font-medium text-stone-700">选择或创建一个场景</p>
+        <p className="mt-1 text-xs text-stone-500">
+          正文、版本和审查结果会在这里集中管理。
+        </p>
       </section>
     );
   }
 
   return (
     <section className="min-w-0">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-lg font-semibold text-slate-950">
+          <p className="text-xs font-medium tracking-[0.14em] text-brand-700">
+            正在撰写
+          </p>
+          <h2 className="mt-1 truncate text-xl font-semibold text-stone-950">
             {scene.title}
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-stone-500">
             {scene.time_text || "未设定时间"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">{wordCount} 字</span>
-          <span className="text-xs text-slate-400">
-            目标 {targetWordCount} 字
-            {wordCount < targetWordCount
-              ? `（还差 ${targetWordCount - wordCount}）`
-              : "（已达目标）"}
-          </span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="min-w-[172px] rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs shadow-sm">
+            <div className="flex items-center justify-between gap-3 text-stone-600">
+              <span>{wordCount} 字</span>
+              <span>目标 {targetWordCount} 字</span>
+            </div>
+            <div
+              className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone-100"
+              role="progressbar"
+              aria-label="本场字数进度"
+              aria-valuemin={0}
+              aria-valuemax={targetWordCount}
+              aria-valuenow={Math.min(wordCount, targetWordCount)}
+            >
+              <div
+                className="h-full rounded-full bg-brand-600 transition-[width]"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.round(
+                      (wordCount / Math.max(targetWordCount, 1)) * 100,
+                    ),
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
           <StatusPill
             tone={
               saveState === "error"
@@ -497,7 +525,11 @@ export function SceneEditor({
                   : "neutral"
             }
           >
-            {saveStateLabel(saveState, dirty, scene.status)}
+            {saveStateLabel(
+              saveState,
+              dirty,
+              label(SCENE_STATUS_LABELS, scene.status),
+            )}
           </StatusPill>
           {scene.is_stale ? (
             <IconButton
@@ -521,7 +553,9 @@ export function SceneEditor({
         </div>
       </div>
 
-      <EditorContent editor={editor} />
+      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-panel">
+        <EditorContent editor={editor} />
+      </div>
 
       {codecMessage ? (
         <p className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
@@ -541,8 +575,8 @@ export function SceneEditor({
         </p>
       ) : null}
 
-      <details className="mt-3 rounded-md border border-slate-200 bg-white text-xs">
-        <summary className="cursor-pointer px-3 py-2 font-medium text-slate-700">
+      <details className="mt-4 rounded-xl border border-stone-200 bg-white text-xs shadow-panel">
+        <summary className="cursor-pointer px-4 py-3 font-medium text-stone-700">
           版本审批（{versions.data?.length ?? 0}）
         </summary>
         <div className="divide-y divide-slate-100 border-t border-slate-100">

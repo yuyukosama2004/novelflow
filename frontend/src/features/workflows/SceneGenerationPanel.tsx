@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient, createSSEStream } from "../../api/client";
+import { Button } from "../../components/ui/button";
 import type { SceneVersion } from "../../types/entities";
 
 interface Props {
@@ -125,41 +126,48 @@ export default function SceneGenerationPanel({
   }
 
   return (
-    <div className="flex flex-col gap-3 h-full">
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold text-gray-700">AI 场景生成</h3>
-        {!generating && (
-          <button
-            onClick={handleGenerate}
-            disabled={generationMode !== "new" && !baseContent.trim()}
-            className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          >
-            {done ? "重新生成" : "生成"}
-          </button>
-        )}
-        {generating && (
-          <button
-            onClick={handleCancel}
-            className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-          >
-            取消
-          </button>
-        )}
-        {generating && (
-          <span className="text-xs text-indigo-600 animate-pulse">生成中…</span>
-        )}
+    <div className="flex h-full flex-col gap-3">
+      <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-panel">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.14em] text-brand-700">
+              AI 草案
+            </p>
+            <h3 className="mt-1 text-sm font-semibold text-stone-900">
+              场景生成
+            </h3>
+          </div>
+          {!generating && (
+            <Button
+              onClick={handleGenerate}
+              disabled={generationMode !== "new" && !baseContent.trim()}
+              variant="primary"
+              size="sm"
+            >
+              {done ? "重新生成" : "生成"}
+            </Button>
+          )}
+          {generating && (
+            <Button onClick={handleCancel} variant="danger" size="sm">
+              取消
+            </Button>
+          )}
+        </div>
+        <p className="mt-2 text-xs leading-5 text-stone-500">
+          生成结果会同步到正文和版本历史，仍需由你审查并批准为正式稿。
+        </p>
       </div>
 
       {error && (
-        <div className="p-2 bg-red-50 text-red-700 text-xs rounded border border-red-200">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
           {error}
         </div>
       )}
 
       {!generating && (
-        <div className="space-y-2 rounded border border-slate-200 bg-white p-2 text-xs">
+        <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4 text-xs shadow-panel">
           <label className="block">
-            <span className="font-medium text-slate-600">生成方式</span>
+            <span className="font-medium text-stone-700">生成方式</span>
             <select
               value={generationMode}
               onChange={(event) =>
@@ -167,7 +175,7 @@ export default function SceneGenerationPanel({
                   event.target.value as "new" | "rewrite" | "polish",
                 )
               }
-              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+              className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             >
               <option value="new">按场景卡全新生成</option>
               <option value="rewrite">根据当前正文全文重写</option>
@@ -175,7 +183,7 @@ export default function SceneGenerationPanel({
             </select>
           </label>
           <label className="block">
-            <span className="font-medium text-slate-600">本次目标字数</span>
+            <span className="font-medium text-stone-700">本次目标字数</span>
             <input
               type="number"
               min="300"
@@ -185,11 +193,11 @@ export default function SceneGenerationPanel({
               onChange={(event) =>
                 setTargetWordCount(Number(event.target.value))
               }
-              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+              className="mt-1 w-full rounded-lg border border-stone-300 px-2.5 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             />
           </label>
           <label className="block">
-            <span className="font-medium text-slate-600">
+            <span className="font-medium text-stone-700">
               本次修改要求（可选）
             </span>
             <textarea
@@ -197,11 +205,11 @@ export default function SceneGenerationPanel({
               onChange={(event) => setInstruction(event.target.value)}
               rows={3}
               placeholder="例如：减少血腥描写，加强两人初次见面的戒备感。"
-              className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+              className="mt-1 w-full rounded-lg border border-stone-300 px-2.5 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             />
           </label>
           {generationMode !== "new" && !baseContent.trim() ? (
-            <p className="text-amber-700">
+            <p className="rounded-lg bg-amber-50 px-3 py-2 leading-5 text-amber-800">
               请先在正文编辑器中保留需要处理的内容。
             </p>
           ) : null}
@@ -211,36 +219,28 @@ export default function SceneGenerationPanel({
       {generating && (
         <pre
           ref={contentRef}
-          className="flex-1 p-3 bg-gray-50 border rounded text-sm text-gray-800 whitespace-pre-wrap overflow-auto max-h-80"
+          className="max-h-80 flex-1 overflow-auto rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm whitespace-pre-wrap text-stone-800 shadow-panel"
         >
           {content}
           {generating && (
-            <span className="inline-block w-2 h-4 bg-indigo-600 animate-pulse" />
+            <span className="inline-block h-4 w-2 animate-pulse bg-brand-600" />
           )}
         </pre>
       )}
 
       {done && !error && (
-        <div className="rounded border border-emerald-100 bg-emerald-50 p-2 text-xs text-emerald-800">
-          已生成并载入编辑器。
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-900">
+          已生成并同步到正文编辑器。
           {version && (
             <span className="ml-1">
               已保存为版本 #{version.version_no}，请审核后再批准为正式稿。
             </span>
           )}
-          {content ? (
-            <details className="mt-2 text-slate-600">
-              <summary className="cursor-pointer">查看本次生成预览</summary>
-              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-xs">
-                {content}
-              </pre>
-            </details>
-          ) : null}
         </div>
       )}
 
       {perspectiveWarning ? (
-        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+        <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
           {perspectiveWarning}
         </p>
       ) : null}

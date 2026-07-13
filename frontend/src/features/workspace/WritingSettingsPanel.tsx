@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "../../api/client";
+import { Button } from "../../components/ui/button";
 import type { NovelProject } from "../../types/entities";
 
 const STYLE_OPTIONS = [
@@ -48,19 +49,22 @@ export function WritingSettingsPanel({ project }: Props) {
   });
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-3 text-xs space-y-2">
+    <section className="space-y-3 rounded-xl border border-stone-200 bg-white p-4 text-xs shadow-panel">
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">全书写作设置</h3>
-        <p className="mt-1 text-slate-500">
-          影响后续 AI 生成，不会改写已有版本。
+        <p className="text-[11px] font-semibold tracking-[0.14em] text-brand-700">
+          全书设置
+        </p>
+        <h3 className="mt-1 text-sm font-semibold text-stone-900">写作规则</h3>
+        <p className="mt-1 leading-5 text-stone-500">
+          这是后续 AI 生成的最高优先级，不会改写已有版本。
         </p>
       </div>
       <label className="block">
-        <span className="font-medium text-slate-600">叙述视角</span>
+        <span className="font-medium text-stone-700">叙述视角</span>
         <select
           value={povType}
           onChange={(event) => setPovType(event.target.value)}
-          className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+          className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         >
           <option value="first_person">第一人称</option>
           <option value="third_person_limited">第三人称限知</option>
@@ -68,11 +72,11 @@ export function WritingSettingsPanel({ project }: Props) {
         </select>
       </label>
       <label className="block">
-        <span className="font-medium text-slate-600">文风预设</span>
+        <span className="font-medium text-stone-700">文风预设</span>
         <select
           value={stylePreset}
           onChange={(event) => setStylePreset(event.target.value)}
-          className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+          className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-2.5 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         >
           {STYLE_OPTIONS.map(([value, name]) => (
             <option key={value} value={value}>
@@ -82,17 +86,17 @@ export function WritingSettingsPanel({ project }: Props) {
         </select>
       </label>
       <label className="block">
-        <span className="font-medium text-slate-600">自定义文风与禁忌</span>
+        <span className="font-medium text-stone-700">自定义文风与禁忌</span>
         <textarea
           value={customStyle}
           onChange={(event) => setCustomStyle(event.target.value)}
           rows={3}
           placeholder="例如：句子偏短，避免网络热梗，角色对话克制。"
-          className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+          className="mt-1 w-full rounded-lg border border-stone-300 px-2.5 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         />
       </label>
       <label className="block">
-        <span className="font-medium text-slate-600">默认单场目标字数</span>
+        <span className="font-medium text-stone-700">默认单场目标字数</span>
         <input
           type="number"
           min="300"
@@ -100,16 +104,17 @@ export function WritingSettingsPanel({ project }: Props) {
           step="100"
           value={defaultWordCount}
           onChange={(event) => setDefaultWordCount(Number(event.target.value))}
-          className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+          className="mt-1 w-full rounded-lg border border-stone-300 px-2.5 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         />
       </label>
-      <button
+      <Button
         onClick={() => save.mutate()}
         disabled={save.isPending}
-        className="rounded bg-emerald-600 px-3 py-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
+        variant="primary"
+        size="sm"
       >
         {save.isPending ? "保存中…" : "保存全书设置"}
-      </button>
+      </Button>
     </section>
   );
 }
