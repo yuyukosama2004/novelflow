@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
+import { vi } from "vitest";
 
 import { ProjectListView } from "./ProjectListPage";
 import type { NovelProject } from "../../types/entities";
@@ -42,5 +43,27 @@ it("renders projects and health status", () => {
 
   expect(screen.getByText("NovelFlow")).toBeInTheDocument();
   expect(screen.getByText("雨夜档案")).toBeInTheDocument();
-  expect(screen.getByText("API 0.1.0")).toBeInTheDocument();
+  expect(screen.getByText("服务已连接 · v0.1.0")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "快速创作" })).toBeInTheDocument();
+});
+
+it("asks for confirmation before archiving a project", () => {
+  const onArchive = vi.fn();
+  render(
+    <BrowserRouter>
+      <ProjectListView
+        projects={[project]}
+        isLoading={false}
+        onCreate={() => undefined}
+        isCreating={false}
+        onArchive={onArchive}
+      />
+    </BrowserRouter>,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "归档《雨夜档案》" }));
+  expect(screen.getByText("归档这本小说？")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "确认归档" }));
+  expect(onArchive).toHaveBeenCalledWith(project.id);
 });
