@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  color: #17212b;
-  background: #f6f7f9;
+  color: #292524;
+  background: #f7f6f2;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -15,6 +15,13 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgb(238 248 245 / 0.75),
+      transparent 32rem
+    ),
+    #f7f6f2;
 }
 
 button,
@@ -27,10 +34,15 @@ select {
 .tiptap {
   min-height: 420px;
   outline: none;
+  font-family:
+    "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif;
+  font-size: 1.0625rem;
+  line-height: 2;
+  color: #292524;
 }
 
 .tiptap p {
-  margin: 0 0 0.75rem;
+  margin: 0 0 1rem;
 }
 
 .tiptap h1,
@@ -44,4 +56,9 @@ select {
 .tiptap ol {
   padding-left: 1.4rem;
   margin: 0.75rem 0;
+}
+
+::selection {
+  background: #b0ddd0;
+  color: #08372f;
 }

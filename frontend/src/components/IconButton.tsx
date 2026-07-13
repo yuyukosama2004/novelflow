@@ -1,5 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
+import { cn } from "../utils/cn";
+
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: ReactNode;
   label: string;
@@ -7,10 +9,10 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const toneClasses = {
-  primary: "bg-slate-900 text-white hover:bg-slate-700",
+  primary: "bg-brand-700 text-white shadow-sm hover:bg-brand-800",
   subtle:
-    "border border-slate-200 bg-white text-slate-700 hover:border-emerald-400",
-  danger: "border border-rose-200 bg-white text-rose-700 hover:border-rose-400",
+    "border border-stone-200 bg-white text-stone-700 shadow-sm hover:border-brand-200 hover:bg-brand-50",
+  danger: "border border-rose-200 bg-white text-rose-700 hover:bg-rose-50",
 };
 
 export function IconButton({
@@ -25,7 +27,11 @@ export function IconButton({
       {...props}
       title={label}
       aria-label={label}
-      className={`inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition ${toneClasses[tone]} disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={cn(
+        "inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        toneClasses[tone],
+        className,
+      )}
     >
       {icon}
       <span>{label}</span>
