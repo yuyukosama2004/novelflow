@@ -144,19 +144,22 @@ export function CreationWizardPage() {
     applyCandidate.isPending;
 
   return (
-    <main className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-5 py-3">
+    <main className="min-h-screen bg-stone-50 text-stone-800">
+      <header className="border-b border-stone-200 bg-white/95 shadow-sm">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-4">
             <Link
               to="/"
-              className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900"
+              className="inline-flex items-center gap-2 text-sm text-stone-500 transition hover:text-brand-800"
             >
               <ArrowLeft size={15} />
               返回项目列表
             </Link>
             <div className="min-w-0">
-              <h1 className="truncate text-xl font-semibold text-slate-950">
+              <p className="text-[11px] font-semibold tracking-[0.14em] text-brand-700">
+                创作辅助
+              </p>
+              <h1 className="mt-1 truncate text-xl font-semibold text-stone-950">
                 {project.data?.title ?? "加载中…"} · 创作向导
               </h1>
             </div>
@@ -168,13 +171,13 @@ export function CreationWizardPage() {
             />
             <Link
               to={`/projects/${projectId}/bible`}
-              className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
+              className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800 shadow-sm transition hover:bg-amber-50"
             >
               故事圣经
             </Link>
             <Link
               to={`/projects/${projectId}`}
-              className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-800"
             >
               进入工作台
               <ArrowRight size={15} />
@@ -183,20 +186,20 @@ export function CreationWizardPage() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1600px] gap-4 px-5 py-4 lg:grid-cols-[260px_minmax(0,1fr)_260px]">
+      <div className="mx-auto grid max-w-[1680px] gap-4 px-4 py-5 lg:grid-cols-[260px_minmax(0,1fr)_280px] sm:px-6">
         {/* 左侧：步骤导航 + 候选数统计 */}
         <aside className="space-y-4">
-          <section className="rounded-md border border-slate-200 bg-white p-3">
-            <h2 className="text-sm font-semibold text-slate-900">创作步骤</h2>
+          <section className="rounded-xl border border-stone-200 bg-white p-4 shadow-panel">
+            <h2 className="text-sm font-semibold text-stone-900">创作步骤</h2>
             <div className="mt-3 space-y-1">
               <div
                 className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
                   step === "entry"
-                    ? "bg-indigo-50 text-indigo-800 font-medium"
-                    : "text-slate-600"
+                    ? "bg-brand-50 text-brand-800 font-medium"
+                    : "text-stone-600"
                 }`}
               >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-xs">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-200 text-xs">
                   1
                 </span>
                 选择入口
@@ -204,11 +207,11 @@ export function CreationWizardPage() {
               <div
                 className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
                   step === "interview"
-                    ? "bg-indigo-50 text-indigo-800 font-medium"
-                    : "text-slate-600"
+                    ? "bg-brand-50 text-brand-800 font-medium"
+                    : "text-stone-600"
                 }`}
               >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-xs">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-200 text-xs">
                   2
                 </span>
                 访谈对话
@@ -217,9 +220,9 @@ export function CreationWizardPage() {
           </section>
 
           {sessionId ? (
-            <section className="rounded-md border border-slate-200 bg-white p-3">
-              <h2 className="text-sm font-semibold text-slate-900">候选设定</h2>
-              <div className="mt-2 space-y-1 text-xs text-slate-600">
+            <section className="rounded-xl border border-stone-200 bg-white p-4 shadow-panel">
+              <h2 className="text-sm font-semibold text-stone-900">候选设定</h2>
+              <div className="mt-2 space-y-1 text-xs text-stone-600">
                 <div className="flex justify-between">
                   <span>待确认</span>
                   <span className="font-medium text-amber-700">
@@ -228,7 +231,7 @@ export function CreationWizardPage() {
                 </div>
                 <div className="flex justify-between">
                   <span>已确认</span>
-                  <span className="font-medium text-emerald-700">
+                  <span className="font-medium text-brand-700">
                     {approvedCount}
                   </span>
                 </div>
@@ -238,7 +241,7 @@ export function CreationWizardPage() {
         </aside>
 
         {/* 中间：主要内容 */}
-        <section className="min-h-[500px] rounded-md border border-slate-200 bg-white p-6 flex flex-col">
+        <section className="flex min-h-[500px] flex-col rounded-2xl border border-stone-200 bg-white p-5 shadow-panel sm:p-6">
           {step === "entry" ? (
             <EntrySelector
               onSelect={handleSelectEntry}
@@ -256,8 +259,11 @@ export function CreationWizardPage() {
             </div>
           )}
           {startSession.isPending ? (
-            <div className="flex items-center justify-center py-12 text-sm text-slate-400">
-              <Sparkles size={16} className="mr-2 animate-pulse" />
+            <div className="flex items-center justify-center py-12 text-sm text-stone-400">
+              <Sparkles
+                size={16}
+                className="mr-2 animate-pulse text-brand-600"
+              />
               正在准备访谈…
             </div>
           ) : null}
@@ -267,12 +273,12 @@ export function CreationWizardPage() {
         <aside className="space-y-3">
           {sessionId ? (
             <>
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
                 <MessageSquare size={14} />
                 提取的候选
               </div>
               {candidates.length === 0 ? (
-                <p className="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
+                <p className="rounded-xl border border-dashed border-stone-300 bg-white px-3 py-6 text-center text-xs leading-5 text-stone-500 shadow-panel">
                   在访谈中积累足够的讨论后，点击「提取候选设定」让 LLM
                   整理可确认的设定条目。
                 </p>

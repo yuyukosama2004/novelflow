@@ -113,33 +113,40 @@ export function ModelSettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3">
+    <main className="min-h-screen bg-stone-50 text-stone-800">
+      <header className="border-b border-stone-200 bg-white/95 shadow-sm">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-4">
             <Link
               to="/"
-              className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900"
+              className="inline-flex items-center gap-2 text-sm text-stone-500 transition hover:text-brand-800"
             >
               <ArrowLeft size={15} /> 返回
             </Link>
-            <h1 className="text-lg font-semibold text-slate-950">模型设置</h1>
+            <div>
+              <p className="text-[11px] font-semibold tracking-[0.14em] text-brand-700">
+                本地配置
+              </p>
+              <h1 className="mt-1 text-lg font-semibold text-stone-950">
+                模型设置
+              </h1>
+            </div>
           </div>
           <button
             onClick={startAdd}
             disabled={adding}
-            className="flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700"
+            className="flex items-center gap-1 rounded-lg bg-brand-700 px-3 py-2 text-sm text-white shadow-sm transition hover:bg-brand-800 disabled:opacity-50"
           >
             <Plus size={14} /> 添加配置
           </button>
         </div>
       </header>
 
-      <div className="mx-auto max-w-3xl space-y-4 px-5 py-4">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-5 sm:px-6">
         {profiles.data?.map((p) => (
           <div
             key={p.id}
-            className={`rounded-md border bg-white p-4 ${p.is_default ? "border-emerald-300" : "border-slate-200"}`}
+            className={`rounded-xl border bg-white p-4 shadow-panel ${p.is_default ? "border-brand-300" : "border-stone-200"}`}
           >
             {editingId === p.id ? (
               <ProfileForm
@@ -155,25 +162,25 @@ export function ModelSettingsPage() {
               <div className="flex items-start justify-between">
                 <div className="text-sm">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-stone-900">
                       {p.name || "未命名"}
                     </span>
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
                       {PROVIDER_LABELS[p.provider] ?? p.provider}
                     </span>
                     {p.is_default ? (
-                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700">
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-700">
                         默认
                       </span>
                     ) : null}
                     {!p.enabled ? (
-                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs text-rose-700">
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
                         已禁用
                       </span>
                     ) : null}
                   </div>
-                  <div className="mt-1 text-slate-500">
-                    模型：{p.model_name || "未设定"} · Key：
+                  <div className="mt-1 text-stone-500">
+                    模型：{p.model_name || "未设定"} · 密钥：
                     {p.api_key_configured ? "已配置" : "未配置"}
                     {p.base_url ? ` · ${p.base_url}` : ""}
                   </div>
@@ -224,7 +231,7 @@ export function ModelSettingsPage() {
         ))}
 
         {adding ? (
-          <div className="rounded-md border border-indigo-200 bg-white p-4">
+          <div className="rounded-xl border border-brand-200 bg-white p-4 shadow-panel">
             <ProfileForm
               form={form}
               setForm={setForm}
@@ -236,13 +243,13 @@ export function ModelSettingsPage() {
         ) : null}
 
         {testResult ? (
-          <div className="rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-700">
+          <div className="rounded-xl border border-stone-200 bg-white p-3 text-sm text-stone-700 shadow-panel">
             {testResult}
           </div>
         ) : null}
 
         {profiles.data?.length === 0 && !adding ? (
-          <div className="rounded-md border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
+          <div className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center text-sm text-stone-500 shadow-panel">
             暂无模型配置，点击「添加配置」创建。
           </div>
         ) : null}
@@ -267,21 +274,21 @@ function ProfileForm({
   return (
     <div className="space-y-3 text-sm">
       <label className="block">
-        <span className="font-medium text-slate-700">名称</span>
+        <span className="font-medium text-stone-700">名称</span>
         <input
           value={String(form.name ?? "")}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           placeholder="如：DeepSeek-正式写作"
-          className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600"
+          className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="font-medium text-slate-700">Provider</span>
+          <span className="font-medium text-stone-700">服务商</span>
           <select
             value={String(form.provider ?? "deepseek")}
             onChange={(e) => setForm({ ...form, provider: e.target.value })}
-            className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600"
+            className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
           >
             {Object.entries(PROVIDER_LABELS).map(([k, v]) => (
               <option key={k} value={k}>
@@ -291,32 +298,32 @@ function ProfileForm({
           </select>
         </label>
         <label className="block">
-          <span className="font-medium text-slate-700">模型名</span>
+          <span className="font-medium text-stone-700">模型名称</span>
           <input
             value={String(form.model_name ?? "")}
             onChange={(e) => setForm({ ...form, model_name: e.target.value })}
             placeholder="如：deepseek-v4-flash"
-            className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600"
+            className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
           />
         </label>
       </div>
       <label className="block">
-        <span className="font-medium text-slate-700">Base URL</span>
+        <span className="font-medium text-stone-700">基础地址（Base URL）</span>
         <input
           value={String(form.base_url ?? "")}
           onChange={(e) => setForm({ ...form, base_url: e.target.value })}
           placeholder="留空使用默认"
-          className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600"
+          className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         />
       </label>
       <label className="block">
-        <span className="font-medium text-slate-700">API Key</span>
+        <span className="font-medium text-stone-700">API 密钥</span>
         <input
           type="password"
           value={String(form.api_key ?? "")}
           onChange={(e) => setForm({ ...form, api_key: e.target.value })}
           placeholder="留空不修改"
-          className="mt-1 w-full rounded border px-3 py-1.5 outline-none focus:border-emerald-600"
+          className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
         />
       </label>
       <div className="grid grid-cols-3 gap-3">
