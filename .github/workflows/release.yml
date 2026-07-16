@@ -50,8 +50,12 @@ jobs:
         run: |
           $tag = $env:RELEASE_TAG
           $archive = "novelflow-frontend-$tag.zip"
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $existingRelease = @(
+            gh release list --limit 1000 --json tagName |
+              ConvertFrom-Json |
+              Where-Object { $_.tagName -eq $tag }
+          )
+          if ($existingRelease.Count -gt 0) {
             gh release upload $tag $archive --clobber
           } else {
             gh release create $tag `
