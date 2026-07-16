@@ -6,6 +6,7 @@ from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.canon.service import CanonService
 from app.core.exceptions import (
     ConflictError,
     NotFoundError,
@@ -424,14 +425,15 @@ class ManuscriptService:
                 {"reason": "VERSION_REVIEW_REQUIRED"},
             )
 
-        blocking_result = await self.session.execute(
-            select(ReviewIssue).where(
-                ReviewIssue.review_run_id == review_run.id,
-                ReviewIssue.severity == "blocking",
-                ReviewIssue.status != "false_positive",
-            )
+        issue_result = await self.session.execute(
+            select(ReviewIssue).where(ReviewIssue.review_run_id == review_run.id).order_by(ReviewIssue.id)
         )
-        blocking_issues = list(blocking_result.scalars().all())
+        review_issues = list(issue_result.scalars().all())
+        blocking_issues = [
+            issue
+            for issue in review_issues
+            if issue.severity == "blocking" and issue.status != "false_positive"
+        ]
         override_reason = (payload.override_reason or "").strip()
         if blocking_issues and not override_reason:
             raise ConflictError(
@@ -448,6 +450,7 @@ class ManuscriptService:
         version.approved_at = utc_now()
         version.approval_override_reason = override_reason if blocking_issues else None
         chapter = await self.get_chapter(scene.chapter_id)
+        volume = await self.get_volume(chapter.volume_id)
         if old_version is None:
             chapter.approved_word_count += count_plaintext_characters(version.content_json)
         else:
@@ -472,6 +475,14 @@ class ManuscriptService:
                     status="open",
                 )
             )
+        await CanonService(self.session).record_scene_approval(
+            project_id=volume.project_id,
+            scene=scene,
+            version=version,
+            review_run=review_run,
+            review_issues=review_issues,
+            override_reason=version.approval_override_reason,
+        )
         await self.session.commit()
         await self.session.refresh(scene)
         return scene
