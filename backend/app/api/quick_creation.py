@@ -74,9 +74,7 @@ async def plan_quick_creation(
         "场景卡要是可执行的正规描述，不能直接照抄作者原话。"
     )
     try:
-        runtime = await ModelRuntimeResolver(session).resolve_default(
-            payload.model_profile_id
-        )
+        runtime = await ModelRuntimeResolver(session).resolve_default(payload.model_profile_id)
         items = await generate_json_array(
             runtime.router,
             runtime.provider,

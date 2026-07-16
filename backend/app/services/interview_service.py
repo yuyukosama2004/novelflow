@@ -253,9 +253,7 @@ class InterviewService:
         await self.session.refresh(discussion)
         return self._session_out(discussion)
 
-    async def list_workspace_discussions(
-        self, project_id: str, scene_id: str | None
-    ) -> list[dict]:
+    async def list_workspace_discussions(self, project_id: str, scene_id: str | None) -> list[dict]:
         await ProjectService(self.session).get(project_id)
         result = await self.session.execute(
             select(InterviewSession)
