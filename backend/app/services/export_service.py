@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.canon.query import CanonQueryService
 from app.models.character import Character
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
 from app.models.world import WorldEntry
@@ -25,14 +26,16 @@ class ExportService:
             for chapter in chapters:
                 lines.extend([f"### {chapter.title}", "", chapter.summary, ""])
                 scenes = await self._scenes(chapter.id)
+                canon_versions = await CanonQueryService(self.session).latest_versions_for_scenes(
+                    [scene.id for scene in scenes]
+                )
                 for scene in scenes:
                     lines.extend([f"#### {scene.title}", ""])
-                    if scene.approved_version_id:
-                        version = await self.session.get(SceneVersion, scene.approved_version_id)
-                        if version is not None:
-                            lines.extend([version.content_markdown, ""])
-                    else:
+                    canon = canon_versions.get(scene.id)
+                    if canon is None:
                         lines.extend(["> No approved version.", ""])
+                    else:
+                        lines.extend([canon.version.content_markdown, ""])
         return "\n".join(lines).strip() + "\n"
 
     async def backup_json(self, project_id: str) -> dict[str, Any]:

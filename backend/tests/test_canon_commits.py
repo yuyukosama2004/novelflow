@@ -163,6 +163,31 @@ def test_replacement_appends_to_linear_canon_history(
     assert len(unchanged_commits) == 2
 
 
+def test_markdown_export_reads_latest_canon_when_projection_drifts(
+    client: TestClient,
+    database_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, scene = create_scene(client)
+    first = create_version(client, scene["id"], "First canon.")
+    review_and_approve(client, monkeypatch, scene["id"], first["id"])
+    second = create_version(client, scene["id"], "Second canon.")
+    review_and_approve(client, monkeypatch, scene["id"], second["id"])
+
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.execute(
+            "UPDATE scenes SET approved_version_id = ? WHERE id = ?",
+            (first["id"], scene["id"]),
+        )
+        connection.commit()
+
+    exported = client.get(f"/api/projects/{project['id']}/exports/markdown")
+
+    assert exported.status_code == 200
+    assert "Second canon." in exported.text
+    assert "First canon." not in exported.text
+
+
 def test_sqlite_rejects_canon_commit_updates_and_deletes(tmp_path: Path) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'immutable.db'}")
     Base.metadata.create_all(engine)

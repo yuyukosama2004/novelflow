@@ -4,10 +4,12 @@ import json
 from dataclasses import dataclass, field
 from typing import Literal
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.canon.query import CanonQueryService
+from app.models.canon import CanonCommit
 from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.manuscript import (
     Chapter,
@@ -175,7 +177,7 @@ class ContextBuilder:
             .join(Volume, Chapter.volume_id == Volume.id)
             .where(
                 Volume.project_id == current_volume.project_id,
-                Scene.approved_version_id.isnot(None),
+                exists(select(CanonCommit.id).where(CanonCommit.scene_id == Scene.id)),
                 or_(
                     Volume.sequence_no < current_volume.sequence_no,
                     and_(
@@ -197,15 +199,16 @@ class ContextBuilder:
             .limit(1)
         )
         prev_scene = result.scalar_one_or_none()
-        if prev_scene is None or prev_scene.approved_version_id is None:
+        if prev_scene is None:
             return None
 
-        prev_version = await self.session.get(SceneVersion, prev_scene.approved_version_id)
-        if prev_version is None:
+        canon = await CanonQueryService(self.session).get_scene_version(prev_scene.id)
+        if canon is None:
             return None
+        prev_version = canon.version
 
         summary = prev_version.summary.strip()
-        tail = prev_version.content_markdown[-PREVIOUS_SCENE_TAIL_CHARS:]
+        tail = prev_version.content_text[-PREVIOUS_SCENE_TAIL_CHARS:]
         preview = f"摘要：{summary}\n\n结尾：{tail}" if summary else tail
         return PreviousScene(
             scene_id=prev_scene.id,
