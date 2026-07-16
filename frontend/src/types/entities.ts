@@ -102,6 +102,9 @@ export interface SceneVersion extends EntityBase {
   branch_name: string;
   content_json: Record<string, unknown>;
   content_markdown: string;
+  content_text: string;
+  document_schema_version: string;
+  document_hash: string;
   summary: string;
   source_type: string;
   model_profile_id: string | null;

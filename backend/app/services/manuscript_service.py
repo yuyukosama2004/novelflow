@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +10,7 @@ from app.core.exceptions import (
     NotFoundError,
     ValidationAppError,
 )
+from app.documents.codec import SceneDocument, SceneDocumentError, build_scene_document
 from app.models.base import utc_now
 from app.models.bible import CharacterRelationship
 from app.models.character import Character, CharacterKnowledge, CharacterState
@@ -48,22 +47,6 @@ from app.schemas.manuscript import (
     VolumeUpdate,
 )
 from app.services.project_service import ProjectService
-
-
-def count_plaintext_characters(document: dict[str, Any]) -> int:
-    """Count visible non-whitespace characters in a Tiptap document."""
-
-    def collect(node: object) -> str:
-        if not isinstance(node, dict):
-            return ""
-        text = node.get("text")
-        own_text = text if isinstance(text, str) else ""
-        children = node.get("content")
-        if not isinstance(children, list):
-            return own_text
-        return own_text + "".join(collect(child) for child in children)
-
-    return sum(not character.isspace() for character in collect(document))
 
 
 class ManuscriptService:
@@ -295,14 +278,38 @@ class ManuscriptService:
 
     async def create_version(self, scene_id: str, payload: SceneVersionCreate) -> SceneVersion:
         await self.get_scene(scene_id)
+        document = self._build_version_document(payload)
         version = SceneVersion(
             scene_id=scene_id,
             version_no=await self.versions.next_version_no(scene_id),
-            **payload.model_dump(),
+            **payload.model_dump(exclude={"content_json", "content_markdown"}),
+            content_json=document.content_json,
+            content_markdown=document.content_markdown,
+            content_text=document.content_text,
+            document_schema_version=document.schema_version,
+            document_hash=document.document_hash,
         )
         await self.versions.add(version)
         await self.session.commit()
         return version
+
+    @staticmethod
+    def _build_version_document(payload: SceneVersionCreate) -> SceneDocument:
+        try:
+            return build_scene_document(
+                content_json=(payload.content_json if "content_json" in payload.model_fields_set else None),
+                content_markdown=(
+                    payload.content_markdown if "content_markdown" in payload.model_fields_set else None
+                ),
+            )
+        except SceneDocumentError as exc:
+            raise ValidationAppError(
+                "scene document representations do not match",
+                {
+                    "reason": "DOCUMENT_REPRESENTATION_MISMATCH",
+                    "message": str(exc),
+                },
+            ) from exc
 
     async def list_versions(self, scene_id: str) -> list[SceneVersion]:
         await self.get_scene(scene_id)
@@ -327,6 +334,19 @@ class ManuscriptService:
         payload: SceneWorkingDraftUpdate,
     ) -> SceneWorkingDraft:
         await self.get_scene(scene_id)
+        try:
+            document = build_scene_document(
+                content_json=payload.content_json,
+                content_markdown=payload.content_markdown,
+            )
+        except SceneDocumentError as exc:
+            raise ValidationAppError(
+                "scene document representations do not match",
+                {
+                    "reason": "DOCUMENT_REPRESENTATION_MISMATCH",
+                    "message": str(exc),
+                },
+            ) from exc
         existing = await self.get_working_draft(scene_id)
         if existing is None:
             if payload.revision != 0:
@@ -336,8 +356,8 @@ class ManuscriptService:
                 )
             draft = SceneWorkingDraft(
                 scene_id=scene_id,
-                content_json=payload.content_json,
-                content_markdown=payload.content_markdown,
+                content_json=document.content_json,
+                content_markdown=document.content_markdown,
                 revision=1,
             )
             self.session.add(draft)
@@ -363,8 +383,8 @@ class ManuscriptService:
                 SceneWorkingDraft.revision == payload.revision,
             )
             .values(
-                content_json=payload.content_json,
-                content_markdown=payload.content_markdown,
+                content_json=document.content_json,
+                content_markdown=document.content_markdown,
                 revision=payload.revision + 1,
             )
         )
@@ -452,13 +472,13 @@ class ManuscriptService:
         chapter = await self.get_chapter(scene.chapter_id)
         volume = await self.get_volume(chapter.volume_id)
         if old_version is None:
-            chapter.approved_word_count += count_plaintext_characters(version.content_json)
+            chapter.approved_word_count += sum(not character.isspace() for character in version.content_text)
         else:
             chapter.approved_word_count = max(
                 0,
                 chapter.approved_word_count
-                - count_plaintext_characters(old_version.content_json)
-                + count_plaintext_characters(version.content_json),
+                - sum(not character.isspace() for character in old_version.content_text)
+                + sum(not character.isspace() for character in version.content_text),
             )
             old_version.superseded_at = utc_now()
             old_version.superseded_by_version_id = version.id

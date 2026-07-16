@@ -186,6 +186,9 @@ class SceneVersionRead(EntityBase):
     branch_name: str
     content_json: dict[str, Any]
     content_markdown: str
+    content_text: str
+    document_schema_version: str
+    document_hash: str
     summary: str
     source_type: str
     model_profile_id: str | None

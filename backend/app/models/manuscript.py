@@ -3,9 +3,25 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    DDL,
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    event,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.documents.codec import (
+    CANONICAL_DOCUMENT_SCHEMA,
+    build_scene_document,
+)
 from app.models.base import Base, TimestampMixin, UUIDMixin
 
 
@@ -128,7 +144,17 @@ class SceneWorkingDraft(UUIDMixin, TimestampMixin, Base):
 
 class SceneVersion(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "scene_versions"
-    __table_args__ = (UniqueConstraint("scene_id", "version_no", name="uq_scene_version_no"),)
+    __table_args__ = (
+        UniqueConstraint("scene_id", "version_no", name="uq_scene_version_no"),
+        CheckConstraint(
+            "length(document_hash) = 64",
+            name="ck_scene_version_document_hash_length",
+        ),
+        CheckConstraint(
+            "length(document_schema_version) > 0",
+            name="ck_scene_version_document_schema",
+        ),
+    )
 
     scene_id: Mapped[str] = mapped_column(ForeignKey("scenes.id"), index=True)
     version_no: Mapped[int] = mapped_column(Integer)
@@ -136,6 +162,12 @@ class SceneVersion(UUIDMixin, TimestampMixin, Base):
     branch_name: Mapped[str] = mapped_column(String(100), default="main")
     content_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     content_markdown: Mapped[str] = mapped_column(Text, default="")
+    content_text: Mapped[str] = mapped_column(Text, default="")
+    document_schema_version: Mapped[str] = mapped_column(
+        String(64),
+        default=CANONICAL_DOCUMENT_SCHEMA,
+    )
+    document_hash: Mapped[str] = mapped_column(String(64))
     summary: Mapped[str] = mapped_column(Text, default="")
     source_type: Mapped[str] = mapped_column(String(40), default="human")
     model_profile_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
@@ -175,6 +207,62 @@ class SceneVersion(UUIDMixin, TimestampMixin, Base):
         foreign_keys="MemoryExtractionRun.scene_version_id",
         order_by="MemoryExtractionRun.created_at",
     )
+
+
+@event.listens_for(SceneVersion, "before_insert")
+def populate_scene_version_document_metadata(
+    _mapper: object,
+    _connection: object,
+    target: SceneVersion,
+) -> None:
+    """Protect direct ORM inserts that do not pass through ManuscriptService."""
+
+    if target.document_hash and target.document_schema_version and target.content_text is not None:
+        return
+    document = build_scene_document(
+        content_json=target.content_json,
+        content_markdown=target.content_markdown,
+    )
+    target.content_json = document.content_json
+    target.content_markdown = document.content_markdown
+    target.content_text = document.content_text
+    target.document_schema_version = document.schema_version
+    target.document_hash = document.document_hash
+
+
+event.listen(
+    SceneVersion.__table__,
+    "after_create",
+    DDL(
+        """
+        CREATE TRIGGER scene_versions_prevent_document_update
+        BEFORE UPDATE OF
+            scene_id,
+            version_no,
+            parent_version_id,
+            branch_name,
+            content_json,
+            content_markdown,
+            content_text,
+            document_schema_version,
+            document_hash,
+            source_type,
+            model_profile_id,
+            prompt_snapshot_json,
+            context_manifest_json,
+            created_by
+        ON scene_versions
+        BEGIN
+            SELECT RAISE(ABORT, 'scene version document is immutable');
+        END
+        """
+    ).execute_if(dialect="sqlite"),
+)
+event.listen(
+    SceneVersion.__table__,
+    "before_drop",
+    DDL("DROP TRIGGER IF EXISTS scene_versions_prevent_document_update").execute_if(dialect="sqlite"),
+)
 
 
 class ImpactReport(UUIDMixin, TimestampMixin, Base):

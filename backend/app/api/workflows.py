@@ -359,15 +359,6 @@ async def generate_scene_stream(
                     logger.warning("version summary generation failed", exc_info=True)
                     summary = ""
                 version_payload = SceneVersionCreate(
-                    content_json={
-                        "type": "doc",
-                        "content": [
-                            {
-                                "type": "paragraph",
-                                "content": [{"type": "text", "text": state.draft}],
-                            }
-                        ],
-                    },
                     content_markdown=state.draft,
                     summary=summary,
                     source_type=("ai_generated" if generation.generation_mode == "new" else "ai_revised"),
