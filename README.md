@@ -31,6 +31,7 @@ NovelFlow 是面向本地单用户的 AI 长篇小说创作工作台。它把“
 ### 正史、审查与上下文
 
 - AI 生成场景后创建草稿版本；正史采用必须由作者手动确认。
+- 每次正式批准都会创建不可变的 `CanonCommit`，记录前序提交、规范化内容哈希、场景契约和审查快照；替换历史形成可追溯的线性提交链。
 - 一致性审查发现问题后，可按条处理；阻塞问题允许填写原因后强制批准。
 - 记忆提取产生候选项，作者可确认、修改或拒绝；AI 不会自动写入正史。
 - 场景上下文可关联角色与世界观条目，并受 POV、故事时间、显式关系和项目规则限制。
@@ -158,6 +159,7 @@ node scripts/smoke.mjs
 - `GET` / `PUT /api/scenes/{scene_id}/working-draft`
 - `GET` / `PUT /api/scenes/{scene_id}/context-links`
 - `POST /api/scenes/{scene_id}/versions`
+- `GET /api/scenes/{scene_id}/canon-commits`
 - `GET /api/workflows/runs/{run_id}`
 - `GET /api/projects/{project_id}/impact-reports`
 - `POST /api/scenes/{scene_id}/clear-stale`
