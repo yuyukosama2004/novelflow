@@ -13,7 +13,7 @@ concurrency:
 jobs:
   backend:
     name: Backend
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, novelflow]
     defaults:
       run:
         working-directory: backend
@@ -46,7 +46,7 @@ jobs:
 
   frontend:
     name: Frontend
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, novelflow]
     defaults:
       run:
         working-directory: frontend

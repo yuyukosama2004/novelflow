@@ -11,7 +11,7 @@ permissions:
 jobs:
   release:
     name: Build and publish release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, novelflow]
 
     steps:
       - name: Check out repository
@@ -29,14 +29,16 @@ jobs:
         run: npm ci && npm run build
 
       - name: Package frontend
-        run: cd frontend && zip -r "../novelflow-frontend-${GITHUB_REF_NAME}.zip" dist
+        shell: pwsh
+        run: Compress-Archive -Path frontend/dist -DestinationPath "novelflow-frontend-$env:GITHUB_REF_NAME.zip"
 
       - name: Create GitHub release
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME"
-          "novelflow-frontend-${GITHUB_REF_NAME}.zip"
-          --verify-tag
-          --generate-notes
-          --title "NovelFlow ${GITHUB_REF_NAME}"
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            "novelflow-frontend-$env:GITHUB_REF_NAME.zip" `
+            --verify-tag `
+            --generate-notes `
+            --title "NovelFlow $env:GITHUB_REF_NAME"
