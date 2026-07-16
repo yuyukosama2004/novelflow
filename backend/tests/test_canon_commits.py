@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -194,3 +196,60 @@ def test_sqlite_rejects_canon_commit_updates_and_deletes(tmp_path: Path) -> None
             connection.execute(delete(CanonCommit).where(CanonCommit.id == commit_id))
 
     engine.dispose()
+
+
+def test_integrity_audit_detects_projection_and_content_drift(
+    client: TestClient,
+    database_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, scene = create_scene(client)
+    first = create_version(client, scene["id"], "First canon.")
+    review_and_approve(client, monkeypatch, scene["id"], first["id"])
+    second = create_version(client, scene["id"], "Second canon.")
+    review_and_approve(client, monkeypatch, scene["id"], second["id"])
+
+    healthy = response_data(client.get(f"/api/projects/{project['id']}/canon-integrity"))
+    assert healthy["status"] == "ok"
+    assert healthy["checked_scenes"] == 1
+    assert healthy["checked_commits"] == 2
+    assert healthy["issues"] == []
+
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.execute(
+            "UPDATE scenes SET approved_version_id = ? WHERE id = ?",
+            (first["id"], scene["id"]),
+        )
+        connection.execute(
+            "UPDATE scene_versions SET content_markdown = ? WHERE id = ?",
+            ("Tampered after approval.", second["id"]),
+        )
+        connection.execute(
+            """
+            INSERT INTO canon_commits (
+                id, project_id, scene_id, scene_version_id, previous_commit_id,
+                sequence_no, content_hash, contract_snapshot_json,
+                review_snapshot_json, commit_reason, override_reason,
+                committed_by, committed_at
+            ) VALUES (?, ?, ?, ?, NULL, 1, ?, '{}', '{}', ?, NULL, ?, ?)
+            """,
+            (
+                "orphan-commit",
+                project["id"],
+                "missing-scene",
+                "missing-version",
+                "b" * 64,
+                "test_orphan",
+                "test",
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        connection.commit()
+
+    drift = response_data(client.get(f"/api/projects/{project['id']}/canon-integrity"))
+    issue_codes = {issue["code"] for issue in drift["issues"]}
+
+    assert drift["status"] == "drift"
+    assert "PROJECTION_VERSION_MISMATCH" in issue_codes
+    assert "COMMIT_HASH_MISMATCH" in issue_codes
+    assert "COMMIT_SCENE_MISSING" in issue_codes

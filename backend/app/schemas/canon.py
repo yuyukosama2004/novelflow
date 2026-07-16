@@ -22,3 +22,23 @@ class CanonCommitRead(BaseModel):
     override_reason: str | None
     committed_by: str
     committed_at: datetime
+
+
+class CanonIntegrityIssueRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    scene_id: str
+    commit_id: str | None
+    details: dict[str, Any]
+
+
+class CanonIntegrityReportRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    project_id: str
+    status: str
+    checked_scenes: int
+    checked_commits: int
+    issues: list[CanonIntegrityIssueRead]
+    audited_at: datetime
