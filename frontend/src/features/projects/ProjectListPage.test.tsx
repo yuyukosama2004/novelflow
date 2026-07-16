@@ -31,7 +31,7 @@ it("renders projects and health status", () => {
   render(
     <BrowserRouter>
       <ProjectListView
-        health={{ status: "ok", database: "ok", version: "0.1.0", models: {} }}
+        health={{ status: "ok", database: "ok", version: "0.2.0", models: {} }}
         projects={[project]}
         isLoading={false}
         onCreate={() => undefined}
@@ -43,7 +43,7 @@ it("renders projects and health status", () => {
 
   expect(screen.getByText("NovelFlow")).toBeInTheDocument();
   expect(screen.getByText("雨夜档案")).toBeInTheDocument();
-  expect(screen.getByText("服务已连接 · v0.1.0")).toBeInTheDocument();
+  expect(screen.getByText("服务已连接 · v0.2.0")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "快速创作" })).toBeInTheDocument();
 });
 
