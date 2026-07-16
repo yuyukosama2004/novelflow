@@ -86,6 +86,24 @@ npm run dev
 
 若密钥曾被提交到 Git，应立即在服务商后台撤销并重新生成；仅删除文件不足以使历史记录失效。
 
+## 数据库备份与恢复
+
+安装后端后，可以在数据库仍被 NovelFlow 使用时创建一致性 SQLite 备份。备份完成前会执行完整性检查，默认不会覆盖已有文件：
+
+```powershell
+cd backend
+novelflow-db create --output .\backups\novelflow-2026-07-16.db
+novelflow-db verify .\backups\novelflow-2026-07-16.db
+```
+
+恢复默认写入新的数据库路径，便于先验证恢复结果再替换现有数据：
+
+```powershell
+novelflow-db restore .\backups\novelflow-2026-07-16.db --output .\restored\novelflow.db
+```
+
+也可以使用 `python -m app.platform.backup` 调用相同命令。数据库迁移、批量导入或大规模正史变更前应先创建备份。
+
 ## 推荐创作流程
 
 1. 新建项目，选择创作入口或使用“快速创作”。

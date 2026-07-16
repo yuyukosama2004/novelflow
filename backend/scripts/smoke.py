@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import json
+import socket
 import subprocess
 import sys
 import time
 import urllib.request
 
 
+def find_available_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
+
+
 def main() -> int:
+    port = find_available_port()
     process = subprocess.Popen(
         [
             sys.executable,
@@ -17,7 +25,7 @@ def main() -> int:
             "--host",
             "127.0.0.1",
             "--port",
-            "8000",
+            str(port),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -35,7 +43,10 @@ def main() -> int:
                     print(stderr, file=sys.stderr)
                 return process.returncode or 1
             try:
-                with urllib.request.urlopen("http://127.0.0.1:8000/api/health", timeout=2) as response:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/api/health",
+                    timeout=2,
+                ) as response:
                     body = response.read().decode("utf-8")
                 print(json.dumps(json.loads(body), ensure_ascii=False, indent=2))
                 return 0
