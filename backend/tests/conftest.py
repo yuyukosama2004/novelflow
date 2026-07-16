@@ -15,8 +15,12 @@ from app.models import Base
 
 
 @pytest.fixture()
-def client(tmp_path: Path) -> Iterator[TestClient]:
-    database_path = tmp_path / "test.db"
+def database_path(tmp_path: Path) -> Path:
+    return tmp_path / "test.db"
+
+
+@pytest.fixture()
+def client(database_path: Path) -> Iterator[TestClient]:
     engine = create_async_engine(f"sqlite+aiosqlite:///{database_path}", future=True)
 
     async def create_schema() -> None:

@@ -160,6 +160,7 @@ node scripts/smoke.mjs
 - `GET` / `PUT /api/scenes/{scene_id}/context-links`
 - `POST /api/scenes/{scene_id}/versions`
 - `GET /api/scenes/{scene_id}/canon-commits`
+- `GET /api/projects/{project_id}/canon-integrity`
 - `GET /api/workflows/runs/{run_id}`
 - `GET /api/projects/{project_id}/impact-reports`
 - `POST /api/scenes/{scene_id}/clear-stale`
