@@ -57,9 +57,7 @@ async def list_creative_discussions(
     scene_id: str | None = None,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    discussions = await InterviewService(session).list_workspace_discussions(
-        project_id, scene_id
-    )
+    discussions = await InterviewService(session).list_workspace_discussions(project_id, scene_id)
     return success(discussions, request)
 
 
