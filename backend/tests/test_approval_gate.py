@@ -160,7 +160,11 @@ def test_approval_counts_plaintext_characters_from_rich_text_json(
                         {
                             "type": "paragraph",
                             "content": [
-                                {"type": "text", "text": "你好"},
+                                {
+                                    "type": "text",
+                                    "text": "你好",
+                                    "marks": [{"type": "bold"}],
+                                },
                                 {"type": "text", "text": " world"},
                             ],
                         }

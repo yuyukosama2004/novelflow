@@ -3,7 +3,6 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.canon.hashing import scene_version_content_hash
 from app.core.exceptions import ConflictError
 from app.models.canon import CanonCommit
 from app.models.manuscript import Scene, SceneVersion
@@ -60,10 +59,7 @@ class CanonService:
             scene_version_id=version.id,
             previous_commit_id=previous.id if previous else None,
             sequence_no=(previous.sequence_no + 1) if previous else 1,
-            content_hash=scene_version_content_hash(
-                version.content_json,
-                version.content_markdown,
-            ),
+            content_hash=version.document_hash,
             contract_snapshot_json=self._contract_snapshot(scene),
             review_snapshot_json=self._review_snapshot(review_run, review_issues),
             commit_reason="version_replacement" if previous else "initial_approval",

@@ -218,6 +218,19 @@ class CanonIntegrityService:
                     version.content_json,
                     version.content_markdown,
                 )
+                if actual_hash != version.document_hash:
+                    issues.append(
+                        CanonIntegrityIssue(
+                            code="DOCUMENT_HASH_MISMATCH",
+                            scene_id=scene.id,
+                            commit_id=commit.id,
+                            details={
+                                "stored_hash": version.document_hash,
+                                "actual_hash": actual_hash,
+                                "scene_version_id": version.id,
+                            },
+                        )
+                    )
                 if actual_hash != commit.content_hash:
                     issues.append(
                         CanonIntegrityIssue(
@@ -227,6 +240,7 @@ class CanonIntegrityService:
                             details={
                                 "expected_hash": commit.content_hash,
                                 "actual_hash": actual_hash,
+                                "stored_document_hash": version.document_hash,
                             },
                         )
                     )

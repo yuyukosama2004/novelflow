@@ -100,7 +100,22 @@ def test_manual_version_stores_tiptap_json_and_rejects_html_markdown(
     client: TestClient,
 ) -> None:
     scene = create_scene(client)
-    content_json = document("规范正文")
+    content_json = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "规范",
+                        "marks": [{"type": "bold"}],
+                    },
+                    {"type": "text", "text": "正文"},
+                ],
+            }
+        ],
+    }
 
     version = response_data(
         client.post(
@@ -122,8 +137,20 @@ def test_manual_version_stores_tiptap_json_and_rejects_html_markdown(
         f"/api/scene-versions/{version['id']}",
         json={"content_markdown": "不能修改"},
     )
+    mismatched = client.post(
+        f"/api/scenes/{scene['id']}/versions",
+        json={
+            "content_json": document("规范正文"),
+            "content_markdown": "**规范**正文",
+        },
+    )
 
     assert version["content_json"] == content_json
     assert version["content_markdown"] == "**规范**正文"
+    assert version["content_text"] == "规范正文"
+    assert version["document_schema_version"] == "novelflow.tiptap.v1"
+    assert len(version["document_hash"]) == 64
     assert invalid.status_code == 422
     assert immutable.status_code == 405
+    assert mismatched.status_code == 422
+    assert mismatched.json()["details"]["reason"] == "DOCUMENT_REPRESENTATION_MISMATCH"

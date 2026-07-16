@@ -220,6 +220,7 @@ def test_integrity_audit_detects_projection_and_content_drift(
             "UPDATE scenes SET approved_version_id = ? WHERE id = ?",
             (first["id"], scene["id"]),
         )
+        connection.execute("DROP TRIGGER scene_versions_prevent_document_update")
         connection.execute(
             "UPDATE scene_versions SET content_markdown = ? WHERE id = ?",
             ("Tampered after approval.", second["id"]),
@@ -251,5 +252,6 @@ def test_integrity_audit_detects_projection_and_content_drift(
 
     assert drift["status"] == "drift"
     assert "PROJECTION_VERSION_MISMATCH" in issue_codes
+    assert "DOCUMENT_HASH_MISMATCH" in issue_codes
     assert "COMMIT_HASH_MISMATCH" in issue_codes
     assert "COMMIT_SCENE_MISSING" in issue_codes

@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
 
+import documentContracts from "../../../contracts/scene-document-v1.json";
 import { RichTextCodec, RichTextCodecError } from "./richTextCodec";
 
 describe("RichTextCodec", () => {
+  it("matches the shared scene-document contract", () => {
+    for (const contract of documentContracts) {
+      expect(RichTextCodec.toMarkdown(contract.document), contract.name).toBe(
+        contract.markdown,
+      );
+      expect(RichTextCodec.toPlaintext(contract.document), contract.name).toBe(
+        contract.plaintext,
+      );
+    }
+  });
+
   it("serializes supported Tiptap nodes to Markdown and plaintext", () => {
     const document = {
       type: "doc",

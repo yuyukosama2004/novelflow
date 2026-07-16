@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import subprocess
 import sys
 from contextlib import closing
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.canon.hashing import scene_version_content_hash
-from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
+from app.models.manuscript import Chapter, Scene, Volume
 from app.models.project import NovelProject
 
 
@@ -33,25 +35,26 @@ def run_alembic(database_path: Path, *arguments: str) -> None:
     assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
 
 
-def seed_approved_history(database_path: Path) -> tuple[SceneVersion, SceneVersion]:
+@dataclass(frozen=True)
+class LegacyVersion:
+    id: str
+    content_json: dict[str, object]
+    content_markdown: str
+
+
+def seed_approved_history(database_path: Path) -> tuple[LegacyVersion, LegacyVersion]:
     engine = create_engine(f"sqlite:///{database_path.as_posix()}")
     second_time = datetime.now(timezone.utc)
-    first = SceneVersion(
+    first = LegacyVersion(
         id="version-1",
-        scene_id="scene-1",
-        version_no=1,
         content_json={
             "type": "doc",
             "content": [{"type": "paragraph", "content": [{"type": "text", "text": "First"}]}],
         },
         content_markdown="First",
-        superseded_at=second_time,
-        superseded_by_version_id="version-2",
     )
-    second = SceneVersion(
+    second = LegacyVersion(
         id="version-2",
-        scene_id="scene-1",
-        version_no=2,
         content_json={
             "type": "doc",
             "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Second"}]}],
@@ -92,8 +95,48 @@ def seed_approved_history(database_path: Path) -> tuple[SceneVersion, SceneVersi
                 approved_version_id=second.id,
             )
         )
-        session.add_all([first, second])
         session.commit()
+    now = datetime.now(timezone.utc).isoformat()
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.executemany(
+            """
+            INSERT INTO scene_versions (
+                id, scene_id, version_no, parent_version_id, branch_name,
+                content_json, content_markdown, summary, source_type,
+                model_profile_id, prompt_snapshot_json, context_manifest_json,
+                review_status, created_by, approved_at,
+                approval_override_reason, superseded_at,
+                superseded_by_version_id, created_at, updated_at
+            ) VALUES (
+                ?, 'scene-1', ?, NULL, 'main', ?, ?, '', 'human',
+                NULL, '{}', '{}', 'not_reviewed', 'user', NULL,
+                NULL, ?, ?, ?, ?
+            )
+            """,
+            [
+                (
+                    first.id,
+                    1,
+                    json.dumps(first.content_json),
+                    first.content_markdown,
+                    second_time.isoformat(),
+                    second.id,
+                    now,
+                    now,
+                ),
+                (
+                    second.id,
+                    2,
+                    json.dumps(second.content_json),
+                    second.content_markdown,
+                    None,
+                    None,
+                    now,
+                    now,
+                ),
+            ],
+        )
+        connection.commit()
     engine.dispose()
     return first, second
 
@@ -115,7 +158,20 @@ def test_migration_backfills_approved_history_and_is_repeatable(tmp_path: Path) 
             ORDER BY sequence_no
             """
         ).fetchall()
+        versions = connection.execute(
+            """
+            SELECT id, content_text, document_schema_version, document_hash
+            FROM scene_versions
+            ORDER BY version_no
+            """
+        ).fetchall()
         assert len(commits) == 2
+        assert [row["content_text"] for row in versions] == ["First", "Second"]
+        assert {row["document_schema_version"] for row in versions} == {"novelflow.scene-document.legacy-v1"}
+        assert [row["document_hash"] for row in versions] == [
+            commits[0]["content_hash"],
+            commits[1]["content_hash"],
+        ]
         assert commits[0]["scene_version_id"] == first.id
         assert commits[0]["previous_commit_id"] is None
         assert commits[1]["scene_version_id"] == second.id
@@ -138,6 +194,14 @@ def test_migration_backfills_approved_history_and_is_repeatable(tmp_path: Path) 
             assert "canon commits are immutable" in str(exc)
         else:  # pragma: no cover - protects the database-level invariant
             raise AssertionError("canon commit update unexpectedly succeeded")
+        try:
+            connection.execute(
+                "UPDATE scene_versions SET content_markdown = 'changed' WHERE id = 'version-1'"
+            )
+        except sqlite3.IntegrityError as exc:
+            assert "scene version document is immutable" in str(exc)
+        else:  # pragma: no cover - protects the database-level invariant
+            raise AssertionError("scene version document update unexpectedly succeeded")
 
     run_alembic(database_path, "downgrade", "20260711_0011")
     run_alembic(database_path, "upgrade", "head")

@@ -1,0 +1,86 @@
+[
+  {
+    "name": "rich-blocks-and-marks",
+    "document": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "标题"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "粗体",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "hardBreak"
+            },
+            {
+              "type": "text",
+              "text": "代码",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "甲"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "乙"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "horizontalRule"
+        }
+      ]
+    },
+    "markdown": "## 标题\n\n**粗体**  \n`代码`\n\n- 甲\n- 乙\n\n---",
+    "plaintext": "标题\n粗体\n代码\n甲\n乙"
+  }
+]
