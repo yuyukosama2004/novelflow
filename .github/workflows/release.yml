@@ -4,9 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and publish
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
@@ -16,22 +25,39 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Build frontend
         working-directory: frontend
-        run: npm ci && npm run build
+        shell: powershell
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package frontend
-        shell: pwsh
-        run: Compress-Archive -Path frontend/dist -DestinationPath "novelflow-frontend-$env:GITHUB_REF_NAME.zip"
+        shell: powershell
+        run: |
+          $archive = "novelflow-frontend-$env:RELEASE_TAG.zip"
+          Compress-Archive -Path frontend/dist -DestinationPath $archive
 
       - name: Create GitHub release
-        shell: pwsh
+        shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME `
-            "novelflow-frontend-$env:GITHUB_REF_NAME.zip" `
-            --verify-tag `
-            --generate-notes `
-            --title "NovelFlow $env:GITHUB_REF_NAME"
+          $tag = $env:RELEASE_TAG
+          $archive = "novelflow-frontend-$tag.zip"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $archive --clobber
+          } else {
+            gh release create $tag `
+              $archive `
+              --verify-tag `
+              --generate-notes `
+              --title "NovelFlow $tag"
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
