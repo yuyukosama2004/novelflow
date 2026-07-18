@@ -58,7 +58,8 @@ async def test_reviewer_detects_an_issue_in_the_last_chunk() -> None:
     version = SceneVersion(
         scene_id="scene-1",
         version_no=1,
-        content_markdown=content,
+        content_markdown=f"**{content}**",
+        content_text=content,
     )
     context = SceneContext(current_scene=scene, previous_scene=None)
 
@@ -76,7 +77,8 @@ async def test_memory_extraction_detects_a_change_in_the_last_chunk() -> None:
     version = SceneVersion(
         scene_id="scene-1",
         version_no=1,
-        content_markdown=content,
+        content_markdown=f"**{content}**",
+        content_text=content,
     )
     context = SceneContext(current_scene=scene, previous_scene=None)
 

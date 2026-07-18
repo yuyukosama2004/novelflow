@@ -99,6 +99,7 @@ def review_and_approve(
 
 def test_approval_creates_one_queryable_canon_commit(
     client: TestClient,
+    database_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     project, scene = create_scene(client)
@@ -122,6 +123,14 @@ def test_approval_creates_one_queryable_canon_commit(
         version["content_markdown"],
     )
 
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.execute(
+            "UPDATE scenes SET approved_version_id = NULL WHERE id = ?",
+            (scene["id"],),
+        )
+        connection.commit()
+
+    delete_response = client.delete(f"/api/scenes/{scene['id']}")
     response_data(
         client.post(
             f"/api/scenes/{scene['id']}/approve-version",
@@ -129,26 +138,40 @@ def test_approval_creates_one_queryable_canon_commit(
         )
     )
     repeated = response_data(client.get(f"/api/scenes/{scene['id']}/canon-commits"))
+    repaired_scene = response_data(client.get(f"/api/scenes/{scene['id']}"))
+
+    assert delete_response.status_code == 409
     assert len(repeated) == 1
+    assert repaired_scene["approved_version_id"] == version["id"]
 
 
 def test_replacement_appends_to_linear_canon_history(
     client: TestClient,
+    database_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, scene = create_scene(client)
     first = create_version(client, scene["id"], "First canon.")
     review_and_approve(client, monkeypatch, scene["id"], first["id"])
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.execute(
+            "UPDATE scenes SET approved_version_id = NULL WHERE id = ?",
+            (scene["id"],),
+        )
+        connection.commit()
     second = create_version(client, scene["id"], "Replacement canon.")
     review_and_approve(client, monkeypatch, scene["id"], second["id"])
 
     commits = response_data(client.get(f"/api/scenes/{scene['id']}/canon-commits"))
+    first_after_replacement = response_data(client.get(f"/api/scene-versions/{first['id']}"))
 
     assert [commit["sequence_no"] for commit in commits] == [2, 1]
     assert commits[0]["scene_version_id"] == second["id"]
     assert commits[0]["previous_commit_id"] == commits[1]["id"]
     assert commits[0]["commit_reason"] == "version_replacement"
     assert commits[1]["scene_version_id"] == first["id"]
+    assert first_after_replacement["superseded_by_version_id"] == second["id"]
+    assert first_after_replacement["superseded_at"] is not None
 
     repeated_history = client.post(
         f"/api/scenes/{scene['id']}/approve-version",

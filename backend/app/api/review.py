@@ -70,7 +70,7 @@ async def review_version(
         builder = ContextBuilder(session)
         ctx = await builder.build_for_scene(version.scene_id, purpose="review")
         reviewer = ContinuityReviewer(runtime.router, runtime.provider)
-        chunks = split_text_chunks(version.content_markdown)
+        chunks = split_text_chunks(version.content_text)
         run.prompt_snapshot_json = {
             "provider": runtime.provider,
             "model": runtime.model,

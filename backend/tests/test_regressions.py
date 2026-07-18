@@ -18,6 +18,7 @@ from app.api.memory import UpdateCandidateRequest, update_candidate
 from app.llm.base import LLMRequest, LLMResponse, LLMStreamChunk
 from app.llm.router import ModelResponseError
 from app.models import Base
+from app.models.canon import CanonCommit
 from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.manuscript import Chapter, Scene, SceneVersion, Volume
 from app.models.memory import MemoryCandidate
@@ -381,8 +382,20 @@ async def test_context_excludes_future_state_and_classifies_confirmed_knowledge(
 async def test_repeated_candidate_approval_is_idempotent(
     session: AsyncSession,
 ) -> None:
-    _, character, scene, version = await create_story_graph(session, story_time_order=7)
-    scene.approved_version_id = version.id
+    project, character, scene, version = await create_story_graph(session, story_time_order=7)
+    session.add(
+        CanonCommit(
+            project_id=project.id,
+            scene_id=scene.id,
+            scene_version_id=version.id,
+            sequence_no=1,
+            content_hash=version.document_hash,
+            contract_snapshot_json={},
+            review_snapshot_json={},
+            commit_reason="test_approval",
+            committed_by="test",
+        )
+    )
     candidate = MemoryCandidate(
         scene_version_id=version.id,
         candidate_type="character_state",

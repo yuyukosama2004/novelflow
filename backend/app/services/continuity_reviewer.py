@@ -37,7 +37,7 @@ class ContinuityReviewer:
     ) -> list[ReviewIssue]:
         """Run continuity review on a scene version."""
         issues: dict[tuple[str, str, str], ReviewIssue] = {}
-        for chunk in split_text_chunks(version.content_markdown):
+        for chunk in split_text_chunks(version.content_text):
             request = LLMRequest(
                 messages=[
                     LLMMessage(
@@ -93,7 +93,7 @@ class ContinuityReviewer:
         context: SceneContext,
         chunk: TextChunk | None = None,
     ) -> str:
-        active_chunk = chunk or split_text_chunks(version.content_markdown)[0]
+        active_chunk = chunk or split_text_chunks(version.content_text)[0]
         parts: list[str] = []
         parts.append(
             f"## Scene Draft Chunk {active_chunk.index + 1} "

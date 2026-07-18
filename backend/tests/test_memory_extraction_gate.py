@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sqlite3
+from contextlib import closing
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -164,6 +167,7 @@ def test_draft_candidate_cannot_be_applied_but_can_be_rejected(
 
 def test_scene_completion_requires_extraction_and_no_pending_candidates(
     client: TestClient,
+    database_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scene, version = create_story(client)
@@ -180,6 +184,13 @@ def test_scene_completion_requires_extraction_and_no_pending_candidates(
     pending = client.post(f"/api/scenes/{scene['id']}/complete")
     assert pending.status_code == 409
     assert error_reason(pending) == "PENDING_MEMORY_CANDIDATES"
+
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.execute(
+            "UPDATE scenes SET approved_version_id = NULL WHERE id = ?",
+            (scene["id"],),
+        )
+        connection.commit()
 
     applied = response_data(
         client.patch(

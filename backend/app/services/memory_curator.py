@@ -26,7 +26,7 @@ class MemoryCurator:
     ) -> list[MemoryCandidate]:
         """Extract memory candidates from a scene version."""
         candidates: dict[tuple[str, str | None, str], MemoryCandidate] = {}
-        for chunk in split_text_chunks(version.content_markdown):
+        for chunk in split_text_chunks(version.content_text):
             request = LLMRequest(
                 messages=[
                     LLMMessage(
@@ -84,7 +84,7 @@ class MemoryCurator:
         context: SceneContext,
         chunk: TextChunk | None = None,
     ) -> str:
-        active_chunk = chunk or split_text_chunks(version.content_markdown)[0]
+        active_chunk = chunk or split_text_chunks(version.content_text)[0]
         parts: list[str] = []
         parts.append(
             f"## Scene Content Chunk {active_chunk.index + 1} "
