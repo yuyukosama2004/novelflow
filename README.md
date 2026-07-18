@@ -123,7 +123,7 @@ novelflow-db restore .\backups\novelflow-2026-07-16.db --output .\restored\novel
 
 ## 版本与发布
 
-- 当前稳定版本：[v0.2.0](https://github.com/yuyukosama2004/novelflow/releases/tag/v0.2.0)（2026-07-16）。
+- 当前稳定版本：[v0.3.0](https://github.com/yuyukosama2004/novelflow/releases/tag/v0.3.0)（2026-07-18）。
 - 发布标签只指向经过完整前端验证的 `main`；历史开发分支在合入后会清理，日常使用以 `main` 和 Release 为准。
 
 ## 质量检查
@@ -135,6 +135,7 @@ cd backend
 ruff check .
 ruff format --check .
 mypy app
+python scripts/verify_migrations.py
 pytest tests -v
 python scripts/smoke.py
 ```

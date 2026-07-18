@@ -20,13 +20,17 @@ env:
 jobs:
   release:
     name: Build and publish release
-    runs-on: [self-hosted, Windows, X64, novelflow]
+    runs-on: windows-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
         with:
           ref: ${{ env.RELEASE_TAG }}
+
+      - name: Validate release version
+        shell: powershell
+        run: python backend/scripts/verify_release_version.py $env:RELEASE_TAG
 
       - name: Build frontend
         working-directory: frontend
