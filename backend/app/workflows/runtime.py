@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.base import utc_now
 from app.models.workflow import WorkflowEvent, WorkflowRun, WorkflowStepRun
 
-TERMINAL_RUN_STATUSES = frozenset({"waiting_review", "succeeded", "failed", "cancelled"})
+TERMINAL_RUN_STATUSES = frozenset({"waiting_review", "succeeded", "failed", "cancelled", "error"})
 
 
 class LeaseLostError(RuntimeError):
@@ -262,6 +262,7 @@ class WorkflowRuntime:
         error_code: str,
         error_message: str,
         retryable: bool,
+        continue_run: bool = False,
     ) -> WorkflowStepRun:
         run = await self._leased_run(run_id, worker_id)
         step = await self._running_step(run_id, step_id, worker_id)
@@ -270,12 +271,11 @@ class WorkflowRuntime:
         step.error_message = error_message
         step.retryable = retryable
         step.completed_at = utc_now()
-        run.status = "queued" if retryable else "failed"
-        run.error = error_message
         run.current_step_key = ""
-        run.lease_owner = ""
-        run.lease_expires_at = None
-        run.heartbeat_at = None
+        if not continue_run:
+            run.status = "queued" if retryable else "failed"
+            run.error = error_message
+            self._clear_lease(run)
         await self._append_event_without_commit(
             run_id,
             "step_failed",
@@ -286,8 +286,55 @@ class WorkflowRuntime:
                 "retryable": retryable,
             },
         )
+        if not retryable and not continue_run:
+            await self._append_event_without_commit(
+                run_id,
+                "error",
+                {"error": error_message, "error_code": error_code},
+            )
         await self.session.commit()
         return step
+
+    async def append_draft_chunk(
+        self,
+        run_id: str,
+        step_id: str,
+        worker_id: str,
+        content_delta: str,
+        finish_reason: str | None,
+    ) -> WorkflowRun:
+        run = await self._leased_run(run_id, worker_id)
+        step = await self._running_step(run_id, step_id, worker_id)
+        run.draft += content_delta
+        if finish_reason is not None:
+            step.raw_output = run.draft
+            step.raw_output_hash = hashlib.sha256(run.draft.encode("utf-8")).hexdigest()
+        await self._append_event_without_commit(
+            run_id,
+            "content_delta",
+            {
+                "content_delta": content_delta,
+                "finish_reason": finish_reason,
+                "status": "running",
+            },
+        )
+        await self.session.commit()
+        return run
+
+    async def reset_draft(
+        self,
+        run_id: str,
+        worker_id: str,
+    ) -> WorkflowRun:
+        run = await self._leased_run(run_id, worker_id)
+        run.draft = ""
+        await self._append_event_without_commit(
+            run_id,
+            "draft_reset",
+            {"status": "running"},
+        )
+        await self.session.commit()
+        return run
 
     async def append_event(
         self,
@@ -312,10 +359,49 @@ class WorkflowRuntime:
         run = await self._leased_run(run_id, worker_id)
         run.status = status
         run.current_step_key = ""
-        run.lease_owner = ""
-        run.lease_expires_at = None
-        run.heartbeat_at = None
+        self._clear_lease(run)
         await self._append_event_without_commit(run_id, "workflow_finished", {"status": status})
+        await self.session.commit()
+        return run
+
+    async def fail_run(
+        self,
+        run_id: str,
+        worker_id: str,
+        *,
+        error_code: str,
+        error_message: str,
+    ) -> WorkflowRun:
+        run = await self._leased_run(run_id, worker_id)
+        run.status = "failed"
+        run.error = error_message
+        run.blocked_reason = error_code
+        run.current_step_key = ""
+        self._clear_lease(run)
+        await self._append_event_without_commit(
+            run_id,
+            "error",
+            {"error": error_message, "error_code": error_code},
+        )
+        await self.session.commit()
+        return run
+
+    async def request_cancel(self, run_id: str) -> WorkflowRun | None:
+        run = await self.session.get(WorkflowRun, run_id)
+        if run is None:
+            return None
+        if run.status in TERMINAL_RUN_STATUSES:
+            return run
+        run.cancel_requested_at = utc_now()
+        if run.status in {"queued", "pending", "planning", "drafting"}:
+            run.status = "cancelled"
+            run.error = "用户已取消生成"
+            self._clear_lease(run)
+            await self._append_event_without_commit(
+                run_id,
+                "workflow_finished",
+                {"status": "cancelled"},
+            )
         await self.session.commit()
         return run
 
@@ -364,17 +450,33 @@ class WorkflowRuntime:
         event_type: str,
         payload: dict[str, Any],
     ) -> WorkflowEvent:
-        maximum_sequence = await self.session.scalar(
-            select(func.max(WorkflowEvent.sequence_no)).where(WorkflowEvent.workflow_run_id == run_id)
-        )
+        run = await self.session.get(WorkflowRun, run_id)
+        if run is None:
+            raise LookupError(f"workflow run not found: {run_id}")
+        sequence_no = run.last_event_sequence + 1
+        run.last_event_sequence = sequence_no
         event = WorkflowEvent(
             workflow_run_id=run_id,
-            sequence_no=(maximum_sequence or 0) + 1,
+            sequence_no=sequence_no,
             event_type=event_type,
             payload_json=payload,
         )
         self.session.add(event)
+        projected_event = {
+            "event_id": event.sequence_no,
+            "run_id": run_id,
+            "event": event_type,
+            **payload,
+        }
+        if event_type != "content_delta":
+            run.events_json = [*(run.events_json or []), projected_event]
         return event
+
+    @staticmethod
+    def _clear_lease(run: WorkflowRun) -> None:
+        run.lease_owner = ""
+        run.lease_expires_at = None
+        run.heartbeat_at = None
 
     @staticmethod
     def _validate_lease_arguments(worker_id: str, lease_seconds: int) -> None:

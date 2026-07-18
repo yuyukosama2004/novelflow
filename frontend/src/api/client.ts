@@ -23,6 +23,7 @@ import type {
   SceneContextLinks,
   SceneVersion,
   SceneWorkingDraft,
+  SSEChunk,
   StoryCandidateEntity,
   Volume,
   WorldEntry,
@@ -470,15 +471,9 @@ export function createSSEStream(
     instruction: string;
     baseContent: string;
     targetWordCount: number;
+    idempotencyKey: string;
   },
-  onChunk: (data: {
-    run_id: string;
-    content_delta: string;
-    finish_reason: string | null;
-    version?: SceneVersion;
-    error?: string;
-    perspective_warning?: string;
-  }) => void,
+  onChunk: (data: SSEChunk) => void,
   onDone: () => void,
   onError: (error: string) => void,
 ): AbortController {
@@ -492,45 +487,11 @@ export function createSSEStream(
       instruction: payload.instruction,
       base_content: payload.baseContent,
       target_word_count: payload.targetWordCount,
+      idempotency_key: payload.idempotencyKey,
     }),
     signal: controller.signal,
   })
-    .then(async (response) => {
-      if (!response.ok) {
-        onError(`HTTP ${response.status}`);
-        return;
-      }
-      const reader = response.body?.getReader();
-      if (!reader) {
-        onError("No readable stream");
-        return;
-      }
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const dataStr = line.slice(6);
-            if (dataStr === "[DONE]") {
-              onDone();
-              return;
-            }
-            try {
-              const data = JSON.parse(dataStr);
-              onChunk(data);
-            } catch {
-              // skip unparseable lines
-            }
-          }
-        }
-      }
-      onDone();
-    })
+    .then((response) => consumeSSE(response, onChunk, onDone, onError))
     .catch((err) => {
       if (err.name !== "AbortError") {
         onError(err.message);
@@ -538,4 +499,65 @@ export function createSSEStream(
     });
 
   return controller;
+}
+
+export function resumeSSEStream(
+  runId: string,
+  lastEventId: number,
+  onChunk: (data: SSEChunk) => void,
+  onDone: () => void,
+  onError: (error: string) => void,
+): AbortController {
+  const controller = new AbortController();
+  fetch(`${API_BASE_URL}/workflows/runs/${runId}/events`, {
+    headers: { "Last-Event-ID": String(lastEventId) },
+    signal: controller.signal,
+  })
+    .then((response) => consumeSSE(response, onChunk, onDone, onError))
+    .catch((err) => {
+      if (err.name !== "AbortError") {
+        onError(err.message);
+      }
+    });
+  return controller;
+}
+
+async function consumeSSE(
+  response: Response,
+  onChunk: (data: SSEChunk) => void,
+  onDone: () => void,
+  onError: (error: string) => void,
+) {
+  if (!response.ok) {
+    onError(`HTTP ${response.status}`);
+    return;
+  }
+  const reader = response.body?.getReader();
+  if (!reader) {
+    onError("No readable stream");
+    return;
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const dataString = line.slice(6);
+      if (dataString === "[DONE]") {
+        onDone();
+        return;
+      }
+      try {
+        onChunk(JSON.parse(dataString) as SSEChunk);
+      } catch {
+        // Ignore malformed events and continue from the next persisted event.
+      }
+    }
+  }
+  onDone();
 }

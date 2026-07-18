@@ -2,48 +2,35 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
-import re
+from collections.abc import AsyncIterator
 from math import ceil
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.responses import success
 from app.database.session import get_session
-from app.llm.router import LLMRouter
 from app.models.manuscript import Chapter, Scene, Volume
 from app.models.project import NovelProject
-from app.models.workflow import WorkflowRun
-from app.schemas.manuscript import SceneVersionCreate, SceneVersionRead
+from app.models.workflow import WorkflowEvent, WorkflowRun
 from app.services.context_builder import ContextBuilder, SceneContext
 from app.services.manuscript_service import ManuscriptService
 from app.services.model_runtime import ModelRuntimeResolver
-from app.services.version_summary import generate_version_summary
 from app.services.writing_style import perspective_instruction, writing_style_instruction
-from app.workflows.scene_writing import SceneWritingWorkflow, WorkflowState
+from app.workflows.runtime import TERMINAL_RUN_STATUSES, WorkflowRuntime, stable_json_hash
+from app.workflows.scene_writing import perspective_warning
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 def _perspective_warning(content: str, pov_type: str) -> str:
-    """Detect only clear, high-signal perspective misses; dialogue is ignored."""
-    if len(content.strip()) < 300:
-        return ""
-    narrative = re.sub(r"“[^”]*”|「[^」]*」|\"[^\"]*\"", "", content)
-    first_person_markers = len(re.findall(r"我(?=[一-龥，。！？；：])", narrative))
-    if pov_type.startswith("third_person") and first_person_markers >= 5:
-        return "检测到较多第一人称叙述痕迹；请在审阅时确认重写是否已转换为全书设定的第三人称。"
-    if pov_type == "first_person" and first_person_markers == 0:
-        return "未检测到明确第一人称叙述；请在审阅时确认是否符合全书设定的第一人称。"
-    return ""
+    return perspective_warning(content, pov_type)
 
 
 def _build_system_prompt(
@@ -152,11 +139,17 @@ def _build_user_prompt(
 
 class WorkflowRunOut(BaseModel):
     id: str
+    scene_id: str
     model_profile_id: str | None
     provider: str
     model: str
     run_type: str
     status: str
+    attempt: int
+    last_event_sequence: int
+    current_step_key: str
+    last_healthy_step_key: str
+    blocked_reason: str
     plan: str
     draft: str
     final_content: str
@@ -169,6 +162,7 @@ class WorkflowRunOut(BaseModel):
 
 class GenerateSceneRequest(BaseModel):
     model_profile_id: str | None = None
+    idempotency_key: str = Field(default="", max_length=128)
     generation_mode: Literal["new", "rewrite", "polish"] = "new"
     instruction: str = Field(default="", max_length=2000)
     base_content: str = Field(default="", max_length=50000)
@@ -226,14 +220,86 @@ async def cancel_workflow_run(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    run = await session.get(WorkflowRun, run_id)
+    run = await WorkflowRuntime(session).request_cancel(run_id)
     if run is None:
         raise NotFoundError("workflow run not found", {"run_id": run_id})
-    if run.status in {"pending", "planning", "drafting"}:
-        run.status = "cancelled"
-        run.error = "用户已取消生成"
-        await session.commit()
+    worker = getattr(request.app.state, "workflow_worker", None)
+    if worker is not None:
+        worker.cancel(run_id)
     return success(WorkflowRunOut.model_validate(run), request)
+
+
+async def _stream_workflow_events(
+    session_factory: async_sessionmaker[AsyncSession],
+    run_id: str,
+    after: int,
+) -> AsyncIterator[str]:
+    cursor = after
+    loop = asyncio.get_running_loop()
+    last_emit = loop.time()
+    while True:
+        async with session_factory() as session:
+            events = (
+                (
+                    await session.execute(
+                        select(WorkflowEvent)
+                        .where(
+                            WorkflowEvent.workflow_run_id == run_id,
+                            WorkflowEvent.sequence_no > cursor,
+                        )
+                        .order_by(WorkflowEvent.sequence_no)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            run = await session.get(WorkflowRun, run_id)
+        if run is None:
+            return
+        for event in events:
+            cursor = event.sequence_no
+            data = {
+                "event_id": event.sequence_no,
+                "run_id": run_id,
+                "event": event.event_type,
+                **event.payload_json,
+            }
+            yield f"id: {event.sequence_no}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+            last_emit = loop.time()
+        if run.status in TERMINAL_RUN_STATUSES and cursor < run.last_event_sequence:
+            await asyncio.sleep(0)
+            continue
+        if run.status in TERMINAL_RUN_STATUSES:
+            yield "data: [DONE]\n\n"
+            return
+        if loop.time() - last_emit >= 15:
+            yield ": heartbeat\n\n"
+            last_emit = loop.time()
+        await asyncio.sleep(0.2)
+
+
+@router.get("/workflows/runs/{run_id}/events")
+async def resume_workflow_events(
+    run_id: str,
+    request: Request,
+    after: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    if await session.get(WorkflowRun, run_id) is None:
+        raise NotFoundError("workflow run not found", {"run_id": run_id})
+    last_event_id = request.headers.get("last-event-id", "").strip()
+    if last_event_id.isdigit():
+        after = max(after, int(last_event_id))
+    session_factory = request.app.state.workflow_session_factory
+    return StreamingResponse(
+        _stream_workflow_events(session_factory, run_id, after),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Run-Id": run_id,
+        },
+    )
 
 
 @router.post("/scenes/{scene_id}/generate")
@@ -243,7 +309,7 @@ async def generate_scene_stream(
     payload: GenerateSceneRequest | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    """Stream-generate scene content via the persisted workflow state machine."""
+    """Enqueue durable scene generation and stream its persisted event log."""
     manuscript = ManuscriptService(session)
     scene = await manuscript.get_scene(scene_id)
     project = await _project_for_scene(session, scene_id)
@@ -253,25 +319,9 @@ async def generate_scene_stream(
         generation.model_profile_id,
     )
 
-    # 并发锁：检查是否有正在运行中的生成任务
-    active_run = await session.execute(
-        select(WorkflowRun)
-        .where(
-            WorkflowRun.scene_id == scene_id,
-            WorkflowRun.status.in_(["pending", "planning", "drafting"]),
-        )
-        .limit(1)
-    )
-    if active_run.scalar_one_or_none() is not None:
-        raise ConflictError(
-            "此场景已有正在进行的生成任务，请等待完成或取消后再试",
-            {"scene_id": scene_id},
-        )
-
     builder = ContextBuilder(session)
     ctx = await builder.build_for_scene(scene_id)
 
-    run_id = getattr(request.state, "request_id", f"run_{scene_id[:8]}")
     target_word_count = generation.target_word_count or project.default_scene_word_count
     system_prompt = _build_system_prompt(
         project,
@@ -287,133 +337,59 @@ async def generate_scene_stream(
     )
     max_output_tokens = min(8192, max(1024, ceil(target_word_count * 1.4)))
     provider = runtime.provider
-
-    # Persist workflow run
-    wf_run = WorkflowRun(
-        id=run_id,
-        scene_id=scene_id,
-        model_profile_id=runtime.profile_id,
-        run_type="scene_writing",
-        status="pending",
-        provider=provider,
-        model=runtime.model,
-        prompt_snapshot_json={
-            "system": system_prompt,
-            "user": user_prompt,
-            "generation_mode": generation.generation_mode,
-            "target_word_count": target_word_count,
-        },
-        context_manifest_json=ctx.manifest,
+    prompt_snapshot = {
+        "system": system_prompt,
+        "user": user_prompt,
+        "generation_mode": generation.generation_mode,
+        "target_word_count": target_word_count,
+        "max_output_tokens": max_output_tokens,
+        "pov_type": project.pov_type,
+    }
+    input_payload = {
+        "run_type": "scene_writing",
+        "scene_id": scene_id,
+        "model_profile_id": runtime.profile_id,
+        "provider": provider,
+        "model": runtime.model,
+        "prompt_snapshot": prompt_snapshot,
+        "context_manifest": ctx.manifest,
+    }
+    idempotency_key = stable_json_hash(
+        {
+            "client_key": generation.idempotency_key,
+            "run_type": "scene_writing",
+            "scene_id": scene_id,
+        }
+        if generation.idempotency_key
+        else input_payload
     )
-    session.add(wf_run)
     try:
-        await session.commit()
+        wf_run, _ = await WorkflowRuntime(session).enqueue(
+            scene_id=scene_id,
+            run_type="scene_writing",
+            idempotency_key=idempotency_key,
+            input_payload=input_payload,
+            model_profile_id=runtime.profile_id,
+            provider=provider,
+            model=runtime.model,
+            prompt_snapshot=prompt_snapshot,
+            context_manifest=ctx.manifest,
+        )
     except IntegrityError:
-        await session.rollback()
         raise ConflictError(
             "此场景已有正在进行的生成任务，请等待完成或取消后再试",
             {"reason": "ACTIVE_WORKFLOW_EXISTS", "scene_id": scene_id},
         ) from None
-
-    state = WorkflowState(
-        scene_id=scene_id,
-        scene_title=scene.title,
-        provider=provider,
-        model=runtime.model,
-        max_output_tokens=max_output_tokens,
-        run_id=run_id,
-        prompt_snapshot={
-            "system": system_prompt,
-            "user": user_prompt,
-            "generation_mode": generation.generation_mode,
-            "target_word_count": target_word_count,
-        },
-        context_manifest=ctx.manifest,
-    )
-    llm = runtime.router if runtime.profile_id else LLMRouter()
-    workflow = SceneWritingWorkflow(state, llm, system_prompt, user_prompt, ctx.manifest)
-
-    async def stream():  # type: ignore[no-untyped-def]
-        try:
-            async for event in workflow.run():
-                await session.refresh(wf_run)
-                if wf_run.status == "cancelled":
-                    state.status = "cancelled"
-                    break
-                # Update persisted run
-                wf_run.status = state.status
-                wf_run.plan = state.plan
-                wf_run.draft = state.draft
-                wf_run.model = state.model
-                wf_run.events_json = state.events
-                wf_run.error = state.error
-                await session.commit()
-
-                yield (f"id: {event['event_id']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n")
-
-            # A successful generation remains a draft awaiting explicit approval.
-            if state.status == "waiting_review" and state.draft.strip():
-                try:
-                    summary = await generate_version_summary(runtime, state.draft)
-                except Exception:
-                    logger.warning("version summary generation failed", exc_info=True)
-                    summary = ""
-                version_payload = SceneVersionCreate(
-                    content_markdown=state.draft,
-                    summary=summary,
-                    source_type=("ai_generated" if generation.generation_mode == "new" else "ai_revised"),
-                    model_profile_id=runtime.profile_id,
-                    prompt_snapshot_json=state.prompt_snapshot,
-                    context_manifest_json=state.context_manifest,
-                )
-                version = await manuscript.create_version(scene_id, version_payload)
-                wf_run.version_created_id = version.id
-                wf_run.final_content = state.draft
-                wf_run.status = "waiting_review"
-                await session.commit()
-
-                done_data = {
-                    "event_id": len(state.events) + 1,
-                    "run_id": run_id,
-                    "event": "version_created",
-                    "status": "waiting_review",
-                    "version": SceneVersionRead.model_validate(version).model_dump(mode="json"),
-                }
-                perspective_warning = _perspective_warning(state.draft, project.pov_type)
-                if perspective_warning:
-                    done_data["perspective_warning"] = perspective_warning
-                state.events.append(done_data)
-                wf_run.events_json = state.events
-                await session.commit()
-                yield (
-                    f"id: {done_data['event_id']}\n"
-                    "data: " + json.dumps(done_data, ensure_ascii=False) + "\n\n"
-                )
-        except asyncio.CancelledError:
-            wf_run.status = "cancelled"
-            wf_run.error = "client cancelled generation"
-            await session.commit()
-            raise
-        except Exception:
-            wf_run.status = "error"
-            wf_run.error = "生成任务执行失败"
-            await session.commit()
-            error_data = {
-                "event_id": len(state.events) + 1,
-                "run_id": run_id,
-                "event": "error",
-                "error": "生成失败，请稍后重试",
-            }
-            yield ("data: " + json.dumps(error_data, ensure_ascii=False) + "\n\n")
-        finally:
-            yield "data: [DONE]\n\n"
-
+    worker = getattr(request.app.state, "workflow_worker", None)
+    if worker is not None:
+        worker.wake()
+    session_factory = request.app.state.workflow_session_factory
     return StreamingResponse(
-        stream(),
+        _stream_workflow_events(session_factory, wf_run.id, 0),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Run-Id": run_id,
+            "X-Run-Id": wf_run.id,
         },
     )

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 from uuid import uuid4
 
@@ -14,12 +17,34 @@ from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.logging import configure_logging
 from app.core.responses import failure
+from app.database.session import AsyncSessionLocal
+from app.workflows.worker import SceneWorkflowWorker
 
 settings = get_settings()
 configure_logging(settings)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    session_factory = getattr(app.state, "workflow_session_factory", AsyncSessionLocal)
+    app.state.workflow_session_factory = session_factory
+    worker = SceneWorkflowWorker(session_factory)
+    app.state.workflow_worker = worker
+    worker_task = asyncio.create_task(worker.run_forever())
+    try:
+        yield
+    finally:
+        worker.stop()
+        try:
+            await asyncio.wait_for(worker_task, timeout=1)
+        except asyncio.TimeoutError:
+            worker_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await worker_task
+
+
+app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

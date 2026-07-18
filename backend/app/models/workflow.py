@@ -39,6 +39,7 @@ class WorkflowRun(UUIDMixin, TimestampMixin, Base):
     idempotency_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     input_hash: Mapped[str] = mapped_column(String(64), default="")
     attempt: Mapped[int] = mapped_column(Integer, default=0)
+    last_event_sequence: Mapped[int] = mapped_column(Integer, default=0)
     current_step_key: Mapped[str] = mapped_column(String(80), default="")
     last_healthy_step_key: Mapped[str] = mapped_column(String(80), default="")
     lease_owner: Mapped[str] = mapped_column(String(100), default="")

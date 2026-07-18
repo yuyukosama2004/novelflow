@@ -13,7 +13,6 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.api import workflows as workflow_api
 from app.api.memory import UpdateCandidateRequest, update_candidate
 from app.llm.base import LLMRequest, LLMResponse, LLMStreamChunk
 from app.llm.router import ModelResponseError
@@ -26,6 +25,7 @@ from app.models.project import NovelProject
 from app.models.workflow import WorkflowRun
 from app.services.context_builder import ContextBuilder
 from app.services.structured_output import generate_json_array
+from app.workflows import worker as workflow_worker
 from app.workflows.scene_writing import SceneWritingWorkflow, WorkflowState
 
 
@@ -206,7 +206,7 @@ def test_sse_success_creates_unapproved_waiting_review_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scene = create_api_scene(client)
-    monkeypatch.setattr(workflow_api, "LLMRouter", SuccessfulRouter)
+    monkeypatch.setattr(workflow_worker, "LLMRouter", SuccessfulRouter)
 
     response = client.post(f"/api/scenes/{scene['id']}/generate")
 
@@ -246,7 +246,7 @@ def test_sse_partial_failure_does_not_create_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scene = create_api_scene(client)
-    monkeypatch.setattr(workflow_api, "LLMRouter", PartialFailureRouter)
+    monkeypatch.setattr(workflow_worker, "LLMRouter", PartialFailureRouter)
 
     response = client.post(f"/api/scenes/{scene['id']}/generate")
 

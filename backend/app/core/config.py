@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     workflow_max_revisions: int = 2
     workflow_max_json_repairs: int = 2
+    workflow_poll_seconds: float = 0.25
+    workflow_lease_seconds: int = 30
+    workflow_heartbeat_seconds: int = 10
+    workflow_max_step_attempts: int = 3
     sse_heartbeat_seconds: int = 15
 
     model_config = SettingsConfigDict(

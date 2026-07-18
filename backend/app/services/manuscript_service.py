@@ -278,6 +278,12 @@ class ManuscriptService:
         return await self.list_scenes(payload.chapter_id)
 
     async def create_version(self, scene_id: str, payload: SceneVersionCreate) -> SceneVersion:
+        version = await self.add_version(scene_id, payload)
+        await self.session.commit()
+        return version
+
+    async def add_version(self, scene_id: str, payload: SceneVersionCreate) -> SceneVersion:
+        """Add a version without committing so callers can link artifacts atomically."""
         await self.get_scene(scene_id)
         document = self._build_version_document(payload)
         version = SceneVersion(
@@ -291,7 +297,6 @@ class ManuscriptService:
             document_hash=document.document_hash,
         )
         await self.versions.add(version)
-        await self.session.commit()
         return version
 
     @staticmethod
