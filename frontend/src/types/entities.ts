@@ -143,6 +143,11 @@ export interface WorkflowRun extends EntityBase {
   model: string;
   run_type: string;
   status: string;
+  attempt: number;
+  last_event_sequence: number;
+  current_step_key: string;
+  last_healthy_step_key: string;
+  blocked_reason: string;
   plan: string;
   draft: string;
   final_content: string;
@@ -255,10 +260,14 @@ export interface MemoryExtractionResult {
 
 export interface SSEChunk {
   run_id: string;
-  content_delta: string;
-  finish_reason: string | null;
+  event_id?: number;
+  event?: string;
+  status?: string;
+  content_delta?: string;
+  finish_reason?: string | null;
   version?: SceneVersion;
   error?: string;
+  perspective_warning?: string;
 }
 
 // ── 访谈相关 ──

@@ -190,6 +190,34 @@ async def test_recorded_model_output_and_completed_step_survive_reclaim(
         (1, "step_completed"),
         (2, "workflow_finished"),
     ]
+    assert run.last_event_sequence == 2
+
+
+@pytest.mark.asyncio
+async def test_final_draft_chunk_atomically_checkpoints_raw_output(
+    session: AsyncSession,
+) -> None:
+    scene = await create_scene(session)
+    runtime = WorkflowRuntime(session)
+    run = await enqueue(runtime, scene.id)
+    assert await runtime.claim_next("worker-a") is not None
+    step, _ = await runtime.begin_step(
+        run.id,
+        "worker-a",
+        "drafting",
+        stable_json_hash({"prompt": "stream"}),
+    )
+
+    await runtime.append_draft_chunk(run.id, step.id, "worker-a", "first", None)
+    await runtime.append_draft_chunk(run.id, step.id, "worker-a", " second", "stop")
+
+    await session.refresh(step)
+    await session.refresh(run)
+    assert run.draft == "first second"
+    assert step.raw_output == "first second"
+    assert step.raw_output_hash == hashlib.sha256(b"first second").hexdigest()
+    assert run.last_event_sequence == 2
+    assert run.events_json == []
 
 
 @pytest.mark.asyncio

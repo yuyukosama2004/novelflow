@@ -92,7 +92,7 @@ def test_migration_preserves_existing_workflow_runs(tmp_path: Path) -> None:
         row = connection.execute(
             """
             SELECT status, draft, events_json, idempotency_key, input_hash,
-                   attempt, current_step_key, lease_owner
+                   attempt, last_event_sequence, current_step_key, lease_owner
             FROM workflow_runs
             WHERE id = 'workflow-1'
             """
@@ -104,6 +104,7 @@ def test_migration_preserves_existing_workflow_runs(tmp_path: Path) -> None:
         assert row["idempotency_key"] is None
         assert row["input_hash"] == ""
         assert row["attempt"] == 0
+        assert row["last_event_sequence"] == 0
         assert row["current_step_key"] == ""
         assert row["lease_owner"] == ""
         tables = {

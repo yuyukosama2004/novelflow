@@ -35,9 +35,11 @@ def client(database_path: Path) -> Iterator[TestClient]:
             yield session
 
     app.dependency_overrides[get_session] = override_get_session
+    app.state.workflow_session_factory = maker
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+    del app.state.workflow_session_factory
 
     async def dispose() -> None:
         await engine.dispose()

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { apiClient, createSSEStream } from "../../api/client";
+import { apiClient, createSSEStream, resumeSSEStream } from "../../api/client";
 import { Button } from "../../components/ui/button";
-import type { SceneVersion } from "../../types/entities";
+import type { SceneVersion, SSEChunk } from "../../types/entities";
 
 interface Props {
   sceneId: string;
@@ -37,24 +37,80 @@ export default function SceneGenerationPanel({
     defaultTargetWordCount,
   );
   const controllerRef = useRef<AbortController | null>(null);
+  const resumedRunIdRef = useRef("");
   const contentRef = useRef<HTMLPreElement>(null);
   const runs = useQuery({
     queryKey: ["workflow-runs", sceneId],
     queryFn: () => apiClient.listWorkflowRuns(sceneId),
     enabled: Boolean(sceneId),
   });
+  const handleWorkflowEvent = useCallback(
+    (data: SSEChunk) => {
+      if (data.run_id) setRunId(data.run_id);
+      if (data.error) {
+        setError(data.error);
+        setGenerating(false);
+        return;
+      }
+      if (data.event === "draft_reset") {
+        setContent("");
+      }
+      if (data.content_delta) {
+        setContent((previous) => previous + data.content_delta);
+      }
+      if (data.version) {
+        setVersion(data.version);
+        if (onVersionCreated) onVersionCreated(data.version);
+      }
+      if (data.perspective_warning) {
+        setPerspectiveWarning(data.perspective_warning);
+      }
+    },
+    [onVersionCreated],
+  );
+  const handleWorkflowDone = useCallback(() => {
+    controllerRef.current = null;
+    setDone(true);
+    setGenerating(false);
+  }, []);
+  const handleWorkflowError = useCallback((errorMessage: string) => {
+    controllerRef.current = null;
+    setError(errorMessage);
+    setGenerating(false);
+  }, []);
 
   useEffect(() => {
     const latest = runs.data?.[0];
     if (!latest) return;
     setRunId(latest.id);
     setContent(latest.draft || latest.final_content);
-    setGenerating(["pending", "planning", "drafting"].includes(latest.status));
+    const active = [
+      "pending",
+      "planning",
+      "drafting",
+      "queued",
+      "running",
+    ].includes(latest.status);
+    setGenerating(active);
     setDone(["waiting_review", "done"].includes(latest.status));
-    if (latest.status === "error" || latest.status === "cancelled") {
+    if (
+      latest.status === "error" ||
+      latest.status === "failed" ||
+      latest.status === "cancelled"
+    ) {
       setError(latest.error || "生成任务未完成");
     }
-  }, [runs.data]);
+    if (active && resumedRunIdRef.current !== latest.id) {
+      resumedRunIdRef.current = latest.id;
+      controllerRef.current = resumeSSEStream(
+        latest.id,
+        latest.last_event_sequence,
+        handleWorkflowEvent,
+        handleWorkflowDone,
+        handleWorkflowError,
+      );
+    }
+  }, [handleWorkflowDone, handleWorkflowError, handleWorkflowEvent, runs.data]);
 
   useEffect(() => {
     setTargetWordCount(defaultTargetWordCount);
@@ -88,33 +144,11 @@ export default function SceneGenerationPanel({
         instruction,
         baseContent,
         targetWordCount,
+        idempotencyKey: crypto.randomUUID(),
       },
-      (data) => {
-        if (data.run_id) setRunId(data.run_id);
-        if (data.error) {
-          setError(data.error);
-          setGenerating(false);
-          return;
-        }
-        if (data.content_delta) {
-          setContent((prev) => prev + data.content_delta);
-        }
-        if (data.version) {
-          setVersion(data.version);
-          if (onVersionCreated) onVersionCreated(data.version);
-        }
-        if (data.perspective_warning) {
-          setPerspectiveWarning(data.perspective_warning);
-        }
-      },
-      () => {
-        setDone(true);
-        setGenerating(false);
-      },
-      (err) => {
-        setError(err);
-        setGenerating(false);
-      },
+      handleWorkflowEvent,
+      handleWorkflowDone,
+      handleWorkflowError,
     );
   }
 
