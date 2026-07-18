@@ -96,6 +96,16 @@ def scene_document_hash(
     return hashlib.sha256(canonical_bytes).hexdigest()
 
 
+def scene_node_hash(value: dict[str, Any]) -> str:
+    canonical_bytes = json.dumps(
+        _normalize_json_value(value),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical_bytes).hexdigest()
+
+
 def tiptap_to_markdown(value: dict[str, Any]) -> str:
     document = _normalize_document(value)
     return _serialize_blocks(_content(document)).strip()
