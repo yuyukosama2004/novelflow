@@ -13,7 +13,7 @@ concurrency:
 jobs:
   backend:
     name: Backend
-    runs-on: [self-hosted, Windows, X64, novelflow]
+    runs-on: windows-latest
     defaults:
       run:
         working-directory: backend
@@ -37,12 +37,15 @@ jobs:
       - name: Mypy
         run: .\.venv-ci\Scripts\python.exe -m mypy app
 
+      - name: Verify migration round trip
+        run: .\.venv-ci\Scripts\python.exe scripts\verify_migrations.py
+
       - name: Pytest
         run: .\.venv-ci\Scripts\python.exe -m pytest tests -q
 
   frontend:
     name: Frontend
-    runs-on: [self-hosted, Windows, X64, novelflow]
+    runs-on: windows-latest
     defaults:
       run:
         working-directory: frontend
