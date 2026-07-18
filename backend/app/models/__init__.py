@@ -17,7 +17,7 @@ from app.models.memory import MemoryCandidate, MemoryExtractionRun, TimelineEven
 from app.models.model_profile import ModelProfile
 from app.models.project import NovelProject
 from app.models.review import ReviewIssue, ReviewRun
-from app.models.workflow import WorkflowRun
+from app.models.workflow import WorkflowEvent, WorkflowRun, WorkflowStepRun
 from app.models.world import WorldEntry
 
 __all__ = [
@@ -45,5 +45,7 @@ __all__ = [
     "TimelineEvent",
     "Volume",
     "WorkflowRun",
+    "WorkflowEvent",
+    "WorkflowStepRun",
     "WorldEntry",
 ]
