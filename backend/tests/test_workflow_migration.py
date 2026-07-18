@@ -111,7 +111,12 @@ def test_migration_preserves_existing_workflow_runs(tmp_path: Path) -> None:
             value[0]
             for value in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
         }
-        assert {"workflow_step_runs", "workflow_events"} <= tables
+        assert {
+            "workflow_step_runs",
+            "workflow_events",
+            "change_sets",
+            "change_operations",
+        } <= tables
 
     run_alembic(database_path, "downgrade", "20260716_0002")
     with closing(sqlite3.connect(database_path)) as connection:

@@ -1,6 +1,7 @@
 from app.models.base import Base
 from app.models.bible import CharacterRelationship
 from app.models.canon import CanonCommit
+from app.models.changeset import ChangeOperation, ChangeSet
 from app.models.character import Character, CharacterKnowledge, CharacterState
 from app.models.interview import InterviewSession, StoryCandidate
 from app.models.manuscript import (
@@ -23,6 +24,8 @@ from app.models.world import WorldEntry
 __all__ = [
     "Base",
     "CanonCommit",
+    "ChangeOperation",
+    "ChangeSet",
     "Chapter",
     "ImpactReport",
     "Character",

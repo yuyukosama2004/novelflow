@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api import (
     bible,
     canon,
+    changesets,
     characters,
     context,
     exports,
@@ -29,6 +30,7 @@ api_router.include_router(characters.router, tags=["characters"])
 api_router.include_router(world_entries.router, tags=["world"])
 api_router.include_router(scenes.router, tags=["manuscript"])
 api_router.include_router(canon.router, tags=["canon"])
+api_router.include_router(changesets.router, tags=["changesets"])
 api_router.include_router(exports.router, tags=["exports"])
 api_router.include_router(model_profiles.router, tags=["models"])
 api_router.include_router(workflows.router, tags=["workflows"])
