@@ -145,10 +145,11 @@ def test_manual_version_stores_tiptap_json_and_rejects_html_markdown(
         },
     )
 
-    assert version["content_json"] == content_json
+    assert version["content_json"]["content"][0]["content"] == content_json["content"][0]["content"]
+    assert "nodeId" in version["content_json"]["content"][0]["attrs"]
     assert version["content_markdown"] == "**规范**正文"
     assert version["content_text"] == "规范正文"
-    assert version["document_schema_version"] == "novelflow.tiptap.v1"
+    assert version["document_schema_version"] == "novelflow.tiptap.v2"
     assert len(version["document_hash"]) == 64
     assert invalid.status_code == 422
     assert immutable.status_code == 405
