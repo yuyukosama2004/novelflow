@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.canon.query import CanonQueryService
 from app.core.exceptions import ConflictError, NotFoundError, ValidationAppError
 from app.models.bible import CharacterRelationship
 from app.models.character import Character, CharacterKnowledge, CharacterState
@@ -28,7 +29,7 @@ from app.schemas.memory import (
 class SceneMetadata:
     project_id: str
     timeline_order: int
-    approved_version_id: str | None
+    canon_version_id: str | None
 
 
 class MemoryHandler(Protocol):
@@ -287,9 +288,9 @@ class MemoryApplicationService:
     async def apply(self, candidate: MemoryCandidate) -> None:
         item = self._validate(candidate)
         metadata = await self._scene_metadata(candidate.scene_version_id)
-        if metadata.approved_version_id != candidate.scene_version_id:
+        if metadata.canon_version_id != candidate.scene_version_id:
             raise ConflictError(
-                "memory candidate source is not the approved version",
+                "memory candidate source is not the current Canon version",
                 {
                     "reason": "CANDIDATE_SOURCE_NOT_APPROVED",
                     "scene_version_id": candidate.scene_version_id,
@@ -325,8 +326,8 @@ class MemoryApplicationService:
         result = await self.session.execute(
             select(
                 Volume.project_id,
+                Scene.id.label("scene_id"),
                 Scene.story_time_order,
-                Scene.approved_version_id,
             )
             .select_from(SceneVersion)
             .join(Scene, SceneVersion.scene_id == Scene.id)
@@ -340,8 +341,9 @@ class MemoryApplicationService:
                 "scene version not found",
                 {"version_id": scene_version_id},
             )
+        canon = await CanonQueryService(self.session).get_scene_version(row.scene_id)
         return SceneMetadata(
             project_id=row.project_id,
             timeline_order=row.story_time_order,
-            approved_version_id=row.approved_version_id,
+            canon_version_id=canon.version.id if canon is not None else None,
         )

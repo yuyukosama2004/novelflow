@@ -265,7 +265,7 @@ async def generate_scene_version_summary(
     manuscript = ManuscriptService(session)
     version = await manuscript.get_version(version_id)
     runtime = await ModelRuntimeResolver(session).resolve_for_version(version_id, None)
-    version.summary = await generate_version_summary(runtime, version.content_markdown)
+    version.summary = await generate_version_summary(runtime, version.content_text)
     await session.commit()
     await session.refresh(version)
     return success(SceneVersionRead.model_validate(version), request)

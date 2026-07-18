@@ -4,6 +4,7 @@ from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.canon.query import CanonQueryService
 from app.canon.service import CanonService
 from app.core.exceptions import (
     ConflictError,
@@ -261,8 +262,8 @@ class ManuscriptService:
         return sorted(requested_characters), sorted(requested_world)
 
     async def delete_scene(self, scene_id: str) -> None:
-        scene = await self.get_scene(scene_id)
-        if scene.approved_version_id:
+        await self.get_scene(scene_id)
+        if await CanonQueryService(self.session).get_scene_version(scene_id) is not None:
             raise ConflictError("approved scene cannot be deleted", {"scene_id": scene_id})
         await self.scenes.delete(scene_id)
         await self.session.commit()
@@ -412,18 +413,19 @@ class ManuscriptService:
                 "version does not belong to scene",
                 {"reason": "VERSION_SCENE_MISMATCH"},
             )
-        if not version.content_markdown.strip():
+        if not version.content_text.strip():
             raise ValidationAppError(
                 "version content is empty",
                 {"reason": "EMPTY_VERSION_CONTENT"},
             )
-        if scene.approved_version_id == version.id:
+        current_canon = await CanonQueryService(self.session).get_scene_version(scene_id)
+        if current_canon is not None and current_canon.version.id == version.id:
+            if scene.approved_version_id != version.id:
+                scene.approved_version_id = version.id
+                await self.session.commit()
+                await self.session.refresh(scene)
             return scene
-        old_version = (
-            await self.get_version(scene.approved_version_id)
-            if scene.approved_version_id is not None
-            else None
-        )
+        old_version = current_canon.version if current_canon is not None else None
 
         review_result = await self.session.execute(
             select(ReviewRun)
@@ -604,16 +606,18 @@ class ManuscriptService:
 
     async def complete_scene(self, scene_id: str) -> Scene:
         scene = await self.get_scene(scene_id)
-        if scene.approved_version_id is None:
+        current_canon = await CanonQueryService(self.session).get_scene_version(scene_id)
+        if current_canon is None:
             raise ConflictError(
                 "scene has no approved version",
                 {"reason": "APPROVED_VERSION_REQUIRED"},
             )
+        canonical_version_id = current_canon.version.id
 
         extraction_result = await self.session.execute(
             select(MemoryExtractionRun)
             .where(
-                MemoryExtractionRun.scene_version_id == scene.approved_version_id,
+                MemoryExtractionRun.scene_version_id == canonical_version_id,
                 MemoryExtractionRun.status == "completed",
             )
             .order_by(
@@ -632,7 +636,7 @@ class ManuscriptService:
         pending_result = await self.session.execute(
             select(MemoryCandidate.id)
             .where(
-                MemoryCandidate.scene_version_id == scene.approved_version_id,
+                MemoryCandidate.scene_version_id == canonical_version_id,
                 MemoryCandidate.status == "pending",
             )
             .limit(1)
@@ -659,4 +663,4 @@ class ManuscriptService:
         right = await self.get_version(right_id)
         if left.scene_id != scene_id or right.scene_id != scene_id:
             raise ConflictError("versions must belong to scene")
-        return left, right, left.content_markdown != right.content_markdown
+        return left, right, left.document_hash != right.document_hash
