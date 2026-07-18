@@ -18,6 +18,7 @@ import {
 
 import { apiClient } from "../../api/client";
 import { IconButton } from "../../components/IconButton";
+import { StableNodeId } from "../../extensions/StableNodeId";
 import { StatusPill } from "../../components/StatusPill";
 import type { Scene, SceneVersion } from "../../types/entities";
 import { label, SCENE_STATUS_LABELS } from "../../utils/enumLabels";
@@ -38,17 +39,17 @@ interface SceneEditorProps {
   onContentChange?: (content: string) => void;
 }
 
-function selectInitialContent(
+function selectInitialDocument(
   versions: SceneVersion[] | undefined,
   scene: Scene | null,
-): string {
+): RichTextNode {
   if (!versions || versions.length === 0) {
-    return "";
+    return { type: "doc", content: [{ type: "paragraph" }] };
   }
   const approved = scene?.approved_version_id
     ? versions.find((version) => version.id === scene.approved_version_id)
     : undefined;
-  return (approved ?? versions[0]).content_markdown;
+  return (approved ?? versions[0]).content_json as unknown as RichTextNode;
 }
 
 function saveStateLabel(
@@ -147,7 +148,7 @@ export function SceneEditor({
   const [initializedSceneId, setInitializedSceneId] = useState("");
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit, StableNodeId],
     content: "",
     editorProps: {
       attributes: {
@@ -172,8 +173,8 @@ export function SceneEditor({
     },
   });
 
-  const selectedContent = useMemo(
-    () => selectInitialContent(versions.data, scene),
+  const selectedDocument = useMemo(
+    () => selectInitialDocument(versions.data, scene),
     [scene, versions.data],
   );
   const wordCount = useMemo(
@@ -200,7 +201,7 @@ export function SceneEditor({
       const document =
         draft && draft.revision > 0
           ? (draft.content_json as unknown as RichTextNode)
-          : RichTextCodec.toTiptapJson(selectedContent);
+          : selectedDocument;
       const markdown = RichTextCodec.toMarkdown(document);
       setContent(markdown);
       onContentChange?.(markdown);
@@ -229,7 +230,7 @@ export function SceneEditor({
     editor,
     onContentChange,
     scene?.id,
-    selectedContent,
+    selectedDocument,
     versions.isLoading,
     workingDraft.data,
     workingDraft.isLoading,
@@ -253,9 +254,7 @@ export function SceneEditor({
       return;
     }
     try {
-      const document = RichTextCodec.toTiptapJson(
-        selectedVersion.content_markdown,
-      );
+      const document = selectedVersion.content_json as unknown as RichTextNode;
       const markdown = RichTextCodec.toMarkdown(document);
       setContent(markdown);
       onContentChange?.(markdown);

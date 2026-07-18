@@ -96,7 +96,15 @@ function version(reviewStatus: string): SceneVersion {
     version_no: 1,
     parent_version_id: null,
     branch_name: "main",
-    content_json: { type: "doc", content: [{ type: "paragraph" }] },
+    content_json: {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "正文" }],
+        },
+      ],
+    },
     content_markdown: "正文",
     content_text: "正文",
     document_schema_version: "novelflow.tiptap.v1",
@@ -171,10 +179,24 @@ describe("SceneEditor approval gate", () => {
     });
   });
 
-  it("normalizes legacy HTML before loading and saving a version", async () => {
+  it("loads canonical JSON even when a legacy Markdown projection is malformed", async () => {
+    const canonicalDocument = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "重点", marks: [{ type: "bold" }] },
+            { type: "hardBreak" },
+            { type: "text", text: "下一行", marks: [] },
+          ],
+        },
+      ],
+    };
     vi.mocked(apiClient.listVersions).mockResolvedValue([
       {
         ...version("not_reviewed"),
+        content_json: canonicalDocument,
         content_markdown: "<p><strong>重点</strong><br>下一行</p>",
       },
     ]);
@@ -182,19 +204,7 @@ describe("SceneEditor approval gate", () => {
 
     await waitFor(() => {
       expect(editorMock.commands.setContent).toHaveBeenCalledWith(
-        {
-          type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              content: [
-                { type: "text", text: "重点", marks: [{ type: "bold" }] },
-                { type: "hardBreak" },
-                { type: "text", text: "下一行", marks: [] },
-              ],
-            },
-          ],
-        },
+        canonicalDocument,
         false,
       );
     });
@@ -205,19 +215,7 @@ describe("SceneEditor approval gate", () => {
     await waitFor(() => {
       expect(apiClient.createVersion).toHaveBeenCalledWith(scene.id, {
         content_markdown: "**重点**  \n下一行",
-        content_json: {
-          type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              content: [
-                { type: "text", text: "重点", marks: [{ type: "bold" }] },
-                { type: "hardBreak" },
-                { type: "text", text: "下一行", marks: [] },
-              ],
-            },
-          ],
-        },
+        content_json: canonicalDocument,
         summary: scene.title,
         source_type: "human_revised",
       });
@@ -261,12 +259,32 @@ describe("SceneEditor approval gate", () => {
     const first = {
       ...version("not_reviewed"),
       id: "version-1",
+      content_json: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "旧版本" }],
+          },
+        ],
+      },
       content_markdown: "旧版本",
     };
+    const nodeId = "13a4b02a-4a2e-4a7b-a88e-6e47d6c8184f";
     const second = {
       ...version("not_reviewed"),
       id: "version-2",
       version_no: 2,
+      content_json: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            attrs: { nodeId },
+            content: [{ type: "text", text: "新生成版本" }],
+          },
+        ],
+      },
       content_markdown: "新生成版本",
     };
     vi.mocked(apiClient.listVersions).mockResolvedValue([first, second]);
@@ -298,6 +316,7 @@ describe("SceneEditor approval gate", () => {
           content: [
             {
               type: "paragraph",
+              attrs: { nodeId },
               content: [{ type: "text", text: "新生成版本" }],
             },
           ],

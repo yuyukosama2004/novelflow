@@ -5,6 +5,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,6 +14,7 @@ from app.documents.codec import (
     CANONICAL_DOCUMENT_SCHEMA,
     SceneDocumentError,
     build_scene_document,
+    ensure_scene_node_ids,
 )
 
 
@@ -56,13 +58,42 @@ def test_markdown_only_input_builds_canonical_rich_document(client: TestClient) 
 
     assert version["content_markdown"] == markdown
     assert version["content_text"] == "标题\n重点\n下一行\n甲\n乙"
-    assert version["content_json"]["content"][0] == {
-        "type": "heading",
-        "attrs": {"level": 1},
-        "content": [{"type": "text", "text": "标题"}],
-    }
+    heading = version["content_json"]["content"][0]
+    assert heading["type"] == "heading"
+    assert heading["attrs"]["level"] == 1
+    assert str(UUID(heading["attrs"]["nodeId"])) == heading["attrs"]["nodeId"]
+    assert heading["content"] == [{"type": "text", "text": "标题"}]
     assert version["document_schema_version"] == CANONICAL_DOCUMENT_SCHEMA
     assert len(version["document_hash"]) == 64
+
+
+def test_stable_node_ids_are_preserved_and_duplicates_are_repaired() -> None:
+    existing_id = "13a4b02a-4a2e-4a7b-a88e-6e47d6c8184f"
+    document = {
+        "type": "doc",
+        "content": [
+            {"type": "paragraph", "attrs": {"nodeId": existing_id}},
+            {"type": "paragraph", "attrs": {"nodeId": existing_id}},
+            {"type": "blockquote", "content": [{"type": "paragraph"}]},
+        ],
+    }
+
+    first = ensure_scene_node_ids(document)
+    second = ensure_scene_node_ids(first)
+    repeated_import = ensure_scene_node_ids(document)
+    node_ids = [
+        first["content"][0]["attrs"]["nodeId"],
+        first["content"][1]["attrs"]["nodeId"],
+        first["content"][2]["attrs"]["nodeId"],
+        first["content"][2]["content"][0]["attrs"]["nodeId"],
+    ]
+
+    assert node_ids[0] == existing_id
+    assert len(set(node_ids)) == 4
+    assert all(str(UUID(node_id)) == node_id for node_id in node_ids)
+    assert second == first
+    assert repeated_import == first
+    assert document["content"][1]["attrs"]["nodeId"] == existing_id
 
 
 def test_document_codec_rejects_unsupported_nodes_and_mismatched_projection() -> None:

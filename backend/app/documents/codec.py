@@ -3,11 +3,26 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
+from uuid import UUID, uuid5
 
-CANONICAL_DOCUMENT_SCHEMA = "novelflow.tiptap.v1"
+CANONICAL_DOCUMENT_SCHEMA = "novelflow.tiptap.v2"
 _HASH_SCHEMA = "novelflow.scene-version.v1"
+_NODE_ID_NAMESPACE = UUID("1ef77b39-c5b7-4ad4-bb25-9aec860d8f80")
+_ADDRESSABLE_NODE_TYPES = frozenset(
+    {
+        "paragraph",
+        "heading",
+        "blockquote",
+        "codeBlock",
+        "bulletList",
+        "orderedList",
+        "horizontalRule",
+        "listItem",
+    }
+)
 _EMPTY_DOCUMENT: dict[str, Any] = {
     "type": "doc",
     "content": [{"type": "paragraph"}],
@@ -40,11 +55,12 @@ def build_scene_document(
 ) -> SceneDocument:
     """Build a canonical document with Tiptap JSON as the authority."""
 
-    document = (
+    source_document = (
         markdown_to_tiptap(content_markdown or "")
         if content_json is None
         else _normalize_document(content_json)
     )
+    document = ensure_scene_node_ids(source_document)
     markdown = tiptap_to_markdown(document)
     submitted_markdown = _normalize_markdown(content_markdown)
     if content_json is not None and submitted_markdown is not None and submitted_markdown != markdown:
@@ -100,6 +116,60 @@ def markdown_to_tiptap(value: str) -> dict[str, Any]:
         "type": "doc",
         "content": _parse_markdown_blocks(source.split("\n")),
     }
+
+
+def ensure_scene_node_ids(value: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy with unique stable UUIDs on every addressable block node."""
+
+    document = deepcopy(_normalize_document(value))
+    seen: set[str] = set()
+
+    def visit(node: dict[str, Any], path: tuple[int, ...]) -> None:
+        if node.get("type") in _ADDRESSABLE_NODE_TYPES:
+            attrs = node.get("attrs") or {}
+            if not isinstance(attrs, dict):
+                raise SceneDocumentError(f"{node.get('type')} attrs must be an object")
+            candidate = attrs.get("nodeId")
+            node_id = str(candidate) if candidate is not None else ""
+            try:
+                valid = str(UUID(node_id)) == node_id.lower()
+            except (ValueError, AttributeError):
+                valid = False
+            if not valid or node_id in seen:
+                identity_source = json.dumps(
+                    {
+                        "path": path,
+                        "node": _without_node_ids(node),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                node_id = str(uuid5(_NODE_ID_NAMESPACE, identity_source))
+            attrs["nodeId"] = node_id
+            node["attrs"] = attrs
+            seen.add(node_id)
+        for index, child in enumerate(_content(node)):
+            visit(child, (*path, index))
+
+    visit(document, ())
+    return document
+
+
+def _without_node_ids(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_without_node_ids(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result: dict[str, Any] = {}
+    for key, item in value.items():
+        if key == "attrs" and isinstance(item, dict):
+            attrs = {name: _without_node_ids(attr) for name, attr in item.items() if name != "nodeId"}
+            if attrs:
+                result[key] = attrs
+        else:
+            result[key] = _without_node_ids(item)
+    return result
 
 
 def _normalize_document(value: dict[str, Any]) -> dict[str, Any]:
