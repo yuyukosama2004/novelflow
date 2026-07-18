@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.models import Base
+from app.models.canon import CanonCommit
 from app.models.character import Character
 from app.models.manuscript import (
     Chapter,
@@ -162,10 +163,30 @@ async def test_previous_scene_uses_narrative_order_across_chapters_and_volumes(
     )
     session.add_all([earlier_version, previous_version])
     await session.flush()
-    earlier.approved_version_id = earlier_version.id
-    previous.approved_version_id = previous_version.id
     session.add_all(
         [
+            CanonCommit(
+                project_id=project.id,
+                scene_id=earlier.id,
+                scene_version_id=earlier_version.id,
+                sequence_no=1,
+                content_hash=earlier_version.document_hash,
+                contract_snapshot_json={},
+                review_snapshot_json={},
+                commit_reason="test_approval",
+                committed_by="test",
+            ),
+            CanonCommit(
+                project_id=project.id,
+                scene_id=previous.id,
+                scene_version_id=previous_version.id,
+                sequence_no=1,
+                content_hash=previous_version.document_hash,
+                contract_snapshot_json={},
+                review_snapshot_json={},
+                commit_reason="test_approval",
+                committed_by="test",
+            ),
             SceneCharacter(
                 scene_id=previous.id,
                 character_id=linked_character.id,
@@ -178,6 +199,8 @@ async def test_previous_scene_uses_narrative_order_across_chapters_and_volumes(
     )
     await session.commit()
 
+    assert earlier.approved_version_id is None
+    assert previous.approved_version_id is None
     context = await ContextBuilder(session).build_for_scene(current.id)
 
     assert context.previous_scene is not None
