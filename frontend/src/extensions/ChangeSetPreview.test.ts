@@ -31,6 +31,7 @@ function operation(
     status: "pending",
     accepted_draft_revision: null,
     conflict_reason: "",
+    application_mode: "",
     created_at: now,
     updated_at: now,
     ...fields,

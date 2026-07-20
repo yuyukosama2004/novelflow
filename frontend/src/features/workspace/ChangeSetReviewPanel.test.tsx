@@ -59,6 +59,7 @@ const operation: ChangeOperation = {
   status: "pending",
   accepted_draft_revision: null,
   conflict_reason: "",
+  application_mode: "",
   created_at: now,
   updated_at: now,
 };
@@ -114,6 +115,7 @@ describe("ChangeSetReviewPanel", () => {
             ...operation,
             status: "accepted",
             accepted_draft_revision: 4,
+            application_mode: "direct",
           },
         ],
       },
@@ -149,6 +151,7 @@ describe("ChangeSetReviewPanel", () => {
     expect(
       await screen.findByText("改动已应用到工作草稿。"),
     ).toBeInTheDocument();
+    expect(screen.getByText("已接受 · 直接应用")).toBeInTheDocument();
   });
 
   it("blocks all decisions while the editor has unsaved content", async () => {

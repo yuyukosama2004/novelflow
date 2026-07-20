@@ -155,7 +155,8 @@ class ChangeSetService:
         )
         outcomes = {item.operation_id: item for item in result.outcomes}
         has_document_change = any(
-            outcomes[operation_id].status == "accepted" for operation_id in payload.accept_operation_ids
+            outcomes[operation_id].status == "accepted" and outcomes[operation_id].changed
+            for operation_id in payload.accept_operation_ids
         )
         next_revision = current_revision + 1 if has_document_change else current_revision
         if has_document_change:
@@ -168,13 +169,21 @@ class ChangeSetService:
             )
         for operation_id in payload.reject_operation_ids:
             operation_by_id[operation_id].status = "rejected"
+            operation_by_id[operation_id].application_mode = ""
         for operation_id in payload.accept_operation_ids:
             outcome = outcomes[operation_id]
             operation = operation_by_id[operation_id]
             operation.status = outcome.status
-            operation.conflict_reason = outcome.reason
+            operation.conflict_reason = outcome.reason if outcome.status in {"conflicted", "orphaned"} else ""
+            operation.application_mode = outcome.application_mode
             if outcome.status == "accepted":
                 operation.accepted_draft_revision = next_revision
+        if has_document_change:
+            self._reevaluate_pending(
+                change_set,
+                result.document,
+                excluded_operation_ids=requested_ids,
+            )
         self._update_status(change_set)
         try:
             await self.session.commit()
@@ -186,6 +195,29 @@ class ChangeSetService:
             ) from None
         persisted_draft = await self.manuscript.get_working_draft(change_set.scene_id)
         return await self.get(change_set.id), persisted_draft
+
+    def _reevaluate_pending(
+        self,
+        change_set: ChangeSet,
+        current: SceneDocument,
+        *,
+        excluded_operation_ids: set[str],
+    ) -> None:
+        for operation in change_set.operations:
+            if operation.status != "pending" or operation.id in excluded_operation_ids:
+                continue
+            evaluation = apply_change_operations(
+                current.content_json,
+                base_document_hash=change_set.base_document_hash,
+                operations=[self._engine_input(operation)],
+                accepted_operation_ids={operation.id},
+                allow_rebase=True,
+            )
+            outcome = evaluation.outcomes[0]
+            if outcome.status in {"conflicted", "orphaned"}:
+                operation.status = outcome.status
+                operation.conflict_reason = outcome.reason
+                operation.application_mode = ""
 
     async def _base_document(
         self,

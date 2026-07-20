@@ -71,5 +71,6 @@ class ChangeOperation(UUIDMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(40), default="pending")
     accepted_draft_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     conflict_reason: Mapped[str] = mapped_column(Text, default="")
+    application_mode: Mapped[str] = mapped_column(String(40), default="")
 
     change_set = relationship("ChangeSet", back_populates="operations")
