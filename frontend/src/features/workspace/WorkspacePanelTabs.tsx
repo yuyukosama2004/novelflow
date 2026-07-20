@@ -1,5 +1,6 @@
 export type WorkspacePanelTab =
   | "ai"
+  | "changes"
   | "review"
   | "memory"
   | "history"
@@ -20,6 +21,7 @@ const TAB_GROUPS: readonly {
   {
     label: "检查",
     tabs: [
+      ["changes", "改动审阅"],
       ["review", "一致性审查"],
       ["memory", "记忆候选"],
     ],

@@ -326,6 +326,81 @@ describe("SceneEditor approval gate", () => {
     });
   });
 
+  it("loads an accepted ChangeSet draft without creating a new version", async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([
+      version("not_reviewed"),
+    ]);
+    const onContentChange = vi.fn();
+    const rendered = renderWithQuery(
+      <SceneEditor scene={scene} onContentChange={onContentChange} />,
+    );
+    await waitFor(() => {
+      expect(editorMock.commands.setContent).toHaveBeenCalled();
+    });
+    editorMock.commands.setContent.mockClear();
+
+    const appliedDocument = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          attrs: { nodeId: "71d414cc-b68e-454c-9414-c583f8fd71a4" },
+          content: [{ type: "text", text: "已接受的改动" }],
+        },
+      ],
+    };
+    rendered.rerender(
+      <QueryClientProvider client={rendered.queryClient}>
+        <SceneEditor
+          scene={scene}
+          onContentChange={onContentChange}
+          appliedWorkingDraft={{
+            scene_id: scene.id,
+            content_json: appliedDocument,
+            content_markdown: "已接受的改动",
+            revision: 4,
+            updated_at: now,
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(editorMock.commands.setContent).toHaveBeenCalledWith(
+        appliedDocument,
+        false,
+      );
+    });
+    expect(onContentChange).toHaveBeenLastCalledWith("已接受的改动");
+    expect(apiClient.createVersion).not.toHaveBeenCalled();
+    expect(screen.getByText("草稿已保存")).toBeInTheDocument();
+  });
+
+  it("reports unsaved editor state to its parent", async () => {
+    vi.mocked(apiClient.listVersions).mockResolvedValue([]);
+    const onDirtyChange = vi.fn();
+    renderWithQuery(
+      <SceneEditor scene={scene} onDirtyChange={onDirtyChange} />,
+    );
+    await waitFor(() => {
+      expect(editorMock.commands.setContent).toHaveBeenCalled();
+    });
+
+    editorMock.getJSON.mockReturnValue({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "尚未保存" }] },
+      ],
+    });
+    act(() => {
+      editorOptions.current?.onUpdate?.({ editor: editorMock });
+    });
+
+    await waitFor(() => {
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    });
+  });
+
   it("saves a pending draft before manually creating a version", async () => {
     vi.mocked(apiClient.listVersions).mockResolvedValue([]);
     renderWithQuery(<SceneEditor scene={scene} />);

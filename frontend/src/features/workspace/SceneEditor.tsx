@@ -20,7 +20,11 @@ import { apiClient } from "../../api/client";
 import { IconButton } from "../../components/IconButton";
 import { StableNodeId } from "../../extensions/StableNodeId";
 import { StatusPill } from "../../components/StatusPill";
-import type { Scene, SceneVersion } from "../../types/entities";
+import type {
+  Scene,
+  SceneVersion,
+  SceneWorkingDraft,
+} from "../../types/entities";
 import { label, SCENE_STATUS_LABELS } from "../../utils/enumLabels";
 import {
   RichTextCodec,
@@ -37,6 +41,8 @@ interface SceneEditorProps {
   onVersionCreated?: (version: SceneVersion) => void;
   targetWordCount?: number;
   onContentChange?: (content: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  appliedWorkingDraft?: SceneWorkingDraft | null;
 }
 
 function selectInitialDocument(
@@ -117,6 +123,8 @@ export function SceneEditor({
   onVersionCreated,
   targetWordCount = 1000,
   onContentChange,
+  onDirtyChange,
+  appliedWorkingDraft = null,
 }: SceneEditorProps) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState("");
@@ -145,6 +153,7 @@ export function SceneEditor({
   const contentRef = useRef("");
   const initializedSceneRef = useRef<string | null>(null);
   const loadedExplicitVersionRef = useRef("");
+  const loadedAppliedDraftRef = useRef("");
   const [initializedSceneId, setInitializedSceneId] = useState("");
 
   const editor = useEditor({
@@ -185,6 +194,7 @@ export function SceneEditor({
   useEffect(() => {
     if (!scene?.id) {
       initializedSceneRef.current = null;
+      loadedAppliedDraftRef.current = "";
       setInitializedSceneId("");
       return;
     }
@@ -215,6 +225,7 @@ export function SceneEditor({
       editor.commands.setContent(document, false);
       initializedSceneRef.current = scene.id;
       loadedExplicitVersionRef.current = "";
+      loadedAppliedDraftRef.current = "";
       setInitializedSceneId(scene.id);
     } catch (error) {
       setContent("");
@@ -234,6 +245,51 @@ export function SceneEditor({
     versions.isLoading,
     workingDraft.data,
     workingDraft.isLoading,
+  ]);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  useEffect(() => {
+    if (
+      !editor ||
+      !scene?.id ||
+      !appliedWorkingDraft ||
+      appliedWorkingDraft.scene_id !== scene.id ||
+      initializedSceneId !== scene.id
+    ) {
+      return;
+    }
+    const key = `${scene.id}:${appliedWorkingDraft.revision}`;
+    if (loadedAppliedDraftRef.current === key) {
+      return;
+    }
+    try {
+      const document =
+        appliedWorkingDraft.content_json as unknown as RichTextNode;
+      const markdown = RichTextCodec.toMarkdown(document);
+      setContent(markdown);
+      onContentChange?.(markdown);
+      contentRef.current = markdown;
+      setContentJson(document);
+      draftRevisionRef.current = appliedWorkingDraft.revision;
+      setCodecMessage("");
+      setDraftMessage("");
+      setDirty(false);
+      setSaveState("draft_saved");
+      editor.commands.setContent(document, false);
+      loadedAppliedDraftRef.current = key;
+    } catch (error) {
+      setCodecMessage(codecFailureMessage(error));
+      setSaveState("error");
+    }
+  }, [
+    appliedWorkingDraft,
+    editor,
+    initializedSceneId,
+    onContentChange,
+    scene?.id,
   ]);
 
   useEffect(() => {

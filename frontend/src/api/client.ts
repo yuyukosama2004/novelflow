@@ -2,6 +2,8 @@
 
 import type {
   Chapter,
+  ChangeSet,
+  ChangeSetApplyResult,
   Character,
   CharacterRelationship,
   HealthStatus,
@@ -237,6 +239,21 @@ export const apiClient = {
   ) =>
     unwrap<SceneWorkingDraft>(
       api.put(`/scenes/${sceneId}/working-draft`, payload),
+    ),
+  listChangeSets: (sceneId: string) =>
+    unwrap<ChangeSet[]>(api.get(`/scenes/${sceneId}/change-sets`)),
+  getChangeSet: (changeSetId: string) =>
+    unwrap<ChangeSet>(api.get(`/change-sets/${changeSetId}`)),
+  applyChangeSet: (
+    changeSetId: string,
+    payload: {
+      expected_draft_revision: number;
+      accept_operation_ids: string[];
+      reject_operation_ids: string[];
+    },
+  ) =>
+    unwrap<ChangeSetApplyResult>(
+      api.post(`/change-sets/${changeSetId}/apply`, payload),
     ),
   approveVersion: (
     sceneId: string,
