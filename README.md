@@ -1,5 +1,7 @@
 # NovelFlow
 
+> 项目案例、设计取舍与后续更新：[execute42 / NovelFlow](https://www.execute42.top/projects/novelflow/)
+
 NovelFlow 是面向本地单用户的 AI 长篇小说创作工作台。它把“生成草稿”和“写入正史”严格分开：AI 可以协助构思、生成和审查，但不能自动改写故事正史、人物状态或后续正文。
 
 ## 核心原则
