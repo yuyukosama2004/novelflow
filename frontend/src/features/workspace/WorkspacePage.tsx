@@ -21,6 +21,8 @@ import { ModelSelector } from "../../components/ModelSelector";
 import { StatusPill } from "../../components/StatusPill";
 import type {
   Chapter,
+  ChangeOperation,
+  ChangeSet,
   Scene,
   SceneVersion,
   SceneWorkingDraft,
@@ -76,6 +78,7 @@ const DEFAULT_WRITING_PREFERENCES: WritingPreferences = {
   spacing: "comfortable",
   width: "standard",
 };
+const EMPTY_CHANGE_OPERATIONS: readonly ChangeOperation[] = [];
 
 function loadWritingPreferences(): WritingPreferences {
   try {
@@ -148,6 +151,9 @@ export function WorkspacePage() {
   const [editorDirty, setEditorDirty] = useState(false);
   const [appliedWorkingDraft, setAppliedWorkingDraft] =
     useState<SceneWorkingDraft | null>(null);
+  const [previewChangeSet, setPreviewChangeSet] = useState<ChangeSet | null>(
+    null,
+  );
   const [discussionInstruction, setDiscussionInstruction] = useState("");
 
   useEffect(() => {
@@ -252,6 +258,7 @@ export function WorkspacePage() {
     setHasExplicitSceneVersionSelection(false);
     setEditorDirty(false);
     setAppliedWorkingDraft(null);
+    setPreviewChangeSet(null);
   }, [selectedSceneId]);
 
   useEffect(() => {
@@ -1253,6 +1260,11 @@ export function WorkspacePage() {
                 onContentChange={setEditorContent}
                 onDirtyChange={setEditorDirty}
                 appliedWorkingDraft={appliedWorkingDraft}
+                previewOperations={
+                  rightTab === "changes"
+                    ? (previewChangeSet?.operations ?? EMPTY_CHANGE_OPERATIONS)
+                    : EMPTY_CHANGE_OPERATIONS
+                }
               />
             </div>
           </>
@@ -1285,6 +1297,7 @@ export function WorkspacePage() {
                       : ""
                   }
                   onDraftApplied={setAppliedWorkingDraft}
+                  onPreviewChange={setPreviewChangeSet}
                 />
               ) : null}
 

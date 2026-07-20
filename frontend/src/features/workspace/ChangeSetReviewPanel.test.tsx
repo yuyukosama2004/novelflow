@@ -123,15 +123,18 @@ describe("ChangeSetReviewPanel", () => {
 
   it("previews original and proposed blocks and applies one decision", async () => {
     const onDraftApplied = vi.fn();
+    const onPreviewChange = vi.fn();
     renderWithQuery(
       <ChangeSetReviewPanel
         sceneId="scene-1"
         onDraftApplied={onDraftApplied}
+        onPreviewChange={onPreviewChange}
       />,
     );
 
     expect(await screen.findByText("他推开旧书店的门。")).toBeInTheDocument();
     expect(screen.getByText("他在雨声中推开旧书店的门。")).toBeInTheDocument();
+    expect(onPreviewChange).toHaveBeenLastCalledWith(changeSet);
 
     fireEvent.click(screen.getByRole("button", { name: "接受" }));
 

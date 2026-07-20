@@ -18,9 +18,11 @@ import {
 
 import { apiClient } from "../../api/client";
 import { IconButton } from "../../components/IconButton";
+import { ChangeSetPreview } from "../../extensions/ChangeSetPreview";
 import { StableNodeId } from "../../extensions/StableNodeId";
 import { StatusPill } from "../../components/StatusPill";
 import type {
+  ChangeOperation,
   Scene,
   SceneVersion,
   SceneWorkingDraft,
@@ -43,7 +45,10 @@ interface SceneEditorProps {
   onContentChange?: (content: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
   appliedWorkingDraft?: SceneWorkingDraft | null;
+  previewOperations?: readonly ChangeOperation[];
 }
+
+const EMPTY_CHANGE_OPERATIONS: readonly ChangeOperation[] = [];
 
 function selectInitialDocument(
   versions: SceneVersion[] | undefined,
@@ -125,6 +130,7 @@ export function SceneEditor({
   onContentChange,
   onDirtyChange,
   appliedWorkingDraft = null,
+  previewOperations = EMPTY_CHANGE_OPERATIONS,
 }: SceneEditorProps) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState("");
@@ -157,7 +163,7 @@ export function SceneEditor({
   const [initializedSceneId, setInitializedSceneId] = useState("");
 
   const editor = useEditor({
-    extensions: [StarterKit, StableNodeId],
+    extensions: [StarterKit, StableNodeId, ChangeSetPreview],
     content: "",
     editorProps: {
       attributes: {
@@ -250,6 +256,10 @@ export function SceneEditor({
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
+
+  useEffect(() => {
+    editor?.commands.setChangeSetPreview(previewOperations);
+  }, [editor, previewOperations]);
 
   useEffect(() => {
     if (
