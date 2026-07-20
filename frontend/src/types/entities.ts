@@ -136,6 +136,55 @@ export interface SceneWorkingDraft {
   updated_at: string | null;
 }
 
+export type ChangeOperationStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "conflicted"
+  | "orphaned";
+
+export interface ChangeOperation extends EntityBase {
+  change_set_id: string;
+  sequence_no: number;
+  operation_type:
+    | "insert_before"
+    | "insert_after"
+    | "replace_block"
+    | "delete_block";
+  target_node_id: string | null;
+  anchor_before_node_id: string | null;
+  anchor_after_node_id: string | null;
+  original_json: Record<string, unknown>;
+  proposed_json: Record<string, unknown>;
+  original_hash: string;
+  status: ChangeOperationStatus;
+  accepted_draft_revision: number | null;
+  conflict_reason: string;
+}
+
+export interface ChangeSet extends EntityBase {
+  scene_id: string;
+  base_working_revision: number;
+  base_document_hash: string;
+  base_version_id: string | null;
+  purpose: "generation" | "rewrite" | "review_fix" | "restore" | "merge";
+  status:
+    | "pending"
+    | "partially_accepted"
+    | "accepted"
+    | "rejected"
+    | "conflicted";
+  workflow_run_id: string | null;
+  summary: string;
+  applied_version_id: string | null;
+  operations: ChangeOperation[];
+}
+
+export interface ChangeSetApplyResult {
+  change_set: ChangeSet;
+  draft: SceneWorkingDraft | null;
+}
+
 export interface WorkflowRun extends EntityBase {
   scene_id: string;
   model_profile_id: string | null;

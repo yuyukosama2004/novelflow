@@ -13,8 +13,8 @@ describe("WorkspacePanelTabs", () => {
     expect(screen.getByRole("button", { name: "AI 续写" })).toHaveClass(
       "text-brand-700",
     );
-    fireEvent.click(screen.getByRole("button", { name: "一致性审查" }));
+    fireEvent.click(screen.getByRole("button", { name: "改动审阅" }));
 
-    expect(onChange).toHaveBeenCalledWith("review");
+    expect(onChange).toHaveBeenCalledWith("changes");
   });
 });

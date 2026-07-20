@@ -23,10 +23,12 @@ import type {
   Chapter,
   Scene,
   SceneVersion,
+  SceneWorkingDraft,
   Volume,
 } from "../../types/entities";
 import { label, PROJECT_STATUS_LABELS } from "../../utils/enumLabels";
 import { MemoryCandidatePanel } from "./MemoryCandidatePanel";
+import { ChangeSetReviewPanel } from "./ChangeSetReviewPanel";
 import { ReviewIssuePanel } from "./ReviewIssuePanel";
 import { SceneCardEditor } from "./SceneCardEditor";
 import { SceneApprovalPanel } from "./SceneApprovalPanel";
@@ -143,6 +145,9 @@ export function WorkspacePage() {
   const [writingPreferences, setWritingPreferences] =
     useState<WritingPreferences>(loadWritingPreferences);
   const [editorContent, setEditorContent] = useState("");
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [appliedWorkingDraft, setAppliedWorkingDraft] =
+    useState<SceneWorkingDraft | null>(null);
   const [discussionInstruction, setDiscussionInstruction] = useState("");
 
   useEffect(() => {
@@ -245,6 +250,8 @@ export function WorkspacePage() {
     setSelectedSceneVersionId("");
     setPendingSceneVersionId("");
     setHasExplicitSceneVersionSelection(false);
+    setEditorDirty(false);
+    setAppliedWorkingDraft(null);
   }, [selectedSceneId]);
 
   useEffect(() => {
@@ -1244,6 +1251,8 @@ export function WorkspacePage() {
                 onVersionCreated={handleVersionCreated}
                 targetWordCount={project.data?.default_scene_word_count ?? 1000}
                 onContentChange={setEditorContent}
+                onDirtyChange={setEditorDirty}
+                appliedWorkingDraft={appliedWorkingDraft}
               />
             </div>
           </>
@@ -1264,6 +1273,18 @@ export function WorkspacePage() {
                   baseContent={editorContent}
                   instructionFromDiscussion={discussionInstruction}
                   onVersionCreated={handleVersionCreated}
+                />
+              ) : null}
+
+              {rightTab === "changes" ? (
+                <ChangeSetReviewPanel
+                  sceneId={selectedSceneId}
+                  disabledReason={
+                    editorDirty
+                      ? "正文还有未保存改动。请等待自动保存完成后再应用 AI 改动。"
+                      : ""
+                  }
+                  onDraftApplied={setAppliedWorkingDraft}
                 />
               ) : null}
 
