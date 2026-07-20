@@ -49,6 +49,7 @@ class ChangeOperationRead(EntityBase):
     status: str
     accepted_draft_revision: int | None
     conflict_reason: str
+    application_mode: str
 
 
 class ChangeSetRead(EntityBase):

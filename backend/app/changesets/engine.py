@@ -4,6 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from app.changesets.merge import ThreeWayMergeConflict, merge_block_changes
 from app.documents.codec import (
     SceneDocument,
     build_scene_document,
@@ -14,6 +15,7 @@ from app.documents.codec import (
 
 OperationType = Literal["insert_before", "insert_after", "replace_block", "delete_block"]
 OperationStatus = Literal["accepted", "skipped", "orphaned", "conflicted"]
+ApplicationMode = Literal["", "direct", "rebased", "three_way"]
 
 
 class ChangeApplicationError(ValueError):
@@ -40,6 +42,8 @@ class OperationOutcome:
     operation_id: str
     status: OperationStatus
     reason: str = ""
+    application_mode: ApplicationMode = ""
+    changed: bool = False
 
 
 @dataclass(frozen=True)
@@ -58,8 +62,10 @@ def apply_change_operations(
 ) -> ChangeApplicationResult:
     current = deepcopy(document)
     actual_hash = scene_document_hash(current, tiptap_to_markdown(current))
-    if actual_hash != base_document_hash and not allow_rebase:
+    baseline_changed = actual_hash != base_document_hash
+    if baseline_changed and not allow_rebase:
         raise ChangeApplicationError("BASE_DOCUMENT_HASH_MISMATCH")
+    application_mode: ApplicationMode = "rebased" if baseline_changed else "direct"
 
     selected = accepted_operation_ids
     outcomes: list[OperationOutcome] = []
@@ -67,7 +73,12 @@ def apply_change_operations(
         if selected is not None and operation.id not in selected:
             outcomes.append(OperationOutcome(operation.id, "skipped"))
             continue
-        outcome = _apply_operation(current, operation)
+        outcome = _apply_operation(
+            current,
+            operation,
+            application_mode=application_mode,
+            allow_three_way=allow_rebase,
+        )
         outcomes.append(outcome)
 
     return ChangeApplicationResult(
@@ -79,6 +90,9 @@ def apply_change_operations(
 def _apply_operation(
     document: dict[str, Any],
     operation: ChangeOperationInput,
+    *,
+    application_mode: ApplicationMode,
+    allow_three_way: bool,
 ) -> OperationOutcome:
     blocks = document.get("content")
     if not isinstance(blocks, list):
@@ -91,37 +105,91 @@ def _apply_operation(
         target = blocks[index]
         if not isinstance(target, dict):
             raise ChangeApplicationError("DOCUMENT_BLOCK_INVALID")
-        if operation.original_hash and scene_node_hash(target) != operation.original_hash:
-            return OperationOutcome(operation.id, "conflicted", "ORIGINAL_HASH_MISMATCH")
-        if operation.original_json is not None and scene_node_hash(
-            operation.original_json
-        ) != scene_node_hash(target):
-            return OperationOutcome(operation.id, "conflicted", "ORIGINAL_CONTENT_MISMATCH")
+        hash_changed = bool(operation.original_hash and scene_node_hash(target) != operation.original_hash)
+        content_changed = bool(
+            operation.original_json is not None
+            and scene_node_hash(operation.original_json) != scene_node_hash(target)
+        )
+        if hash_changed or content_changed:
+            if (
+                allow_three_way
+                and operation.operation_type == "replace_block"
+                and operation.original_json is not None
+                and operation.proposed_json is not None
+            ):
+                try:
+                    merged = merge_block_changes(
+                        operation.original_json,
+                        target,
+                        operation.proposed_json,
+                    )
+                except ThreeWayMergeConflict as exc:
+                    return OperationOutcome(
+                        operation.id,
+                        "conflicted",
+                        exc.reason,
+                    )
+                merged_attrs = merged.get("attrs") or {}
+                if not isinstance(merged_attrs, dict):
+                    raise ChangeApplicationError("PROPOSED_BLOCK_ATTRS_INVALID")
+                merged_attrs["nodeId"] = operation.target_node_id
+                merged["attrs"] = merged_attrs
+                changed = scene_node_hash(target) != scene_node_hash(merged)
+                blocks[index] = merged
+                return OperationOutcome(
+                    operation.id,
+                    "accepted",
+                    application_mode="three_way",
+                    changed=changed,
+                )
+            reason = "ORIGINAL_HASH_MISMATCH" if hash_changed else "ORIGINAL_CONTENT_MISMATCH"
+            return OperationOutcome(operation.id, "conflicted", reason)
         if operation.operation_type == "delete_block":
             blocks.pop(index)
-            return OperationOutcome(operation.id, "accepted")
+            return OperationOutcome(
+                operation.id,
+                "accepted",
+                application_mode=application_mode,
+                changed=True,
+            )
         proposed = _proposed_block(operation)
         proposed_attrs = proposed.get("attrs") or {}
         if not isinstance(proposed_attrs, dict):
             raise ChangeApplicationError("PROPOSED_BLOCK_ATTRS_INVALID")
-        proposed_attrs.setdefault("nodeId", operation.target_node_id)
+        proposed_attrs["nodeId"] = operation.target_node_id
         proposed["attrs"] = proposed_attrs
+        changed = scene_node_hash(target) != scene_node_hash(proposed)
         blocks[index] = proposed
-        return OperationOutcome(operation.id, "accepted")
+        return OperationOutcome(
+            operation.id,
+            "accepted",
+            application_mode=application_mode,
+            changed=changed,
+        )
 
     if operation.operation_type == "insert_before":
         index = _find_top_level_block(blocks, operation.anchor_after_node_id)
         if index is None:
             return OperationOutcome(operation.id, "orphaned", "ANCHOR_NODE_NOT_FOUND")
         blocks.insert(index, _proposed_block(operation))
-        return OperationOutcome(operation.id, "accepted")
+        return OperationOutcome(
+            operation.id,
+            "accepted",
+            application_mode=application_mode,
+            changed=True,
+        )
 
     if operation.operation_type == "insert_after":
         index = _find_top_level_block(blocks, operation.anchor_before_node_id)
         if index is None:
             return OperationOutcome(operation.id, "orphaned", "ANCHOR_NODE_NOT_FOUND")
         blocks.insert(index + 1, _proposed_block(operation))
-        return OperationOutcome(operation.id, "accepted")
+        return OperationOutcome(
+            operation.id,
+            "accepted",
+            application_mode=application_mode,
+            changed=True,
+        )
 
     raise ChangeApplicationError("OPERATION_TYPE_UNSUPPORTED")
 

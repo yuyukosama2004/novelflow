@@ -57,6 +57,30 @@ const OPERATION_STATUS_LABELS: Record<ChangeOperation["status"], string> = {
   orphaned: "目标丢失",
 };
 
+const APPLICATION_MODE_LABELS: Record<
+  Exclude<ChangeOperation["application_mode"], "">,
+  string
+> = {
+  direct: "直接应用",
+  rebased: "安全重放",
+  three_way: "三方合并",
+};
+
+const CONFLICT_REASON_LABELS: Record<string, string> = {
+  TARGET_NODE_NOT_FOUND: "目标段落已不存在",
+  ANCHOR_NODE_NOT_FOUND: "定位锚点已不存在",
+  ORIGINAL_HASH_MISMATCH: "目标段落已被修改",
+  ORIGINAL_CONTENT_MISMATCH: "目标段落内容与提议基线不一致",
+  THREE_WAY_BLOCK_CONTENT_CONFLICT: "作者和 AI 修改了同一内容区域",
+  THREE_WAY_BLOCK_TYPE_CONFLICT: "作者和 AI 对段落类型的修改冲突",
+  THREE_WAY_BLOCK_ATTRIBUTE_CONFLICT: "作者和 AI 对段落格式的修改冲突",
+  THREE_WAY_BLOCK_STRUCTURE_CONFLICT: "段落结构变化无法安全自动合并",
+};
+
+function conflictReasonLabel(reason: string): string {
+  return CONFLICT_REASON_LABELS[reason] ?? reason;
+}
+
 function renderBlock(
   value: Record<string, unknown>,
   emptyLabel: string,
@@ -350,6 +374,9 @@ export function ChangeSetReviewPanel({
                   </p>
                   <span className="text-[11px] text-slate-500">
                     {OPERATION_STATUS_LABELS[operation.status]}
+                    {operation.application_mode
+                      ? ` · ${APPLICATION_MODE_LABELS[operation.application_mode]}`
+                      : ""}
                   </span>
                 </div>
                 <div className="mt-2 grid gap-2">
@@ -368,7 +395,8 @@ export function ChangeSetReviewPanel({
                 </div>
                 {operation.conflict_reason ? (
                   <p className="mt-2 rounded bg-amber-50 p-2 text-amber-800">
-                    无法自动应用：{operation.conflict_reason}
+                    无法自动应用：
+                    {conflictReasonLabel(operation.conflict_reason)}
                   </p>
                 ) : null}
                 {isPending ? (

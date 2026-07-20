@@ -160,6 +160,7 @@ export interface ChangeOperation extends EntityBase {
   status: ChangeOperationStatus;
   accepted_draft_revision: number | null;
   conflict_reason: string;
+  application_mode: "" | "direct" | "rebased" | "three_way";
 }
 
 export interface ChangeSet extends EntityBase {

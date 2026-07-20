@@ -83,6 +83,11 @@ def test_applies_selected_block_operations_in_sequence() -> None:
         "skipped",
         "accepted",
     ]
+    assert [outcome.application_mode for outcome in result.outcomes] == [
+        "direct",
+        "",
+        "direct",
+    ]
     blocks = result.document.content_json["content"]
     assert blocks[0]["attrs"]["nodeId"] == FIRST_ID
     assert len({block["attrs"]["nodeId"] for block in blocks}) == 4
@@ -148,6 +153,107 @@ def test_rebases_unchanged_target_when_working_revision_has_other_edits() -> Non
 
     assert result.document.content_markdown == "rebased\n\nsecond\n\nthird\n\nauthor edit"
     assert result.outcomes[0].status == "accepted"
+    assert result.outcomes[0].application_mode == "rebased"
+
+
+def test_three_way_merges_non_overlapping_changes_to_same_block() -> None:
+    base = base_document()
+    edited = {
+        **base.content_json,
+        "content": [
+            paragraph(FIRST_ID, "author: first"),
+            *base.content_json["content"][1:],
+        ],
+    }
+    result = apply_change_operations(
+        edited,
+        base_document_hash=base.document_hash,
+        allow_rebase=True,
+        operations=[
+            ChangeOperationInput(
+                id="merge",
+                sequence_no=1,
+                operation_type="replace_block",
+                target_node_id=FIRST_ID,
+                original_json=paragraph(FIRST_ID, "first"),
+                original_hash=scene_node_hash(paragraph(FIRST_ID, "first")),
+                proposed_json=paragraph(None, "first revised"),
+            )
+        ],
+    )
+
+    assert result.document.content_markdown == "author: first revised\n\nsecond\n\nthird"
+    assert result.outcomes[0].status == "accepted"
+    assert result.outcomes[0].application_mode == "three_way"
+    assert result.outcomes[0].changed is True
+    assert result.document.content_json["content"][0]["attrs"]["nodeId"] == FIRST_ID
+
+
+def test_three_way_rejects_overlapping_changes_and_changed_delete() -> None:
+    base = base_document()
+    edited = {
+        **base.content_json,
+        "content": [
+            paragraph(FIRST_ID, "author replacement"),
+            *base.content_json["content"][1:],
+        ],
+    }
+    operations = [
+        ChangeOperationInput(
+            id="replace",
+            sequence_no=1,
+            operation_type="replace_block",
+            target_node_id=FIRST_ID,
+            original_json=paragraph(FIRST_ID, "first"),
+            original_hash=scene_node_hash(paragraph(FIRST_ID, "first")),
+            proposed_json=paragraph(None, "model replacement"),
+        ),
+        ChangeOperationInput(
+            id="delete",
+            sequence_no=2,
+            operation_type="delete_block",
+            target_node_id=FIRST_ID,
+            original_json=paragraph(FIRST_ID, "first"),
+            original_hash=scene_node_hash(paragraph(FIRST_ID, "first")),
+        ),
+    ]
+
+    result = apply_change_operations(
+        edited,
+        base_document_hash=base.document_hash,
+        allow_rebase=True,
+        operations=operations,
+    )
+
+    assert result.document.content_markdown == "author replacement\n\nsecond\n\nthird"
+    assert [(item.status, item.reason) for item in result.outcomes] == [
+        ("conflicted", "THREE_WAY_BLOCK_CONTENT_CONFLICT"),
+        ("conflicted", "ORIGINAL_HASH_MISMATCH"),
+    ]
+
+
+def test_replace_preserves_target_identity_and_reports_noop() -> None:
+    base = base_document()
+    proposed = paragraph("99999999-9999-4999-8999-999999999999", "first")
+    result = apply_change_operations(
+        base.content_json,
+        base_document_hash=base.document_hash,
+        operations=[
+            ChangeOperationInput(
+                id="noop",
+                sequence_no=1,
+                operation_type="replace_block",
+                target_node_id=FIRST_ID,
+                original_json=paragraph(FIRST_ID, "first"),
+                original_hash=scene_node_hash(paragraph(FIRST_ID, "first")),
+                proposed_json=proposed,
+            )
+        ],
+    )
+
+    assert result.document.content_json["content"][0]["attrs"]["nodeId"] == FIRST_ID
+    assert result.outcomes[0].status == "accepted"
+    assert result.outcomes[0].changed is False
 
 
 def test_rejects_stale_baseline_and_duplicate_target_identity() -> None:

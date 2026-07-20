@@ -101,6 +101,8 @@ def test_create_and_partially_apply_change_set_to_working_draft(
         "rejected",
     ]
     assert applied["change_set"]["operations"][0]["accepted_draft_revision"] == 1
+    assert applied["change_set"]["operations"][0]["application_mode"] == "direct"
+    assert applied["change_set"]["operations"][1]["application_mode"] == ""
     assert len(versions) == 1
 
 
@@ -243,3 +245,135 @@ def test_pending_operation_rebases_after_an_earlier_partial_accept(
     assert rebased["draft"]["revision"] == 2
     assert rebased["draft"]["content_markdown"] == "first changed\n\nsecond changed"
     assert rebased["change_set"]["status"] == "accepted"
+    assert rebased["change_set"]["operations"][0]["application_mode"] == "direct"
+    assert rebased["change_set"]["operations"][1]["application_mode"] == "rebased"
+
+
+def test_three_way_merges_non_overlapping_author_edit(client: TestClient) -> None:
+    scene = create_scene(client)
+    version = data(
+        client.post(
+            f"/api/scenes/{scene['id']}/versions",
+            json={"content_markdown": "The lantern went dark."},
+        )
+    )
+    block = version["content_json"]["content"][0]
+    change_set = data(
+        client.post(
+            f"/api/scenes/{scene['id']}/change-sets",
+            json={
+                "base_working_revision": 0,
+                "base_version_id": version["id"],
+                "purpose": "rewrite",
+                "operations": [
+                    {
+                        "sequence_no": 1,
+                        "operation_type": "replace_block",
+                        "target_node_id": block["attrs"]["nodeId"],
+                        "original_json": block,
+                        "original_hash": scene_node_hash(block),
+                        "proposed_json": {
+                            "type": "paragraph",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "The lantern went completely dark.",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            },
+        )
+    )
+    edited_block = {
+        **block,
+        "content": [
+            {
+                "type": "text",
+                "text": "Suddenly, the lantern went dark.",
+            }
+        ],
+    }
+    draft = data(
+        client.put(
+            f"/api/scenes/{scene['id']}/working-draft",
+            json={
+                "revision": 0,
+                "content_json": {"type": "doc", "content": [edited_block]},
+                "content_markdown": "Suddenly, the lantern went dark.",
+            },
+        )
+    )
+
+    applied = data(
+        client.post(
+            f"/api/change-sets/{change_set['id']}/apply",
+            json={
+                "expected_draft_revision": draft["revision"],
+                "accept_operation_ids": [change_set["operations"][0]["id"]],
+            },
+        )
+    )
+
+    assert applied["draft"]["revision"] == 2
+    assert applied["draft"]["content_markdown"] == "Suddenly, the lantern went completely dark."
+    operation = applied["change_set"]["operations"][0]
+    assert operation["status"] == "accepted"
+    assert operation["application_mode"] == "three_way"
+    assert operation["conflict_reason"] == ""
+
+
+def test_accept_reevaluates_remaining_operations(client: TestClient) -> None:
+    scene = create_scene(client)
+    version = data(
+        client.post(
+            f"/api/scenes/{scene['id']}/versions",
+            json={"content_markdown": "first\n\nsecond"},
+        )
+    )
+    first = version["content_json"]["content"][0]
+    change_set = data(
+        client.post(
+            f"/api/scenes/{scene['id']}/change-sets",
+            json={
+                "base_working_revision": 0,
+                "base_version_id": version["id"],
+                "purpose": "rewrite",
+                "operations": [
+                    {
+                        "sequence_no": 1,
+                        "operation_type": "insert_after",
+                        "anchor_before_node_id": first["attrs"]["nodeId"],
+                        "proposed_json": {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "after first"}],
+                        },
+                    },
+                    {
+                        "sequence_no": 2,
+                        "operation_type": "delete_block",
+                        "target_node_id": first["attrs"]["nodeId"],
+                        "original_json": first,
+                        "original_hash": scene_node_hash(first),
+                    },
+                ],
+            },
+        )
+    )
+
+    applied = data(
+        client.post(
+            f"/api/change-sets/{change_set['id']}/apply",
+            json={
+                "expected_draft_revision": 0,
+                "accept_operation_ids": [change_set["operations"][1]["id"]],
+            },
+        )
+    )
+
+    assert applied["change_set"]["status"] == "conflicted"
+    assert [(item["status"], item["conflict_reason"]) for item in applied["change_set"]["operations"]] == [
+        ("orphaned", "ANCHOR_NODE_NOT_FOUND"),
+        ("accepted", ""),
+    ]
