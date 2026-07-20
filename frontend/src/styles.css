@@ -68,6 +68,52 @@ select {
   margin: 0.75rem 0;
 }
 
+.tiptap .changeset-preview-original {
+  border-radius: 0.375rem;
+  box-shadow: inset 3px 0 0 #fb7185;
+  background: #fff1f2;
+}
+
+.tiptap .changeset-preview-replace {
+  text-decoration: line-through;
+  text-decoration-color: #e11d48;
+}
+
+.tiptap .changeset-preview-delete {
+  opacity: 0.7;
+  text-decoration: line-through;
+  text-decoration-color: #be123c;
+}
+
+.tiptap .changeset-preview-widget {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0.35rem 0 1rem;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  background: #ecfdf5;
+  color: #14532d;
+  white-space: pre-wrap;
+}
+
+.tiptap .changeset-preview-badge {
+  flex: none;
+  border-radius: 9999px;
+  padding: 0.05rem 0.45rem;
+  background: #d1fae5;
+  color: #047857;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.5rem;
+}
+
+.tiptap .changeset-preview-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 ::selection {
   background: #b0ddd0;
   color: #08372f;

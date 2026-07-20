@@ -21,7 +21,7 @@ import { SceneApprovalPanel } from "./SceneApprovalPanel";
 
 const { editorMock, editorOptions } = vi.hoisted(() => ({
   editorMock: {
-    commands: { setContent: vi.fn() },
+    commands: { setContent: vi.fn(), setChangeSetPreview: vi.fn() },
     getJSON: vi.fn(),
   },
   editorOptions: {

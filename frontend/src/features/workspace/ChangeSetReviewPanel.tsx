@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { Check, RefreshCw, X } from "lucide-react";
@@ -17,6 +17,7 @@ interface Props {
   sceneId: string;
   disabledReason?: string;
   onDraftApplied?: (draft: SceneWorkingDraft) => void;
+  onPreviewChange?: (changeSet: ChangeSet | null) => void;
 }
 
 interface Decision {
@@ -109,6 +110,7 @@ export function ChangeSetReviewPanel({
   sceneId,
   disabledReason = "",
   onDraftApplied,
+  onPreviewChange,
 }: Props) {
   const queryClient = useQueryClient();
   const [selectedChangeSetId, setSelectedChangeSetId] = useState("");
@@ -133,6 +135,17 @@ export function ChangeSetReviewPanel({
     : (changeSets[0]?.id ?? "");
   const activeChangeSet = changeSets.find(
     (item) => item.id === activeChangeSetId,
+  );
+
+  useEffect(() => {
+    onPreviewChange?.(activeChangeSet ?? null);
+  }, [activeChangeSet, onPreviewChange]);
+
+  useEffect(
+    () => () => {
+      onPreviewChange?.(null);
+    },
+    [onPreviewChange, sceneId],
   );
 
   const applyDecision = useMutation({
